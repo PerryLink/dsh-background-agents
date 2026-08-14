@@ -27,6 +27,10 @@ export declare const backgroundAgentEntrySchema: z.ZodObject<{
     createdAt: z.ZodNumber;
     /** Epoch ms of the last folded fact for this agent. */
     lastActiveAt: z.ZodNumber;
+    /** Epoch ms of the idle-sweep archive fact, when the row is parked. */
+    archivedAt: z.ZodOptional<z.ZodNumber>;
+    /** Epoch ms of the latest interrupt request, when one was recorded. */
+    stopRequestedAt: z.ZodOptional<z.ZodNumber>;
 }, "strict", z.ZodTypeAny, {
     agentId: string;
     label: string;
@@ -35,6 +39,8 @@ export declare const backgroundAgentEntrySchema: z.ZodObject<{
     createdAt: number;
     lastActiveAt: number;
     lastMessage?: string | undefined;
+    archivedAt?: number | undefined;
+    stopRequestedAt?: number | undefined;
 }, {
     agentId: string;
     label: string;
@@ -43,6 +49,8 @@ export declare const backgroundAgentEntrySchema: z.ZodObject<{
     createdAt: number;
     lastActiveAt: number;
     lastMessage?: string | undefined;
+    archivedAt?: number | undefined;
+    stopRequestedAt?: number | undefined;
 }>;
 /** The whole wire value of the `backgroundAgents` projection unit. */
 export declare const backgroundAgentsSchema: z.ZodObject<{
@@ -65,6 +73,10 @@ export declare const backgroundAgentsSchema: z.ZodObject<{
         createdAt: z.ZodNumber;
         /** Epoch ms of the last folded fact for this agent. */
         lastActiveAt: z.ZodNumber;
+        /** Epoch ms of the idle-sweep archive fact, when the row is parked. */
+        archivedAt: z.ZodOptional<z.ZodNumber>;
+        /** Epoch ms of the latest interrupt request, when one was recorded. */
+        stopRequestedAt: z.ZodOptional<z.ZodNumber>;
     }, "strict", z.ZodTypeAny, {
         agentId: string;
         label: string;
@@ -73,6 +85,8 @@ export declare const backgroundAgentsSchema: z.ZodObject<{
         createdAt: number;
         lastActiveAt: number;
         lastMessage?: string | undefined;
+        archivedAt?: number | undefined;
+        stopRequestedAt?: number | undefined;
     }, {
         agentId: string;
         label: string;
@@ -81,6 +95,8 @@ export declare const backgroundAgentsSchema: z.ZodObject<{
         createdAt: number;
         lastActiveAt: number;
         lastMessage?: string | undefined;
+        archivedAt?: number | undefined;
+        stopRequestedAt?: number | undefined;
     }>, "many">;
 }, "strict", z.ZodTypeAny, {
     agents: {
@@ -91,6 +107,8 @@ export declare const backgroundAgentsSchema: z.ZodObject<{
         createdAt: number;
         lastActiveAt: number;
         lastMessage?: string | undefined;
+        archivedAt?: number | undefined;
+        stopRequestedAt?: number | undefined;
     }[];
 }, {
     agents: {
@@ -101,6 +119,8 @@ export declare const backgroundAgentsSchema: z.ZodObject<{
         createdAt: number;
         lastActiveAt: number;
         lastMessage?: string | undefined;
+        archivedAt?: number | undefined;
+        stopRequestedAt?: number | undefined;
     }[];
 }>;
 /** One background-agent row of the projection. */

@@ -15,6 +15,7 @@ import { boundContextSummary, createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { Session, SessionEvent, SessionId } from '@deepseek-ai/dsh-session'
 import type { AgentRegistry } from '@deepseek-ai/dsh-agent'
 import { finalAssistantOutput, SubagentError } from '@deepseek-ai/dsh-subagent'
+import { FACT_EVENT } from './events.ts'
 import { isBackgroundAgentsProjection } from './projection-schema.ts'
 import { noticeLine, PLUGIN } from './vocabulary.ts'
 
@@ -207,6 +208,9 @@ export function reportProgress(
   } else {
     parent.inject(message)
   }
+  // The structured progress fact rides the parent log next to the model-
+  // visible notice; the projection folds it instead of parsing the text back.
+  parent.session.append(FACT_EVENT, { kind: 'progress', agentId: child.childId, text: line }, { ignorable: true })
   lifecycle.noteReport(child.childId, now)
   return true
 }
@@ -255,6 +259,10 @@ export function archiveChild(
     } catch (error) {
       ctx.logger('background-agents').warn(`idle archive interrupt failed: ${String(error)}`)
     }
+  }
+  if (parent !== undefined) {
+    // The structured archived fact rides the parent log next to the notice.
+    parent.session.append(FACT_EVENT, { kind: 'archived', agentId: child.childId }, { ignorable: true })
   }
   lifecycle.archive(child.childId)
 }

@@ -90,6 +90,14 @@ describe('dsh-background-agents tools', () => {
     })
     const child = ctx.agents.get(SessionId(started.agentId))
     expect(child).toBeDefined()
+    // The structured registered fact rides the parent log next to the replay
+    // meta, stamped ignorable for readers that do not know the type.
+    const fact = parent.session.events.find(event => event.type === 'background-agents/fact')
+    expect(fact).toMatchObject({
+      type: 'background-agents/fact',
+      ignorable: true,
+      data: { kind: 'registered', agentId: started.agentId, label: 'write one line' },
+    })
   })
 
   it('derives the label from the optional argument and bounds it by maxLabelChars', async () => {
@@ -108,6 +116,19 @@ describe('dsh-background-agents tools', () => {
     const second = await callTool(ctx, 'background_agent', { task: 'second' }, parent)
     expect(second.isError).toBe(true)
     expect(text(second)).toContain('maxBackgroundAgents=1')
+  })
+
+  it('serializes concurrent starts so the cap cannot be double-passed', async () => {
+    const { ctx, parent } = await setup({ maxBackgroundAgents: 1 })
+    const settled = await Promise.allSettled([
+      callTool(ctx, 'background_agent', { task: 'first' }, parent),
+      callTool(ctx, 'background_agent', { task: 'second' }, parent),
+    ])
+    const errors = settled.filter(result => result.status === 'fulfilled' && result.value.isError)
+    const started = settled.filter(result => result.status === 'fulfilled' && !result.value.isError)
+    expect(started).toHaveLength(1)
+    expect(errors).toHaveLength(1)
+    expect(text((errors[0] as PromiseFulfilledResult<{ content: { type: string; text?: string }[] }>).value)).toContain('maxBackgroundAgents=1')
   })
 
   it('rejects a start when the configured provider cannot continue', async () => {
@@ -188,11 +209,15 @@ describe('dsh-background-agents tools', () => {
     const value = valueOf<{ kind: string; agents: Array<Record<string, unknown>> }>(listing)
     expect(value.kind).toBe('listing')
     expect(value.agents).toHaveLength(1)
-    expect(value.agents[0]).toEqual({
+    // The structured registered fact lands even for direct tool execution;
+    // the child then settles (no adapter), so the row reads the settled state
+    // with the initial message counted.
+    expect(value.agents[0]).toMatchObject({
       agentId: startedValue.agentId,
       label: 'writer',
       mode: 'continuable',
-      activity: 'ready',
+      activity: 'settled',
+      messageCount: 1,
     })
   })
 
@@ -257,17 +282,49 @@ describe('dsh-background-agents tools', () => {
 
     const result = await callTool(ctx, 'bg_result', { agent_id: childId }, parent)
     expect(result.isError).toBe(false)
-    // Direct tool execution appends no parent turn, so the projection fact is
-    // absent and the activity falls back to the live catalog view ('ready').
+    // The structured registered fact lands even for direct tool execution and
+    // the official settled account folds over it, so the activity reads the
+    // durable settled state instead of the live-catalog fallback.
     expect(valueOf<{ agentId: string; activity: string; text?: string }>(result)).toEqual({
       agentId: childId,
-      activity: 'ready',
+      activity: 'settled',
       text: 'final answer text',
     })
 
     const ghost = await callTool(ctx, 'bg_result', { agent_id: 'ghost-child' }, parent)
     expect(ghost.isError).toBe(true)
     expect(text(ghost)).toContain('not one of this conversation\'s tracked children')
+  })
+
+  it('bg_result ellipsizes over-long text by resultMaxChars and flags truncation', async () => {
+    const { ctx, parent } = await setup({ resultMaxChars: 100 })
+    ctx.llm.registerAdapter(['mock'], new MockAdapter([textResponse('a'.repeat(5000))]))
+    const started = await callTool(ctx, 'background_agent', { task: 'long answer' }, parent)
+    expect(started.isError).toBe(false)
+    const childId = valueOf<{ agentId: string }>(started).agentId
+    await vi.waitFor(() => { expect(ctx.agents.get(SessionId(childId))).toBeUndefined() }, { timeout: 5_000 })
+
+    const result = await callTool(ctx, 'bg_result', { agent_id: childId }, parent)
+    expect(result.isError).toBe(false)
+    const value = valueOf<{ agentId: string; activity: string; text?: string; truncated?: boolean }>(result)
+    expect(value.truncated).toBe(true)
+    expect(value.text).toHaveLength(100)
+    expect(value.text!.endsWith('…')).toBe(true)
+  })
+
+  it('fails loud at load when the configured provider is registered but cannot continue', async () => {
+    const ctx = new Context()
+    await mountAgentLoopTestDependencies(ctx)
+    await ctx.plugin(AgentLoop, { agents: [] })
+    await ctx.plugin(SessionProjectionRegistry)
+    await ctx.plugin(SubagentRuntime)
+    ctx.subagents.registerProvider({
+      name: 'one-shot-only',
+      capabilities: { outputSchema: false, depthLimit: false, toolFilter: false, persona: false },
+      inheritsParentContext: false,
+      start: async () => { throw new Error('unused') },
+    })
+    await expect(ctx.plugin(plugin, { provider: 'one-shot-only' })).rejects.toThrow(/cannot serve continuable children/)
   })
 
   it('lists the descendant tree with parentId and depth when recursive', async () => {
@@ -331,6 +388,10 @@ describe('dsh-background-agents tools', () => {
     expect(result.isError).toBe(false)
     expect(result.value).toEqual({ outcome: 'interrupt-requested', agentId: started.childId })
     expect(cancelSpy).toHaveBeenCalledExactlyOnceWith({ kind: 'parent' }, { keepInbox: true })
+    expect(parent.session.events.some(event =>
+      event.type === 'background-agents/fact'
+      && event.data.kind === 'stop'
+      && event.data.agentId === started.childId)).toBe(true)
     await vi.waitFor(() => { expect(ctx.agents.get(started.childId)).toBeUndefined() }, { timeout: 5_000 })
   })
 

@@ -29,6 +29,10 @@ export const backgroundAgentEntrySchema = z.object({
   createdAt: z.number().int().nonnegative(),
   /** Epoch ms of the last folded fact for this agent. */
   lastActiveAt: z.number().int().nonnegative(),
+  /** Epoch ms of the idle-sweep archive fact, when the row is parked. */
+  archivedAt: z.number().int().nonnegative().optional(),
+  /** Epoch ms of the latest interrupt request, when one was recorded. */
+  stopRequestedAt: z.number().int().nonnegative().optional(),
 }).strict()
 
 /** The whole wire value of the `backgroundAgents` projection unit. */

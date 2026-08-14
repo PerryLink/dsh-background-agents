@@ -21,7 +21,12 @@ import { fileURLToPath } from 'node:url'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const pluginRoot = resolve(here, '..')
-const harnessRoot = resolve(pluginRoot, '..', '..', '..')
+// CI clones the harness to an arbitrary location and maps paths through
+// DSH_HARNESS_ROOT; local development keeps the sibling-checkout default
+// (three levels above the plugin directory).
+const harnessRoot = process.env.DSH_HARNESS_ROOT
+  ? resolve(process.env.DSH_HARNESS_ROOT)
+  : resolve(pluginRoot, '..', '..', '..')
 
 /** Recursively collect `name -> package dir` for every scoped harness package. */
 function collectHarnessPackages() {

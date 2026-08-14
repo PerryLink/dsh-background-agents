@@ -178,4 +178,91 @@ describe('backgroundAgents projection', () => {
     const rows = fold([toolResultEvent({ plugin: PLUGIN, action: 'stop', agentId: 'ghost' }, 40)])
     expect(rows).toEqual([])
   })
+
+  it('folds structured fact events into rows with the stateVersion bumped for the new semantics', () => {
+    expect(unit.stateVersion).toBe(2)
+    const rows = fold([
+      event('background-agents/fact', { kind: 'registered', agentId: 'child-1', label: 'writer' }, 10),
+    ])
+    expect(rows).toEqual([{
+      agentId: 'child-1',
+      label: 'writer',
+      activity: 'running',
+      messageCount: 1,
+      createdAt: rows[0]!.createdAt,
+      lastActiveAt: rows[0]!.lastActiveAt,
+    }])
+  })
+
+  it('folds the dual write path exactly once per fact', () => {
+    // The v0.3.0 write path appends both the structured fact and the legacy
+    // channel for the same fact: the fold must count each once.
+    const rows = fold([
+      event('background-agents/fact', { kind: 'registered', agentId: 'child-1', label: 'writer' }, 10),
+      toolResultEvent({ plugin: PLUGIN, action: 'registered', agentId: 'child-1', label: 'writer' }, 11),
+      event('background-agents/fact', { kind: 'message', agentId: 'child-1', messageId: 'm1' }, 20),
+      toolResultEvent({ plugin: PLUGIN, action: 'message', agentId: 'child-1', messageId: 'm1' }, 21),
+      event('background-agents/fact', { kind: 'progress', agentId: 'child-1', text: 'wrote line 1' }, 30),
+      userMessageEvent(
+        { kind: 'plugin', plugin: PLUGIN, form: 'notice', summary: 'writer progress' },
+        noticeLine('child-1', 'progress', 'wrote line 1'),
+        31,
+      ),
+    ])
+    expect(rows).toHaveLength(1)
+    expect(rows[0]).toMatchObject({
+      agentId: 'child-1',
+      messageCount: 2,
+      activity: 'running',
+      lastMessage: 'wrote line 1',
+      lastActiveAt: 30,
+    })
+  })
+
+  it('folds stop and archived facts with their timestamps', () => {
+    const rows = fold([
+      event('background-agents/fact', { kind: 'registered', agentId: 'child-1', label: 'writer' }, 10),
+      event('background-agents/fact', { kind: 'stop', agentId: 'child-1' }, 40),
+      event('background-agents/fact', { kind: 'archived', agentId: 'child-1' }, 60),
+    ])
+    expect(rows[0]).toMatchObject({
+      activity: 'archived',
+      stopRequestedAt: 40,
+      archivedAt: 60,
+      lastActiveAt: 60,
+    })
+  })
+
+  it('ignores progress, stop, and archived facts for unknown children', () => {
+    const rows = fold([
+      event('background-agents/fact', { kind: 'progress', agentId: 'ghost', text: 'x' }, 10),
+      event('background-agents/fact', { kind: 'stop', agentId: 'ghost' }, 20),
+      event('background-agents/fact', { kind: 'archived', agentId: 'ghost' }, 30),
+    ])
+    expect(rows).toEqual([])
+  })
+
+  it('folds the official settled account even for event-provenance rows', () => {
+    const rows = fold([
+      event('background-agents/fact', { kind: 'registered', agentId: 'child-1', label: 'writer' }, 10),
+      userMessageEvent(
+        { kind: 'subagent-settled', form: 'notice', summary: 'child settled with a final answer', senderSessionId: SessionId('child-1') },
+        'settled notice',
+        50,
+      ),
+    ])
+    expect(rows[0]).toMatchObject({ activity: 'inactive', lastMessage: 'child settled with a final answer' })
+  })
+
+  it('flips a legacy row to event provenance without double-counting later deliveries', () => {
+    // A session upgraded mid-flight: the registration rode the legacy meta,
+    // the follow-ups ride the structured events. The count continues from
+    // the legacy fold instead of restarting.
+    const rows = fold([
+      toolResultEvent({ plugin: PLUGIN, action: 'registered', agentId: 'child-1', label: 'writer' }, 10),
+      event('background-agents/fact', { kind: 'message', agentId: 'child-1', messageId: 'm1' }, 20),
+      toolResultEvent({ plugin: PLUGIN, action: 'message', agentId: 'child-1', messageId: 'm1' }, 21),
+    ])
+    expect(rows[0]).toMatchObject({ messageCount: 2, lastActiveAt: 20 })
+  })
 })

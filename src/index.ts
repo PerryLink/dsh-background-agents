@@ -43,6 +43,8 @@ export interface Config {
   reportThrottleMs?: number
   /** Hard cap on the injected progress-line text (ellipsized). */
   reportSummaryMaxChars?: number
+  /** Hard cap on the bg_result text returned to the parent (ellipsized). */
+  resultMaxChars?: number
   /** Hard cap on non-archived background agents per parent session. */
   maxBackgroundAgents?: number
   /** Idle window after which the sweep archives a quiet child (`>= 1`). */
@@ -77,6 +79,7 @@ export const DEFAULTS = {
   autoReport: true,
   reportThrottleMs: 15_000,
   reportSummaryMaxChars: 300,
+  resultMaxChars: 4_000,
   maxBackgroundAgents: 4,
   idleTimeoutMinutes: 120,
   idleSweepIntervalMs: 60_000,
@@ -89,6 +92,8 @@ export const Config: Schema<Config> = Schema.object({
   autoReport: Schema.boolean().default(DEFAULTS.autoReport),
   reportThrottleMs: Schema.natural().max(Number.MAX_SAFE_INTEGER).default(DEFAULTS.reportThrottleMs),
   reportSummaryMaxChars: Schema.natural().max(Number.MAX_SAFE_INTEGER).default(DEFAULTS.reportSummaryMaxChars),
+  // 0 would erase every bg_result answer; the schema forbids it.
+  resultMaxChars: Schema.natural().min(1).max(Number.MAX_SAFE_INTEGER).default(DEFAULTS.resultMaxChars),
   maxBackgroundAgents: Schema.natural().max(Number.MAX_SAFE_INTEGER).default(DEFAULTS.maxBackgroundAgents),
   // 0 would archive any quiet child on the next sweep pass; the schema forbids it.
   idleTimeoutMinutes: Schema.natural().min(1).max(Number.MAX_SAFE_INTEGER).default(DEFAULTS.idleTimeoutMinutes),
@@ -118,6 +123,7 @@ export function apply(ctx: Context, config: Config): void {
     autoReport: config.autoReport ?? DEFAULTS.autoReport,
     reportThrottleMs: config.reportThrottleMs ?? DEFAULTS.reportThrottleMs,
     reportSummaryMaxChars: config.reportSummaryMaxChars ?? DEFAULTS.reportSummaryMaxChars,
+    resultMaxChars: config.resultMaxChars ?? DEFAULTS.resultMaxChars,
     maxBackgroundAgents: config.maxBackgroundAgents ?? DEFAULTS.maxBackgroundAgents,
     idleTimeoutMinutes: config.idleTimeoutMinutes ?? DEFAULTS.idleTimeoutMinutes,
     idleSweepIntervalMs: config.idleSweepIntervalMs ?? DEFAULTS.idleSweepIntervalMs,
@@ -130,6 +136,20 @@ export function apply(ctx: Context, config: Config): void {
   }
   if (policy.provider.trim() === '') {
     throw new Error('dsh-background-agents: `provider` must name a registered subagent provider')
+  }
+  // Misconfiguration fails loud at load when it is already decidable: a
+  // registered provider without the continuable-creation capability can never
+  // serve background_agent. An absent provider may mount later (the same
+  // pattern as tool-subagent), so it only logs.
+  const registeredProvider = ctx.subagents.getProvider(policy.provider)
+  if (registeredProvider !== undefined && registeredProvider.prepareContinuable === undefined) {
+    throw new Error(
+      `dsh-background-agents: subagent provider "${policy.provider}" cannot serve continuable children `
+      + '(no prepareContinuable capability)',
+    )
+  }
+  if (registeredProvider === undefined) {
+    ctx.logger('background-agents').info(`subagent provider "${policy.provider}" not registered yet; background_agent will fail until it appears`)
   }
 
   const lifecycle = new BackgroundAgentLifecycle()

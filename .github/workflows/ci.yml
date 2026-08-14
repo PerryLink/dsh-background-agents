@@ -1,0 +1,89 @@
+# Continuous integration: typecheck + tests against the pinned harness
+# commit (HARNESS_COMMIT), the committed-lib build-drift gate, and the
+# pack-and-install smoke. Tag pushes that pass also publish to npm when the
+# repository owns an NPM_TOKEN secret.
+name: ci
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+
+jobs:
+  test:
+    name: typecheck + test + build drift + pack smoke
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Read pinned harness commit
+        id: harness
+        run: echo "commit=$(cat HARNESS_COMMIT)" >> "$GITHUB_OUTPUT"
+      - name: Cache harness checkout and build
+        id: harness-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            /tmp/dsh-harness
+          key: harness-${{ steps.harness.outputs.commit }}
+      - name: Checkout harness
+        if: steps.harness-cache.outputs.cache-hit != 'true'
+        run: |
+          git clone --filter=blob:none --no-checkout https://github.com/deepseek-ai/deepseek-harness.git /tmp/dsh-harness
+          git -C /tmp/dsh-harness checkout "$(cat HARNESS_COMMIT)"
+      - name: Install and build harness
+        if: steps.harness-cache.outputs.cache-hit != 'true'
+        working-directory: /tmp/dsh-harness
+        run: |
+          corepack enable
+          pnpm install --frozen-lockfile
+          pnpm run build:lib
+      - name: Install plugin and map harness paths
+        run: |
+          corepack enable
+          pnpm install --frozen-lockfile
+          DSH_HARNESS_ROOT=/tmp/dsh-harness pnpm run gen-aliases
+      - name: Typecheck
+        run: pnpm run typecheck
+      - name: Test
+        run: pnpm test
+      - name: Build drift gate (lib/ must match the committed sources)
+        run: |
+          pnpm run build
+          git diff --exit-code lib/
+      - name: Pack smoke
+        run: DSH_HARNESS_ROOT=/tmp/dsh-harness node scripts/pack-smoke.mjs
+
+  publish:
+    name: publish to npm
+    needs: test
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+      - name: Build and publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          corepack enable
+          pnpm install --frozen-lockfile
+          pnpm run build
+          if [ -z "$NODE_AUTH_TOKEN" ]; then
+            echo "NPM_TOKEN is not configured on this repository; skipping the npm publish (git install stays the primary channel)"
+          else
+            npm publish --access public
+          fi

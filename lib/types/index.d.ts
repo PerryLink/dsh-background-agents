@@ -36,6 +36,8 @@ export interface Config {
     reportThrottleMs?: number;
     /** Hard cap on the injected progress-line text (ellipsized). */
     reportSummaryMaxChars?: number;
+    /** Hard cap on the bg_result text returned to the parent (ellipsized). */
+    resultMaxChars?: number;
     /** Hard cap on non-archived background agents per parent session. */
     maxBackgroundAgents?: number;
     /** Idle window after which the sweep archives a quiet child (`>= 1`). */
@@ -69,6 +71,7 @@ export declare const DEFAULTS: {
     readonly autoReport: true;
     readonly reportThrottleMs: 15000;
     readonly reportSummaryMaxChars: 300;
+    readonly resultMaxChars: 4000;
     readonly maxBackgroundAgents: 4;
     readonly idleTimeoutMinutes: 120;
     readonly idleSweepIntervalMs: 60000;

@@ -91,7 +91,7 @@ function Row({ row, t, now, busy, composing, draft, onDraft, onOpen, onStop, onC
         <button
           type="button"
           className={css.action}
-          disabled={busy || row.status !== 'running'}
+          disabled={busy || row.status === 'archived'}
           onClick={onStop}
         >
           {t('row.stop')}

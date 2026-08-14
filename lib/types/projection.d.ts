@@ -11,9 +11,21 @@
  */
 import type { ProjectionDefinition } from '@deepseek-ai/dsh-session-projection';
 import { type BackgroundAgentEntry, type BackgroundAgentsProjection } from './projection-schema.ts';
-/** Mutable fold state; plain JSON so the persisted projection cache can store it. */
+/**
+ * Mutable fold state; plain JSON so the persisted projection cache can store
+ * it. `source` is fold-internal only (never in the wire value): `legacy`
+ * entries were built from the pre-event channels (`tool/result` replay
+ * metadata and notice text), `event` entries from the structured
+ * `background-agents/fact` records. Once the structured channel owns a row
+ * the legacy folds stop for it, so a log that carries both channels (the
+ * v0.3.0 write path keeps writing both) never double-counts.
+ */
 interface State {
-    entries: BackgroundAgentEntry[];
+    entries: StateEntry[];
+}
+/** One fold row plus its channel provenance. */
+interface StateEntry extends BackgroundAgentEntry {
+    readonly source: 'legacy' | 'event';
 }
 /**
  * The registered projection unit. `stateVersion` bumps whenever the fold

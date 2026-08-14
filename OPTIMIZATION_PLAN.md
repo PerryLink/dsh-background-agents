@@ -29,28 +29,28 @@
 | 版本 | 内容 | 状态 |
 |---|---|---|
 | **v0.2.0（已发布）** | 阶段 0：透传 toolFilter/persona/max_depth + childModel/childProvider、bg_result、reportDelivery、bg_list 递归、面板发消息、jsdom 面板测试 | ✅ 完成 |
-| **v0.3.0** | 阶段 A（工程守护）+ 阶段 B（插件自有 ignorable 事件通道）+ 阶段 C（产品增强） | 执行中 |
+| **v0.3.0** | 阶段 A（工程守护）+ 阶段 B（插件自有 ignorable 事件通道）+ 阶段 C（产品增强） | ✅ 完成 |
 
 ### 执行日志
 
 - [x] 0-1 重建 `lib/` 并随 v0.2.0 提交（git 安装免构建的前提）
 - [x] 0-2 package.json → `0.2.0` + `packageManager` 字段；tag `v0.2.0` 并推送（README 指向该 tag）
 - [x] 0-3 `OPTIMIZATION_PLAN.md` 重写为 v2 并记录执行状态；`ARCHITECTURE.md` 补 v0.2.0 事实
-- [ ] A-1 cap 竞态：`background_agent` per-parent 互斥（count+start 同链）
-- [ ] A-2 CI：`.github/workflows/ci.yml` + `HARNESS_COMMIT` pin + `gen-aliases` 支持 `DSH_HARNESS_ROOT`
-- [ ] A-3 `scripts/pack-smoke.mjs`：pack → 内容检查 →（有 harness 时）干净 profile 安装 + dump-config 断言
-- [ ] A-4 暗色主题 fallback：`BackgroundAgentsAction.module.css` 硬编码色改 `light-dark()`
-- [ ] A-5 停止按钮语义：`disabled = busy || archived`（与 `bg_stop` no-op 语义对齐）
-- [ ] A-6 面板词典补 es/pt/hi
-- [ ] A-7 npm 发布 workflow（tag 推送触发，`NPM_TOKEN` 缺失则跳过）
-- [ ] B-1 `background-agents/fact` 插件自有 ignorable 事件（`src/events.ts` 声明合并 + 四工具/lifecycle 双写）
-- [ ] B-2 投影双通道折叠：事件事实优先，legacy 通道兼容旧日志（entry 级 `source` 判别，`stateVersion` → 2）
-- [ ] B-3 投影字段扩展 `archivedAt`/`stopRequestedAt`；`ARCHITECTURE.md` 重写硬约束章节
-- [ ] C-1 `bg_result` 文本上限 `resultMaxChars`（`truncated` 标志）
-- [ ] C-2 cap 语义文档化：非归档 continuable 子共享会话级预算（含核心工具创建的）
-- [ ] C-3 provider 加载期校验：已注册但缺 `prepareContinuable` → 加载期响亮失败
-- [ ] C-4 五语言 README 增「与内置 subagent 工具的关系」定位表
-- [ ] 收尾 版本 → `0.3.0`、重建 `lib/`、全量测试/typecheck、tag `v0.3.0` 并推送
+- [x] A-1 cap 竞态：`background_agent` per-parent 互斥（count+start 同链）＋并发测试（`maxBackgroundAgents:1` 双并发恰一成功）
+- [x] A-2 CI：`.github/workflows/ci.yml` + `HARNESS_COMMIT` pin（`8c690c7cf885`）+ `gen-aliases` 支持 `DSH_HARNESS_ROOT`
+- [x] A-3 `scripts/pack-smoke.mjs`：pack → 离线产物门 →（有 harness 时）干净 profile 安装 + dump-config 断言
+- [x] A-4 暗色主题 fallback：`light-dark()`/`color-mix` 替换硬编码色
+- [x] A-5 停止按钮语义：`disabled = busy || archived`（与 `bg_stop` no-op 语义对齐），action.spec 覆盖四态
+- [x] A-6 面板词典 es/pt/hi：**不可实施**——harness 客户端 `LOCALE_IDS = ['zh','en']`（`packages/client/locale/src/locale-settings.ts`），第三方词典永不可选中；已回退并在 `locales.ts` 注明 seam 约束，五语言 README 保留
+- [x] A-7 npm 发布 workflow（tag 推送触发，`NPM_TOKEN` 缺失则跳过）
+- [x] B-1 `background-agents/fact` 插件自有 ignorable 事件（`src/events.ts` 声明合并进 `@deepseek-ai/dsh-session/types` + 四工具/lifecycle 双写）
+- [x] B-2 投影双通道折叠：事件事实优先，legacy 通道兼容旧日志（entry 级 `source` 判别，`stateVersion` → 2）
+- [x] B-3 投影字段扩展 `archivedAt`/`stopRequestedAt`；`ARCHITECTURE.md` 重写硬约束章节
+- [x] C-1 `bg_result` 文本上限 `resultMaxChars`（默认 4000，`truncated` 标志）
+- [x] C-2 cap 语义文档化：非归档 continuable 子共享会话级预算（含核心工具创建的）
+- [x] C-3 provider 加载期校验：已注册但缺 `prepareContinuable` → 加载期响亮失败
+- [x] C-4 五语言 README 增「与内置 subagent 工具的关系」定位表
+- [x] 收尾 版本 → `0.3.0`、重建 `lib/`、全量测试/typecheck、tag `v0.3.0` 并推送
 
 ---
 
@@ -88,10 +88,12 @@
 - **改法**：`BackgroundAgentsAction.tsx` `disabled={busy || row.status !== 'running'}` → `disabled={busy || row.status === 'archived'}`，与 `bg_stop` 已 settle 也接受的语义对齐；`action.spec.tsx` 相应断言。
 - **风险**：无。
 
-### A-6 面板词典 es/pt/hi 【S】
+### A-6 面板词典 es/pt/hi 【不可实施，已记录】
 
-- **改法**：`locales.ts` 增 `es`/`pt`/`hi` 三个字典（键与 zh 一致），`client/index.ts` 注册 `{ zh, en, es, pt, hi }`。
-- **验收**：类型检查键齐（`Record<BackgroundAgentsKey, string>` 已强制）。
+- **证据**：harness 客户端 locale 注册表只随附 `LOCALE_IDS = ['zh', 'en']`（`packages/client/locale/src/locale-settings.ts`），`register()` 类型签名要求 `Record<LocaleId, ...>`；注册第三方语言永不进入可选集合。
+- **改法**：不注册死词典；`locales.ts` 注明 seam 约束，五语言 README（文档面）保留。
+- **验收**：类型检查通过；无死代码。
+- **风险**：无。
 
 ### A-7 npm 发布 workflow 【S】
 
@@ -155,10 +157,11 @@
 | 定时唤醒/调度 | ⏸ 边界决定 | 官方 schedule seam 存在但 README 已划界给 dsh-automation。 |
 | 跨机器 agent | ❌ | 与官方 subagent 激活契约冲突，明确 out of scope。 |
 | 面板树形渲染 | ⏸ 可选 | 全局面板聚合所有父会话，树渲染边际价值低。 |
+| 面板词典 es/pt/hi | ❌ 不可实施 | harness 客户端 `LOCALE_IDS = ['zh','en']`，第三方语言永不可选中；待 harness 扩展后再开。 |
 
 ## 6. 决策记录
 
 1. **阶段 B 纳入路线图**：✅ 已确认（用户拍板）。
 2. **npm 发布**：CI 门控发布（tag 推送 + `NPM_TOKEN`），git 安装维持主通道；本仓库只提交 workflow，实际发布由 owner 配置 token 后自动发生。
 3. **cap 计数口径**：维持"所有非归档 continuable 直属子共享预算"，README 明示（C-2）。
-4. **版本节奏**：A+B+C 合并为一次 v0.3.0 发布（两个提交：A 系列一个、B+C 一个），避免过多中间 tag。
+4. **版本节奏**：A+B+C 合并为一次 v0.3.0 发布；因 `tools.ts`/`tools.spec.ts` 同时承载 A 与 C 的改动、无法按文件干净拆分，实际落地为单一提交（比计划的"两个提交"更诚实）。

@@ -53,5 +53,10 @@ export const en: Record<BackgroundAgentsKey, string> = {
   'time.years': '{n}y ago',
 }
 
+// NOTE: no es/pt/hi dictionaries here by seam constraint — the harness
+// client locale registry ships exactly `zh`/`en` as LocaleIds
+// (`packages/client/locale/src/locale-settings.ts`), so a registered third
+// locale would never be selectable. The five-language READMEs stay.
+
 /** Key domain of the `background-agents` namespace (zh is the source of truth). */
 export type BackgroundAgentsKey = keyof typeof zh

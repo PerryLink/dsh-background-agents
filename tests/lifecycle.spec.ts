@@ -26,6 +26,7 @@ interface FakeParent {
   readonly id: SessionId
   readonly inject: ReturnType<typeof vi.fn>
   readonly followup: ReturnType<typeof vi.fn>
+  readonly session: { readonly append: ReturnType<typeof vi.fn> }
 }
 
 function makeAgents(parent: FakeParent | undefined): LiveAgents {
@@ -62,7 +63,7 @@ describe('reportProgress throttle and bounds', () => {
     const lifecycle = new BackgroundAgentLifecycle()
     lifecycle.register(childId, parentId, 'writer', 0)
     const inject = vi.fn()
-    const parent: FakeParent = { id: parentId, inject, followup: vi.fn() }
+    const parent: FakeParent = { id: parentId, inject, followup: vi.fn(), session: { append: vi.fn() } }
     const agents = makeAgents(parent)
     const sessions = makeSessions(childSessionWithAssistant('wrote line 1'))
     const child = lifecycle.get(childId)!
@@ -78,13 +79,18 @@ describe('reportProgress throttle and bounds', () => {
     const head = parseNotice(message.content[0].text)
     expect(head).toMatchObject({ agentId: childId, kind: 'progress' })
     expect(head!.text).toContain('wrote line 1')
+    expect(parent.session.append).toHaveBeenCalledExactlyOnceWith(
+      'background-agents/fact',
+      { kind: 'progress', agentId: childId, text: expect.stringContaining('wrote line 1') },
+      { ignorable: true },
+    )
   })
 
   it('emits again after the throttle window elapses', () => {
     const lifecycle = new BackgroundAgentLifecycle()
     lifecycle.register(childId, parentId, 'writer', 0)
     const inject = vi.fn()
-    const parent: FakeParent = { id: parentId, inject, followup: vi.fn() }
+    const parent: FakeParent = { id: parentId, inject, followup: vi.fn(), session: { append: vi.fn() } }
     const agents = makeAgents(parent)
     const sessions = makeSessions(childSessionWithAssistant('first'))
     const child = lifecycle.get(childId)!
@@ -97,7 +103,7 @@ describe('reportProgress throttle and bounds', () => {
     const lifecycle = new BackgroundAgentLifecycle()
     lifecycle.register(childId, parentId, 'writer', 0)
     const inject = vi.fn()
-    const parent: FakeParent = { id: parentId, inject, followup: vi.fn() }
+    const parent: FakeParent = { id: parentId, inject, followup: vi.fn(), session: { append: vi.fn() } }
     const child = lifecycle.get(childId)!
     expect(reportProgress(makeAgents(parent), makeSessions(childSessionWithAssistant('x')), policy({ autoReport: false }), lifecycle, child, 10_000)).toBe(false)
     expect(inject).not.toHaveBeenCalled()
@@ -108,7 +114,7 @@ describe('reportProgress throttle and bounds', () => {
     lifecycle.register(childId, parentId, 'writer', 0)
     const inject = vi.fn()
     const followup = vi.fn()
-    const parent: FakeParent = { id: parentId, inject, followup }
+    const parent: FakeParent = { id: parentId, inject, followup, session: { append: vi.fn() } }
     const child = lifecycle.get(childId)!
 
     expect(reportProgress(makeAgents(parent), makeSessions(childSessionWithAssistant('wake line')), policy({ reportDelivery: 'wakeup' }), lifecycle, child, 10_000)).toBe(true)
@@ -117,6 +123,11 @@ describe('reportProgress throttle and bounds', () => {
     const head = parseNotice(followup.mock.calls[0]![0].content[0].text)
     expect(head).toMatchObject({ agentId: childId, kind: 'progress' })
     expect(head!.text).toContain('wake line')
+    expect(parent.session.append).toHaveBeenCalledExactlyOnceWith(
+      'background-agents/fact',
+      { kind: 'progress', agentId: childId, text: expect.stringContaining('wake line') },
+      { ignorable: true },
+    )
   })
 
   it('stays silent when the parent agent is gone', () => {
@@ -130,7 +141,7 @@ describe('reportProgress throttle and bounds', () => {
     const lifecycle = new BackgroundAgentLifecycle()
     lifecycle.register(childId, parentId, 'writer', 0)
     const inject = vi.fn()
-    const parent: FakeParent = { id: parentId, inject, followup: vi.fn() }
+    const parent: FakeParent = { id: parentId, inject, followup: vi.fn(), session: { append: vi.fn() } }
     const child = lifecycle.get(childId)!
     reportProgress(makeAgents(parent), makeSessions(childSessionWithAssistant('a'.repeat(500))), policy({ reportSummaryMaxChars: 50 }), lifecycle, child, 0)
     const head = parseNotice(inject.mock.calls[0]![0].content[0].text)!
@@ -152,7 +163,7 @@ describe('idle sweep', () => {
     const lifecycle = new BackgroundAgentLifecycle()
     lifecycle.register(childId, parentId, 'writer', 0)
     const inject = vi.fn()
-    const parent: FakeParent = { id: parentId, inject, followup: vi.fn() }
+    const parent: FakeParent = { id: parentId, inject, followup: vi.fn(), session: { append: vi.fn() } }
     const interrupt = vi.fn()
     // The live child sits idle (not running): eligible for archiving.
     const childAgent = { id: childId, status: 'idle' }
@@ -165,13 +176,18 @@ describe('idle sweep', () => {
     const message = inject.mock.calls[0]![0]
     const head = parseNotice(message.content[0].text)
     expect(head).toMatchObject({ agentId: childId, kind: 'archived' })
+    expect(parent.session.append).toHaveBeenCalledExactlyOnceWith(
+      'background-agents/fact',
+      { kind: 'archived', agentId: childId },
+      { ignorable: true },
+    )
   })
 
   it('leaves a mid-turn child alone even past the idle window', () => {
     const lifecycle = new BackgroundAgentLifecycle()
     lifecycle.register(childId, parentId, 'writer', 0)
     const inject = vi.fn()
-    const parent: FakeParent = { id: parentId, inject, followup: vi.fn() }
+    const parent: FakeParent = { id: parentId, inject, followup: vi.fn(), session: { append: vi.fn() } }
     const interrupt = vi.fn()
     const childAgent = { id: childId, status: 'running' }
     const agentFace = { get: (id: SessionId) => (id === childId ? childAgent : parent) } as unknown as LiveAgents

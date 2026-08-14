@@ -22,6 +22,8 @@ export interface ToolConfig {
     readonly maxBackgroundAgents: number;
     /** Display-label cap; longer labels ellipsize. */
     readonly maxLabelChars: number;
+    /** Hard cap on the bg_result text; longer answers ellipsize with a truncated flag. */
+    readonly resultMaxChars: number;
     /** Provider route for child model requests; undefined inherits the parent's. */
     readonly childProvider: string | undefined;
     /** Model id for child model requests; undefined inherits the parent's. */

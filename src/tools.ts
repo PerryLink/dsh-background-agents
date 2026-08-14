@@ -20,6 +20,7 @@ import type { ContentBlock } from '@deepseek-ai/dsh-llm'
 import { SessionId, type SessionEvent } from '@deepseek-ai/dsh-session'
 import { SubagentError, type SubagentDescendantListEntry, type SubagentListEntry } from '@deepseek-ai/dsh-subagent'
 import { countBackgroundAgents, sessionLastText, type BackgroundAgentLifecycle } from './lifecycle.ts'
+import { FACT_EVENT } from './events.ts'
 import { isBackgroundAgentsProjection } from './projection-schema.ts'
 import { PLUGIN } from './vocabulary.ts'
 
@@ -31,6 +32,8 @@ export interface ToolConfig {
   readonly maxBackgroundAgents: number
   /** Display-label cap; longer labels ellipsize. */
   readonly maxLabelChars: number
+  /** Hard cap on the bg_result text; longer answers ellipsize with a truncated flag. */
+  readonly resultMaxChars: number
   /** Provider route for child model requests; undefined inherits the parent's. */
   readonly childProvider: string | undefined
   /** Model id for child model requests; undefined inherits the parent's. */
@@ -210,6 +213,12 @@ export function registerBackgroundAgentTools(
   config: ToolConfig,
   lifecycle: BackgroundAgentLifecycle,
 ): void {
+  // Per-parent start gates: concurrent background_agent calls serialize their
+  // count + cap-check + start critical section, so two racing starts cannot
+  // both pass a cap of one. Keys are parent session ids; the map grows at
+  // most with the number of parents this fiber ever serves and is disposed
+  // with it (no manual cleanup).
+  const startGates = new Map<string, Promise<unknown>>()
   ctx.tools.register(defineTool({
     name: 'background_agent',
     description:
@@ -302,40 +311,54 @@ export function registerBackgroundAgentTools(
       if (provider.prepareContinuable === undefined) {
         throw new Error(`subagent provider "${config.provider}" does not support continuable children`)
       }
-      const count = await countBackgroundAgents(ctx, parent, lifecycle, exec.signal)
-      if (count >= config.maxBackgroundAgents) {
-        throw new Error(
-          `background agent limit reached: maxBackgroundAgents=${config.maxBackgroundAgents} non-archived agents; `
-          + 'bg_stop one or wait for one to settle before starting more',
-        )
-      }
-      const label = labelOf(args, config)
-      const toolFilter = validateToolFilter(args.tool_filter, config)
-      const maxDepth = validateMaxDepth(args.max_depth, config)
-      const persona = args.persona === undefined || args.persona.trim() === ''
-        ? undefined
-        : args.persona.trim()
-      const agentOptions = config.childProvider !== undefined || config.childModel !== undefined
-        ? {
-          ...(config.childProvider !== undefined ? { provider: config.childProvider } : {}),
-          ...(config.childModel !== undefined ? { model: config.childModel } : {}),
+      // Enter the per-parent critical section: wait for the previous start's
+      // count+start to finish, then hold the gate until this one completes
+      // (success or failure), so the next caller counts this attempt.
+      const previous = startGates.get(parent.id) ?? Promise.resolve()
+      let releaseGate: () => void = () => {}
+      startGates.set(parent.id, new Promise<void>(resolve => { releaseGate = resolve }))
+      try {
+        await previous
+        const count = await countBackgroundAgents(ctx, parent, lifecycle, exec.signal)
+        if (count >= config.maxBackgroundAgents) {
+          throw new Error(
+            `background agent limit reached: maxBackgroundAgents=${config.maxBackgroundAgents} non-archived agents; `
+            + 'bg_stop one or wait for one to settle before starting more',
+          )
         }
-        : undefined
-      const started = await ctx.subagents.startContinuable({
-        provider: config.provider,
-        label,
-        request: {
-          prompt: [{ type: 'text', text: args.task }] as ContentBlock[],
-          parent,
-          ...(toolFilter !== undefined ? { toolFilter } : {}),
-          ...(persona !== undefined ? { persona } : {}),
-          ...(maxDepth !== undefined ? { maxDepth } : {}),
-          ...(agentOptions !== undefined ? { agentOptions } : {}),
-        },
-        signal: exec.signal,
-      })
-      lifecycle.register(started.childId, parent.id, label, Date.now())
-      return { agentId: started.childId, messageId: started.messageId }
+        const label = labelOf(args, config)
+        const toolFilter = validateToolFilter(args.tool_filter, config)
+        const maxDepth = validateMaxDepth(args.max_depth, config)
+        const persona = args.persona === undefined || args.persona.trim() === ''
+          ? undefined
+          : args.persona.trim()
+        const agentOptions = config.childProvider !== undefined || config.childModel !== undefined
+          ? {
+            ...(config.childProvider !== undefined ? { provider: config.childProvider } : {}),
+            ...(config.childModel !== undefined ? { model: config.childModel } : {}),
+          }
+          : undefined
+        const started = await ctx.subagents.startContinuable({
+          provider: config.provider,
+          label,
+          request: {
+            prompt: [{ type: 'text', text: args.task }] as ContentBlock[],
+            parent,
+            ...(toolFilter !== undefined ? { toolFilter } : {}),
+            ...(persona !== undefined ? { persona } : {}),
+            ...(maxDepth !== undefined ? { maxDepth } : {}),
+            ...(agentOptions !== undefined ? { agentOptions } : {}),
+          },
+          signal: exec.signal,
+        })
+        lifecycle.register(started.childId, parent.id, label, Date.now())
+        // The structured fact rides the parent log next to the replay meta;
+        // the projection folds it (the legacy meta fold then skips the row).
+        parent.session.append(FACT_EVENT, { kind: 'registered', agentId: started.childId, label }, { ignorable: true })
+        return { agentId: started.childId, messageId: started.messageId }
+      } finally {
+        releaseGate()
+      }
     },
   }))
 
@@ -398,6 +421,7 @@ export function registerBackgroundAgentTools(
       // A cold child resumed through bg_message re-enters the live tracking
       // set; the durable label stays with the projection.
       lifecycle.register(childId, parent.id, '', Date.now())
+      parent.session.append(FACT_EVENT, { kind: 'message', agentId: childId, messageId }, { ignorable: true })
       return { messageId }
     },
   }))
@@ -580,6 +604,10 @@ export function registerBackgroundAgentTools(
             enum: ['running', 'idle', 'ready', 'settled', 'archived'],
           },
           text: { type: 'string' },
+          truncated: {
+            type: 'boolean',
+            description: 'True when the text was ellipsized by resultMaxChars.',
+          },
         },
       },
       render: (_args, value) => [{
@@ -622,10 +650,13 @@ export function registerBackgroundAgentTools(
         if (persistence !== undefined) session = await persistence.load(childId)
       }
       const text = session === undefined ? '' : sessionLastText(session)
+      const truncated = text.length > config.resultMaxChars
+      const capped = truncated ? `${text.slice(0, config.resultMaxChars - 1)}…` : text
       return {
         agentId: childId,
         activity: activityOf(ctx, childId, fact),
-        ...(text === '' ? {} : { text }),
+        ...(capped === '' ? {} : { text: capped }),
+        ...(truncated ? { truncated: true } : {}),
       }
     },
   }))
@@ -691,6 +722,7 @@ export function registerBackgroundAgentTools(
       // The service authorizes the exact live caller against the target's
       // recorded lineage; the tool adds no authority of its own.
       ctx.subagents.interrupt(childId, { kind: 'ancestor', agent: parent })
+      parent.session.append(FACT_EVENT, { kind: 'stop', agentId: childId }, { ignorable: true })
       return { outcome: 'interrupt-requested' as const, agentId: childId }
     },
   }))

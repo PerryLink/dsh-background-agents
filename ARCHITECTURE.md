@@ -2,29 +2,28 @@
 
 `dsh-background-agents` turns DSH's tool-level background jobs into interactive long-session background agents. This document records the design decisions; the external contracts live in [README.md](./README.md).
 
-## The one hard constraint: no plugin session events
+## Durable facts: one structured channel, one model-visible channel
 
-The current harness has **no registration surface for plugin session events**: `KNOWN_SESSION_EVENT_TYPES` is a generated, read-only set, `Session.append` never stamps the `ignorable` envelope marker, and the persistence read path refuses logs containing unknown types. A plugin that appends its own `background-agents/*` events would make every parent session unloadable on reopen.
-
-So the plugin writes **only through channels the harness already persists**, each carrying one class of facts:
+The plugin writes every fact through **two channels with one discipline each**:
 
 | Fact | Channel | Event type |
 |---|---|---|
-| child registered (agent id, label, created) | `background_agent` tool result **replay metadata** (`output.presentationMeta`) | `tool/result` |
-| message delivered (count bump) | `bg_message` tool result replay metadata | `tool/result` |
-| stop requested | `bg_stop` tool result replay metadata | `tool/result` |
-| per-turn progress (last message, running) | **injected notice** via `agent.inject()`, source `{ kind: 'plugin', plugin: 'dsh-background-agents', form: 'notice' }`, canonical line prefix `[background-agent <id>] progress: …` | `user/message` |
-| idle-archived | injected notice, prefix `[background-agent <id>] archived: …` | `user/message` |
+| registered / message / stop / progress / archived | **structured fact event** `background-agents/fact`, appended log-only with the envelope's `ignorable: true` marker | `background-agents/fact` |
+| the same facts in logs written before v0.3.0 | `tool/result` **replay metadata** (`output.presentationMeta`), folded only while a row has no structured provenance | `tool/result` |
+| per-turn progress and idle-archive lines the model sees | **injected notice** via `agent.inject()` / `agent.followup()`, source `{ kind: 'plugin', plugin: 'dsh-background-agents', form: 'notice' }`, canonical line prefix `[background-agent <id>] progress: …` | `user/message` |
 | settled (inactive, closing message) | the **official** `subagent-settled` notice the continuation manager delivers | `user/message` |
 
-This satisfies model-visible ⟺ logged for every injected line (the notice is a real user message in the parent log) and makes the dashboard value reconstructable without a second database.
+The structured channel rides the harness's ignorable-append surface (`Session.append(type, data, { ignorable: true })`, open at the plugin's pinned baseline): readers that do not know the type skip the record instead of refusing the log, so older harness builds and older plugin versions still load parents written by this one. The `backgroundAgents` projection folds the structured channel, keeps the legacy folds for pre-v0.3.0 logs, and switches a row to structured provenance on its first fact — so a log that carries both channels (the v0.3.0 write path keeps writing both) never double-counts. The official `subagent-settled` account folds regardless of provenance: it has no structured counterpart.
+
+This satisfies model-visible ⟺ logged for every injected line (the notice is a real user message in the parent log) and makes the dashboard value reconstructable without a second database — and it decouples the dashboard facts from the human-readable notice wording, which is now free to evolve.
 
 ## Data flow
 
 ```
 background_agent ──▶ ctx.subagents.startContinuable() ──▶ durable child Session
       │                        ▲
-      └─ tool/result.meta ────┘ (folded by the projection)
+      ├─ background-agents/fact (ignorable) ─┘ (structured fact, folded by the projection)
+      └─ tool/result.meta ────────────────────┘ (legacy channel, folded only without a fact row)
 
 child turn ends ──▶ session/event ──▶ lifecycle observer (throttle)
                         └─▶ parent.inject / parent.followup (progress notice) ──▶ parent log

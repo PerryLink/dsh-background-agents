@@ -140,6 +140,12 @@ describe('dsh-background-agents end-to-end', () => {
       .find(meta => meta !== undefined && (meta as { plugin?: unknown }).plugin === PLUGIN)
     expect(registeredMeta).toMatchObject({ plugin: PLUGIN, action: 'registered', agentId: childId, label: 'writer' })
 
+    // The structured fact channel rides the same log, stamped ignorable so
+    // readers that do not know the type skip the records.
+    const facts = events.filter(event => event.type === 'background-agents/fact')
+    expect(facts.map(fact => fact.data.kind)).toEqual(expect.arrayContaining(['registered', 'progress']))
+    expect(facts.every(fact => fact.ignorable === true)).toBe(true)
+
     // The projection folds the parent log into the dashboard value, including
     // the settled account from the official notice.
     const snapshot = ctx.sessionProjections.snapshot(parent.session)
@@ -217,6 +223,13 @@ describe('dsh-background-agents end-to-end', () => {
     const snapshot = second.sessionProjections.snapshot(resumed.session)
     const projection = isBackgroundAgentsProjection(snapshot.values.backgroundAgents)
     expect(projection?.agents.map(row => row.agentId)).toEqual([childId])
+
+    // The structured facts round-tripped through the persistence backend,
+    // still stamped ignorable after the reopen.
+    const reopenedFacts = (await second.sessionPersistence.load(SessionId('parent'))).events
+      .filter(event => event.type === 'background-agents/fact')
+    expect(reopenedFacts.length).toBeGreaterThanOrEqual(1)
+    expect(reopenedFacts.every(fact => fact.ignorable === true)).toBe(true)
     await second.fiber.dispose()
   })
 })

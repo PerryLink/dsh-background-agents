@@ -17,15 +17,29 @@ import type {} from '@deepseek-ai/dsh-subagent'
 import {
   backgroundAgentsSchema, type BackgroundAgentEntry, type BackgroundAgentsProjection,
 } from './projection-schema.ts'
+import { FACT_EVENT } from './events.ts'
 import { isBackgroundAgentsMeta, parseNotice, PLUGIN } from './vocabulary.ts'
 
-/** Mutable fold state; plain JSON so the persisted projection cache can store it. */
+/**
+ * Mutable fold state; plain JSON so the persisted projection cache can store
+ * it. `source` is fold-internal only (never in the wire value): `legacy`
+ * entries were built from the pre-event channels (`tool/result` replay
+ * metadata and notice text), `event` entries from the structured
+ * `background-agents/fact` records. Once the structured channel owns a row
+ * the legacy folds stop for it, so a log that carries both channels (the
+ * v0.3.0 write path keeps writing both) never double-counts.
+ */
 interface State {
-  entries: BackgroundAgentEntry[]
+  entries: StateEntry[]
+}
+
+/** One fold row plus its channel provenance. */
+interface StateEntry extends BackgroundAgentEntry {
+  readonly source: 'legacy' | 'event'
 }
 
 /** The folded entry without its identity; `state` owns order and the base fills the rest. */
-type EntryDelta = Partial<Omit<BackgroundAgentEntry, 'agentId'>>
+type EntryDelta = Partial<Omit<StateEntry, 'agentId'>>
 
 /** Concatenate the text blocks of one user-role message. */
 function messageText(message: UserMessage): string {
@@ -35,37 +49,50 @@ function messageText(message: UserMessage): string {
     .join('')
 }
 
-/** Return a new state whose entry for `agentId` carries `delta`; `base` fills unknown agents. */
-function upsert(state: State, agentId: string, delta: EntryDelta, base: Omit<BackgroundAgentEntry, 'agentId'>): State {
-  const found = state.entries.some(entry => entry.agentId === agentId)
-  if (found) {
-    const entries = state.entries.map((entry): BackgroundAgentEntry => entry.agentId === agentId
-      ? {
-        agentId,
-        label: delta.label ?? entry.label,
-        activity: delta.activity ?? entry.activity,
-        messageCount: delta.messageCount ?? entry.messageCount,
-        createdAt: delta.createdAt ?? entry.createdAt,
-        lastActiveAt: delta.lastActiveAt ?? entry.lastActiveAt,
-        ...(delta.lastMessage !== undefined || entry.lastMessage !== undefined
-          ? { lastMessage: delta.lastMessage ?? entry.lastMessage }
-          : {}),
-      }
-      : entry)
-    return { entries }
-  }
-  const merged: BackgroundAgentEntry = {
+/** Merge one delta over the present entry or the base; `delta` wins field by field. */
+function merge(agentId: string, entry: StateEntry, delta: EntryDelta): StateEntry {
+  return {
     agentId,
-    label: delta.label ?? base.label,
-    activity: delta.activity ?? base.activity,
-    messageCount: delta.messageCount ?? base.messageCount,
-    createdAt: delta.createdAt ?? base.createdAt,
-    lastActiveAt: delta.lastActiveAt ?? base.lastActiveAt,
-    ...(delta.lastMessage !== undefined || base.lastMessage !== undefined
-      ? { lastMessage: delta.lastMessage ?? base.lastMessage }
+    label: delta.label ?? entry.label,
+    activity: delta.activity ?? entry.activity,
+    messageCount: delta.messageCount ?? entry.messageCount,
+    createdAt: delta.createdAt ?? entry.createdAt,
+    lastActiveAt: delta.lastActiveAt ?? entry.lastActiveAt,
+    source: delta.source ?? entry.source,
+    ...(delta.lastMessage !== undefined || entry.lastMessage !== undefined
+      ? { lastMessage: delta.lastMessage ?? entry.lastMessage }
+      : {}),
+    ...(delta.archivedAt !== undefined || entry.archivedAt !== undefined
+      ? { archivedAt: delta.archivedAt ?? entry.archivedAt }
+      : {}),
+    ...(delta.stopRequestedAt !== undefined || entry.stopRequestedAt !== undefined
+      ? { stopRequestedAt: delta.stopRequestedAt ?? entry.stopRequestedAt }
       : {}),
   }
-  return { entries: [...state.entries, merged] }
+}
+
+/** Return a new state whose entry for `agentId` carries `delta`; `base` fills unknown agents. */
+function upsert(state: State, agentId: string, delta: EntryDelta, base: Omit<StateEntry, 'agentId'>): State {
+  const found = state.entries.some(entry => entry.agentId === agentId)
+  if (found) {
+    const entries = state.entries.map(entry =>
+      entry.agentId === agentId ? merge(agentId, entry, delta) : entry)
+    return { entries }
+  }
+  const created: StateEntry = { agentId, ...base }
+  return { entries: [...state.entries, merge(agentId, created, delta)] }
+}
+
+/** The base for a row opened by a fact whose own payload carries no full identity. */
+function factBase(at: number): Omit<StateEntry, 'agentId'> {
+  return {
+    label: '',
+    activity: 'running',
+    messageCount: 0,
+    createdAt: at,
+    lastActiveAt: at,
+    source: 'event',
+  }
 }
 
 /**
@@ -82,16 +109,71 @@ ProjectionDefinition<'backgroundAgents', State> = {
   init: () => ({ entries: [] }),
   apply(state, event: SessionEvent) {
     switch (event.type) {
+      case FACT_EVENT: {
+        // The structured channel: every fact is folded from its event, and
+        // the row it touches switches to `event` provenance.
+        const fact = event.data
+        const existing = state.entries.find(entry => entry.agentId === fact.agentId)
+        switch (fact.kind) {
+          case 'registered':
+            return upsert(state, fact.agentId, {
+              label: fact.label,
+              activity: 'running',
+              messageCount: 1,
+              createdAt: event.time,
+              lastActiveAt: event.time,
+              source: 'event',
+            }, factBase(event.time))
+          case 'message':
+            return upsert(state, fact.agentId, {
+              activity: 'running',
+              messageCount: (existing?.messageCount ?? 0) + 1,
+              lastActiveAt: event.time,
+              source: 'event',
+            }, factBase(event.time))
+          case 'stop':
+            // A stop fact for an unknown child records nothing (mirrors the legacy fold).
+            if (existing === undefined) return state
+            return upsert(state, fact.agentId, {
+              stopRequestedAt: event.time,
+              lastActiveAt: event.time,
+              source: 'event',
+            }, factBase(event.time))
+          case 'progress':
+            if (existing === undefined) return state
+            return upsert(state, fact.agentId, {
+              activity: 'running',
+              lastMessage: fact.text,
+              lastActiveAt: event.time,
+              source: 'event',
+            }, factBase(event.time))
+          case 'archived':
+            if (existing === undefined) return state
+            return upsert(state, fact.agentId, {
+              activity: 'archived',
+              archivedAt: event.time,
+              lastActiveAt: event.time,
+              source: 'event',
+            }, factBase(event.time))
+          /* v8 ignore next 2 -- the closed union is total by construction. */
+          default:
+            return state
+        }
+      }
       case 'tool/result': {
         const meta = isBackgroundAgentsMeta(event.data.meta)
         if (meta === undefined) return state
+        // The structured channel already folded this row's facts; the legacy
+        // meta replay must not fold them a second time.
+        if (state.entries.some(entry => entry.agentId === meta.agentId && entry.source === 'event')) return state
         const shared = { lastActiveAt: event.time }
-        const emptyBase: Omit<BackgroundAgentEntry, 'agentId'> = {
+        const emptyBase: Omit<StateEntry, 'agentId'> = {
           label: '',
           activity: 'running',
           messageCount: 0,
           createdAt: event.time,
           lastActiveAt: event.time,
+          source: 'legacy',
         }
         switch (meta.action) {
           case 'registered':
@@ -114,7 +196,7 @@ ProjectionDefinition<'backgroundAgents', State> = {
             // A stop request changes no durable lifecycle fact of its own; the
             // interruption's settlement lands through the settled fold.
             if (!state.entries.some(entry => entry.agentId === meta.agentId)) return state
-            return upsert(state, meta.agentId, shared, emptyBase)
+            return upsert(state, meta.agentId, { stopRequestedAt: event.time, ...shared }, emptyBase)
           /* v8 ignore next 2 -- the guard's closed switch is total by construction. */
           default:
             return state
@@ -125,14 +207,15 @@ ProjectionDefinition<'backgroundAgents', State> = {
         if (source.kind === 'plugin' && source.plugin === PLUGIN && source.form === 'notice') {
           const head = parseNotice(messageText(event.data))
           if (head === undefined) return state
-          const known = state.entries.some(entry => entry.agentId === head.agentId)
-          if (!known) return state
-          const emptyBase: Omit<BackgroundAgentEntry, 'agentId'> = {
+          const entry = state.entries.find(candidate => candidate.agentId === head.agentId)
+          if (entry === undefined || entry.source === 'event') return state
+          const emptyBase: Omit<StateEntry, 'agentId'> = {
             label: '',
             activity: 'running',
             messageCount: 0,
             createdAt: event.time,
             lastActiveAt: event.time,
+            source: 'legacy',
           }
           if (head.kind === 'progress') {
             return upsert(state, head.agentId, {
@@ -143,6 +226,7 @@ ProjectionDefinition<'backgroundAgents', State> = {
           }
           return upsert(state, head.agentId, {
             activity: 'archived',
+            archivedAt: event.time,
             lastActiveAt: event.time,
           }, emptyBase)
         }
@@ -150,7 +234,8 @@ ProjectionDefinition<'backgroundAgents', State> = {
           // The official account of a settled activation epoch. Only fold it
           // for children this plugin tracks: a foreign child (started through
           // another delegation tool) has no row and must not gain a
-          // label-less one.
+          // label-less one. The official channel has no structured
+          // counterpart, so it folds regardless of provenance.
           if (!state.entries.some(entry => entry.agentId === source.senderSessionId)) return state
           return upsert(state, source.senderSessionId, {
             activity: 'inactive',
@@ -162,6 +247,7 @@ ProjectionDefinition<'backgroundAgents', State> = {
             messageCount: 0,
             createdAt: event.time,
             lastActiveAt: event.time,
+            source: 'legacy',
           })
         }
         return state
@@ -171,10 +257,15 @@ ProjectionDefinition<'backgroundAgents', State> = {
     }
   },
   view: (state): BackgroundAgentsProjection => ({
-    agents: [...state.entries].sort((a, b) =>
-      a.createdAt !== b.createdAt ? a.createdAt - b.createdAt : (a.agentId < b.agentId ? -1 : 1)),
+    agents: state.entries
+      .map((entry): BackgroundAgentEntry => {
+        const { source: _source, ...wire } = entry
+        return wire
+      })
+      .sort((a, b) =>
+        a.createdAt !== b.createdAt ? a.createdAt - b.createdAt : (a.agentId < b.agentId ? -1 : 1)),
   }),
-  stateVersion: 1,
+  stateVersion: 2,
 }
 
 declare module '@deepseek-ai/dsh-session-projection/types' {

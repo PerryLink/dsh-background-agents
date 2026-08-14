@@ -12,7 +12,10 @@ vi.mock('@deepseek-ai/dsh-client-ui-primitives', () => ({
 }))
 
 /** One snapshot: a parent whose projection carries one tracked child. */
-function list(childRunning: boolean): SessionListLike {
+function list(
+  childRunning: boolean,
+  activity: 'running' | 'inactive' | 'archived' = 'running',
+): SessionListLike {
   return {
     byId: {
       parent: {
@@ -24,7 +27,7 @@ function list(childRunning: boolean): SessionListLike {
             agents: [{
               agentId: 'child-1',
               label: 'writer',
-              activity: 'running',
+              activity,
               messageCount: 3,
               createdAt: 100,
               lastActiveAt: 200,
@@ -116,21 +119,22 @@ describe('BackgroundAgentsAction', () => {
     await vi.waitFor(() => { expect(document.body.querySelector('[role="dialog"]')).toBeNull() })
   })
 
-  it('disables stop for non-running rows and enables it for running rows', async () => {
-    const idle = mount(list(false))
-    await vi.waitFor(() => { expect(idle.container.querySelector('button')).not.toBeNull() })
-    idle.container.querySelector('button')!.click()
+  it('enables stop for live, idle, and settled rows and disables it for archived rows', async () => {
+    for (const [childRunning, activity] of [[true, 'running'], [false, 'running'], [false, 'inactive']] as const) {
+      const mounted = mount(list(childRunning, activity))
+      await vi.waitFor(() => { expect(mounted.container.querySelector('button')).not.toBeNull() })
+      mounted.container.querySelector('button')!.click()
+      await vi.waitFor(() => { expect(buttons('row.stop').length).toBe(1) })
+      expect(buttons('row.stop')[0]!.disabled).toBe(false)
+      mounted.root.unmount()
+      mounted.container.remove()
+    }
+
+    const archived = mount(list(false, 'archived'))
+    await vi.waitFor(() => { expect(archived.container.querySelector('button')).not.toBeNull() })
+    archived.container.querySelector('button')!.click()
     await vi.waitFor(() => { expect(buttons('row.stop').length).toBe(1) })
     expect(buttons('row.stop')[0]!.disabled).toBe(true)
-
-    idle.root.unmount()
-    idle.container.remove()
-
-    const running = mount(list(true))
-    await vi.waitFor(() => { expect(running.container.querySelector('button')).not.toBeNull() })
-    running.container.querySelector('button')!.click()
-    await vi.waitFor(() => { expect(buttons('row.stop').length).toBe(1) })
-    expect(buttons('row.stop')[0]!.disabled).toBe(false)
   })
 
   it('sends a message through the injected action and closes the composer', async () => {
