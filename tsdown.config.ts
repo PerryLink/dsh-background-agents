@@ -12,7 +12,8 @@
 
 import { readFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
-import { dirname, resolve as resolvePath, sep } from 'node:path'
+import { dirname, relative, resolve as resolvePath, sep } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'tsdown'
 import { transform } from 'lightningcss'
 
@@ -93,8 +94,14 @@ export default defineConfig([
         const fileId = virtualId.slice(CSS_VIRTUAL_PREFIX.length, -CSS_VIRTUAL_SUFFIX.length)
         this.addWatchFile(fileId)
         const source = await readFile(fileId)
+        // lightningcss derives CSS-module hashes from the filename it is
+        // given, so the transform must see a platform-stable name (the
+        // source-relative posix path) — a Windows and a Linux build of the
+        // same tree would otherwise emit different class maps and fail the
+        // committed-lib drift gate.
+        const stableName = relative(dirname(fileURLToPath(import.meta.url)), fileId).split(sep).join('/')
         const { code, exports: cssExports } = transform({
-          filename: fileId,
+          filename: stableName,
           code: source,
           cssModules: { pattern: '[hash]_[local]' },
           minify: true,
