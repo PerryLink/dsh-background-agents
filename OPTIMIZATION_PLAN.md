@@ -68,7 +68,7 @@
 - [x] D-5 startGates 尾门回收 + `idleSweepIntervalMs` schema min(1)
 - [x] D-6 harness pin 复核(远程可达性校验:`8c690c7cf885` 保持)+ CI publish job 幂等(已发布版本优雅跳过)
 - [x] D-7 五语言 README + ARCHITECTURE.md 同步
-- [ ] 收尾:版本 0.4.0、重建 `lib/`、全量 typecheck/test、commit、tag `v0.4.0` 推送、npm 发布验证
+- [x] 收尾:版本 0.4.0、重建 `lib/`、全量 typecheck/test(83/83)、commit `26a97ca`、tag `v0.4.0` 推送、npm 0.4.0 发布(`latest`)、CI 双 job 全绿(publish 幂等跳过已发布版本)
 
 ---
 
