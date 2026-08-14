@@ -20,6 +20,14 @@ import { transform } from 'lightningcss'
 /** Plugin id: the cordis.yml bare row name, the graph row id, and the stamped bundle id must all match. */
 const PLUGIN_ID = 'dsh-background-agents'
 
+/** The config file's directory: the anchor every path-stable name derives from. */
+const CONFIG_DIR = dirname(fileURLToPath(import.meta.url))
+
+/** The platform-stable posix path of one file, relative to the plugin root. */
+function stablePath(fileId: string): string {
+  return relative(CONFIG_DIR, fileId).split(sep).join('/')
+}
+
 /** Virtual-id wrapper keeping module CSS away from tsdown's own css pipeline. */
 const CSS_VIRTUAL_PREFIX = '\0dsh-bg-css:'
 const CSS_VIRTUAL_SUFFIX = '.mjs'
@@ -87,11 +95,14 @@ export default defineConfig([
       resolveId(source: string, importer: string | undefined) {
         if (!source.endsWith('.module.css')) return null
         const abs = importer !== undefined ? sourceAssetPath(source, importer) : source
-        return CSS_VIRTUAL_PREFIX + abs + CSS_VIRTUAL_SUFFIX
+        // The virtual id uses the platform-stable name so emitted region
+        // comments and source maps are byte-reproducible across platforms.
+        return CSS_VIRTUAL_PREFIX + stablePath(abs) + CSS_VIRTUAL_SUFFIX
       },
       async load(virtualId: string) {
         if (!virtualId.startsWith(CSS_VIRTUAL_PREFIX)) return null
-        const fileId = virtualId.slice(CSS_VIRTUAL_PREFIX.length, -CSS_VIRTUAL_SUFFIX.length)
+        const stableName = virtualId.slice(CSS_VIRTUAL_PREFIX.length, -CSS_VIRTUAL_SUFFIX.length)
+        const fileId = resolvePath(CONFIG_DIR, stableName)
         this.addWatchFile(fileId)
         const source = await readFile(fileId)
         // lightningcss derives CSS-module hashes from the filename it is
@@ -99,7 +110,6 @@ export default defineConfig([
         // source-relative posix path) — a Windows and a Linux build of the
         // same tree would otherwise emit different class maps and fail the
         // committed-lib drift gate.
-        const stableName = relative(dirname(fileURLToPath(import.meta.url)), fileId).split(sep).join('/')
         const { code, exports: cssExports } = transform({
           filename: stableName,
           code: source,
