@@ -24,11 +24,13 @@ Os *jobs* em segundo plano do DSH são execuções de ferramentas do tipo "dispa
 ## Início rápido
 
 ```sh
-# no diretório do seu perfil DSH (web ou headless)
-pnpm add dsh-background-agents
+# a partir do checkout do harness ou de onde o CLI dsh estiver (web ou headless)
+dsh plugin --profile <name> add "github:PerryLink/dsh-background-agents#v0.1.1"
 ```
 
-Adicione a linha do plugin ao `cordis.patch.yml` do perfil (ou deixe o `dsh plugin add dsh-background-agents` fazer isso):
+O patch do bundle carrega a linha do plugin, então o `dsh plugin add` a compõe na pilha de camadas do perfil (`dsh.profile.bundles`). Prefira a fonte git com uma ref fixada: o repo versiona a saída do build (`lib/`), então instalações git não precisam de etapa de build nem de entrada `allowBuilds`. (Quando o pacote for publicado no npm, `pnpm add dsh-background-agents` também funcionará.)
+
+A linha que aterrissa no perfil (sobrescreva `config` por perfil no `cordis.patch.yml`):
 
 ```yaml
 - insert:
@@ -60,7 +62,7 @@ Todo parâmetro ajustável é um campo `Config` validado — mude no `cordis.yml
 | `reportThrottleMs` | `15000` | intervalo mínimo entre duas injeções de progresso de um filho |
 | `reportSummaryMaxChars` | `300` | teto rígido do texto da linha de progresso (com reticências) |
 | `maxBackgroundAgents` | `4` | teto rígido de agentes não arquivados por sessão pai |
-| `idleTimeoutMinutes` | `120` | janela de inatividade após a qual um filho quieto é arquivado e notificado |
+| `idleTimeoutMinutes` | `120` | janela de inatividade após a qual um filho quieto é arquivado e notificado (`>= 1`) |
 | `idleSweepIntervalMs` | `60000` | período da varredura de arquivamento |
 | `maxLabelChars` | `120` | teto do rótulo exibido (com reticências) |
 
@@ -94,6 +96,13 @@ pnpm run typecheck  # TS estrito, programas node + client
 pnpm test           # 48 testes unitários e ponta a ponta (seam real de subagentes, LLM roteirizado)
 pnpm run build      # lib/index.js (metade node) + lib/client.js (bundle web)
 pnpm run gen-aliases  # re-mapeia caminhos de pacotes do harness quando o checkout se move
+```
+
+Uma demo ponta a ponta sem chave move uma sessão pai real e um filho de fundo por um LLM roteirizado determinista (sem API key; `dev/` é gitignorado — ajuste os caminhos ao seu checkout):
+
+```powershell
+$env:DSH_HOME = 'D:/deepseek-harness/Project/Plugins/dsh-background-agents/dev/dsh-home'
+pnpm dsh --profile headless --patch dev/cordis.yml "【父会话】驱动后台 agent 演示"
 ```
 
 ## Licença

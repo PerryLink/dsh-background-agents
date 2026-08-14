@@ -24,11 +24,13 @@ DSH के बिल्ट-इन बैकग्राउंड *jobs* "चल�
 ## त्वरित शुरुआत
 
 ```sh
-# अपनी DSH प्रोफ़ाइल निर्देशिका में (web या headless)
-pnpm add dsh-background-agents
+# harness checkout से या जहाँ भी dsh CLI हो (web या headless)
+dsh plugin --profile <name> add "github:PerryLink/dsh-background-agents#v0.1.1"
 ```
 
-फिर प्रोफ़ाइल के `cordis.patch.yml` में प्लगइन पंक्ति जोड़ें (या `dsh plugin add dsh-background-agents` से करवाएँ):
+बंडल पैच प्लगइन पंक्ति साथ लाता है, इसलिए `dsh plugin add` उसे प्रोफ़ाइल की लेयर स्टैक (`dsh.profile.bundles`) में जोड़ देता है। पिन की गई ref वाला git स्रोत बेहतर है: रिपो अपना बिल्ड आउटपुट (`lib/`) कमिट करता है, इसलिए git इंस्टॉल को बिल्ड चरण या `allowBuilds` प्रविष्टि की ज़रूरत नहीं होती। (पैकेज npm पर प्रकाशित होने पर `pnpm add dsh-background-agents` भी चलेगा।)
+
+प्रोफ़ाइल में उतरने वाली पंक्ति (`cordis.patch.yml` में प्रति प्रोफ़ाइल `config` ओवरराइड करें):
 
 ```yaml
 - insert:
@@ -60,7 +62,7 @@ bg_stop <agentId>
 | `reportThrottleMs` | `15000` | एक चाइल्ड की दो प्रगति इंजेक्शनों के बीच न्यूनतम अंतराल |
 | `reportSummaryMaxChars` | `300` | इंजेक्ट की गई प्रगति पंक्ति की कठोर सीमा (इलिप्सिस सहित) |
 | `maxBackgroundAgents` | `4` | प्रति पैरेंट सत्र गैर-संग्रहित एजेंटों की कठोर सीमा |
-| `idleTimeoutMinutes` | `120` | निष्क्रियता विंडो जिसके बाद शांत चाइल्ड संग्रहित और सूचित होता है |
+| `idleTimeoutMinutes` | `120` | निष्क्रियता विंडो जिसके बाद शांत चाइल्ड संग्रहित और सूचित होता है (`>= 1`) |
 | `idleSweepIntervalMs` | `60000` | संग्रह सफ़ाई अवधि |
 | `maxLabelChars` | `120` | प्रदर्शन लेबल सीमा (इलिप्सिस सहित) |
 
@@ -94,6 +96,13 @@ pnpm run typecheck  # सख्त TS, node + client प्रोग्राम
 pnpm test           # 48 यूनिट + एंड-टू-एंड टेस्ट (असली सबएजेंट सीम, स्क्रिप्टेड LLM)
 pnpm run build      # lib/index.js (node आधा) + lib/client.js (वेब क्लाइंट बंडल)
 pnpm run gen-aliases  # चेकआउट हिलने पर harness पैकेज पथ फिर मैप करें
+```
+
+बिना चाबी वाला एंड-टू-एंड डेमो एक असली पैरेंट सत्र और बैकग्राउंड चाइल्ड को निर्धारित स्क्रिप्टेड LLM से चलाता है (कोई API key नहीं; `dev/` gitignored है — पथ अपने checkout के अनुसार बदलें):
+
+```powershell
+$env:DSH_HOME = 'D:/deepseek-harness/Project/Plugins/dsh-background-agents/dev/dsh-home'
+pnpm dsh --profile headless --patch dev/cordis.yml "【父会话】驱动后台 agent 演示"
 ```
 
 ## लाइसेंस

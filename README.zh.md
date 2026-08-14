@@ -24,11 +24,13 @@ DSH 内置的后台 *jobs* 是"发后即忘"的工具执行：能读输出、能
 ## 快速开始
 
 ```sh
-# 在你的 DSH profile 目录（web 或 headless）
-pnpm add dsh-background-agents
+# 在 harness checkout 或任意 dsh CLI 可用处（web 或 headless）
+dsh plugin --profile <name> add "github:PerryLink/dsh-background-agents#v0.1.1"
 ```
 
-然后在 profile 的 `cordis.patch.yml` 里加一行（或让 `dsh plugin add dsh-background-agents` 代劳）：
+bundle patch 自带插件行，`dsh plugin add` 会把它组合进 profile 的层栈（`dsh.profile.bundles`）。建议使用 pin 了 ref 的 git 源：本仓库已提交构建产物（`lib/`），git 安装无需构建步骤、无需 `allowBuilds`。（将来发布到 npm 后，`pnpm add dsh-background-agents` 同样可用。）
+
+落进 profile 的插件行（按 profile 在 `cordis.patch.yml` 里覆盖 `config`）：
 
 ```yaml
 - insert:
@@ -60,7 +62,7 @@ bg_stop <agentId>
 | `reportThrottleMs` | `15000` | 同一子 agent 两次进度注入的最小间隔 |
 | `reportSummaryMaxChars` | `300` | 注入进度行文本的硬上限（显式省略号截断） |
 | `maxBackgroundAgents` | `4` | 每个父会话非归档后台 agent 的硬上限 |
-| `idleTimeoutMinutes` | `120` | 空闲窗口：超时后归档并通知 |
+| `idleTimeoutMinutes` | `120` | 空闲窗口：超时后归档并通知（`>= 1`） |
 | `idleSweepIntervalMs` | `60000` | 归档巡检周期 |
 | `maxLabelChars` | `120` | 展示标签上限（省略号截断） |
 
@@ -94,6 +96,13 @@ pnpm run typecheck  # strict TS，node + client 双程序
 pnpm test           # 48 个单元 + 端到端测试（真实 subagent seam + 脚本化 LLM）
 pnpm run build      # lib/index.js（node 半）+ lib/client.js（Web client bundle）
 pnpm run gen-aliases  # checkout 移动后重新映射 harness 包路径
+```
+
+免 key 的端到端演示：用确定性脚本化 LLM 驱动真实父会话 + 后台子 agent（无需 API key；`dev/` 不入库——按你的 checkout 调整路径）：
+
+```powershell
+$env:DSH_HOME = 'D:/deepseek-harness/Project/Plugins/dsh-background-agents/dev/dsh-home'
+pnpm dsh --profile headless --patch dev/cordis.yml "【父会话】驱动后台 agent 演示"
 ```
 
 测试覆盖全路径——启动、列、消息、停止——基于**真实** `SubagentRuntime` + 进程内 spawn 提供方 + 脚本化适配器；另有节流/上限/归档策略、投影折叠、以及经 `session-persistence-jsonl` 的崩溃恢复用例。

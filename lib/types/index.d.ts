@@ -23,8 +23,8 @@ export declare const inject: string[];
 /**
  * Lifecycle policy. Every tunable is a validated Config field: thresholds and
  * throttles belong in cordis.yml, never in code. Only `provider` is required;
- * the Schemastery schema materializes the documented defaults for the rest,
- * and direct apply() callers keep the same defaults.
+ * the Schemastery schema materializes the documented defaults from
+ * {@link DEFAULTS}, and direct apply() callers keep the same defaults.
  */
 export interface Config {
     /** The `ctx.subagents` provider name that starts continuable children (e.g. `spawn`). */
@@ -37,13 +37,27 @@ export interface Config {
     reportSummaryMaxChars?: number;
     /** Hard cap on non-archived background agents per parent session. */
     maxBackgroundAgents?: number;
-    /** Idle window after which the sweep archives a quiet child. */
+    /** Idle window after which the sweep archives a quiet child (`>= 1`). */
     idleTimeoutMinutes?: number;
     /** Sweep period. */
     idleSweepIntervalMs?: number;
     /** Display-label cap (creation labels ellipsize). */
     maxLabelChars?: number;
 }
+/**
+ * The single source of truth for every optional policy default: the schema
+ * materializes from it and apply() falls back to it, so the two can never
+ * drift apart.
+ */
+export declare const DEFAULTS: {
+    readonly autoReport: true;
+    readonly reportThrottleMs: 15000;
+    readonly reportSummaryMaxChars: 300;
+    readonly maxBackgroundAgents: 4;
+    readonly idleTimeoutMinutes: 120;
+    readonly idleSweepIntervalMs: 60000;
+    readonly maxLabelChars: 120;
+};
 export declare const Config: Schema<Config>;
 /**
  * Mount the four tools, the `backgroundAgents` projection unit, the

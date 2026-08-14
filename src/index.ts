@@ -30,8 +30,8 @@ export const inject = ['tools', 'subagents', 'agents', 'sessions']
 /**
  * Lifecycle policy. Every tunable is a validated Config field: thresholds and
  * throttles belong in cordis.yml, never in code. Only `provider` is required;
- * the Schemastery schema materializes the documented defaults for the rest,
- * and direct apply() callers keep the same defaults.
+ * the Schemastery schema materializes the documented defaults from
+ * {@link DEFAULTS}, and direct apply() callers keep the same defaults.
  */
 export interface Config {
   /** The `ctx.subagents` provider name that starts continuable children (e.g. `spawn`). */
@@ -44,7 +44,7 @@ export interface Config {
   reportSummaryMaxChars?: number
   /** Hard cap on non-archived background agents per parent session. */
   maxBackgroundAgents?: number
-  /** Idle window after which the sweep archives a quiet child. */
+  /** Idle window after which the sweep archives a quiet child (`>= 1`). */
   idleTimeoutMinutes?: number
   /** Sweep period. */
   idleSweepIntervalMs?: number
@@ -52,15 +52,31 @@ export interface Config {
   maxLabelChars?: number
 }
 
+/**
+ * The single source of truth for every optional policy default: the schema
+ * materializes from it and apply() falls back to it, so the two can never
+ * drift apart.
+ */
+export const DEFAULTS = {
+  autoReport: true,
+  reportThrottleMs: 15_000,
+  reportSummaryMaxChars: 300,
+  maxBackgroundAgents: 4,
+  idleTimeoutMinutes: 120,
+  idleSweepIntervalMs: 60_000,
+  maxLabelChars: 120,
+} as const
+
 export const Config: Schema<Config> = Schema.object({
   provider: Schema.string().required(),
-  autoReport: Schema.boolean().default(true),
-  reportThrottleMs: Schema.natural().max(Number.MAX_SAFE_INTEGER).default(15_000),
-  reportSummaryMaxChars: Schema.natural().max(Number.MAX_SAFE_INTEGER).default(300),
-  maxBackgroundAgents: Schema.natural().max(Number.MAX_SAFE_INTEGER).default(4),
-  idleTimeoutMinutes: Schema.natural().max(Number.MAX_SAFE_INTEGER).default(120),
-  idleSweepIntervalMs: Schema.natural().max(Number.MAX_SAFE_INTEGER).default(60_000),
-  maxLabelChars: Schema.natural().max(Number.MAX_SAFE_INTEGER).default(120),
+  autoReport: Schema.boolean().default(DEFAULTS.autoReport),
+  reportThrottleMs: Schema.natural().max(Number.MAX_SAFE_INTEGER).default(DEFAULTS.reportThrottleMs),
+  reportSummaryMaxChars: Schema.natural().max(Number.MAX_SAFE_INTEGER).default(DEFAULTS.reportSummaryMaxChars),
+  maxBackgroundAgents: Schema.natural().max(Number.MAX_SAFE_INTEGER).default(DEFAULTS.maxBackgroundAgents),
+  // 0 would archive any quiet child on the next sweep pass; the schema forbids it.
+  idleTimeoutMinutes: Schema.natural().min(1).max(Number.MAX_SAFE_INTEGER).default(DEFAULTS.idleTimeoutMinutes),
+  idleSweepIntervalMs: Schema.natural().max(Number.MAX_SAFE_INTEGER).default(DEFAULTS.idleSweepIntervalMs),
+  maxLabelChars: Schema.natural().max(Number.MAX_SAFE_INTEGER).default(DEFAULTS.maxLabelChars),
 })
 
 /**
@@ -71,16 +87,17 @@ export const Config: Schema<Config> = Schema.object({
  */
 export function apply(ctx: Context, config: Config): void {
   // Direct apply() bypasses Schemastery's constraints; a loader-omitted field
-  // keeps its documented default instead of failing at load.
+  // keeps its documented default (the shared DEFAULTS constant) instead of
+  // failing at load.
   const policy: Required<Config> = {
     provider: config.provider,
-    autoReport: config.autoReport ?? true,
-    reportThrottleMs: config.reportThrottleMs ?? 15_000,
-    reportSummaryMaxChars: config.reportSummaryMaxChars ?? 300,
-    maxBackgroundAgents: config.maxBackgroundAgents ?? 4,
-    idleTimeoutMinutes: config.idleTimeoutMinutes ?? 120,
-    idleSweepIntervalMs: config.idleSweepIntervalMs ?? 60_000,
-    maxLabelChars: config.maxLabelChars ?? 120,
+    autoReport: config.autoReport ?? DEFAULTS.autoReport,
+    reportThrottleMs: config.reportThrottleMs ?? DEFAULTS.reportThrottleMs,
+    reportSummaryMaxChars: config.reportSummaryMaxChars ?? DEFAULTS.reportSummaryMaxChars,
+    maxBackgroundAgents: config.maxBackgroundAgents ?? DEFAULTS.maxBackgroundAgents,
+    idleTimeoutMinutes: config.idleTimeoutMinutes ?? DEFAULTS.idleTimeoutMinutes,
+    idleSweepIntervalMs: config.idleSweepIntervalMs ?? DEFAULTS.idleSweepIntervalMs,
+    maxLabelChars: config.maxLabelChars ?? DEFAULTS.maxLabelChars,
   }
   if (policy.provider.trim() === '') {
     throw new Error('dsh-background-agents: `provider` must name a registered subagent provider')

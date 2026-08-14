@@ -24,11 +24,13 @@ DSH's built-in background *jobs* are fire-and-forget tool executions: you can re
 ## Quick start
 
 ```sh
-# in your DSH profile directory (web or headless)
-pnpm add dsh-background-agents
+# from the harness checkout or wherever the dsh CLI lives (web or headless)
+dsh plugin --profile <name> add "github:PerryLink/dsh-background-agents#v0.1.1"
 ```
 
-Then add the plugin row to your profile's `cordis.patch.yml` (or let `dsh plugin add dsh-background-agents` do it):
+The bundle patch carries the plugin row, so `dsh plugin add` composes it into your profile's layer stack (`dsh.profile.bundles`). Prefer the git source with a pinned ref: the repo commits its build output (`lib/`), so git installs need no build step and no `allowBuilds` entry. (Once the package is published to npm, plain `pnpm add dsh-background-agents` works too.)
+
+The row that lands in your profile (override `config` per profile in `cordis.patch.yml`):
 
 ```yaml
 - insert:
@@ -60,7 +62,7 @@ Every tunable is a validated `Config` field — change it in `cordis.yml`, never
 | `reportThrottleMs` | `15000` | minimum gap between two progress injections for one child |
 | `reportSummaryMaxChars` | `300` | hard cap on the injected progress-line text (ellipsized) |
 | `maxBackgroundAgents` | `4` | hard cap on non-archived background agents per parent session |
-| `idleTimeoutMinutes` | `120` | idle window after which a quiet child is archived and notified |
+| `idleTimeoutMinutes` | `120` | idle window after which a quiet child is archived and notified (`>= 1`) |
 | `idleSweepIntervalMs` | `60000` | archive sweep period |
 | `maxLabelChars` | `120` | display-label cap (ellipsized) |
 
@@ -94,6 +96,13 @@ pnpm run typecheck  # strict TS, node + client programs
 pnpm test           # 48 unit + end-to-end tests (real subagent seam, scripted LLM)
 pnpm run build      # lib/index.js (node half) + lib/client.js (web client bundle)
 pnpm run gen-aliases  # re-map harness package paths after the checkout moves
+```
+
+A keyless end-to-end demo drives a real parent session and a background child through a deterministic scripted LLM (no API key; `dev/` is gitignored — adapt the paths to your checkout):
+
+```powershell
+$env:DSH_HOME = 'D:/deepseek-harness/Project/Plugins/dsh-background-agents/dev/dsh-home'
+pnpm dsh --profile headless --patch dev/cordis.yml "【父会话】驱动后台 agent 演示"
 ```
 
 The test suite covers the full path — start, list, message, stop — against the **real** `SubagentRuntime` with the in-process spawn provider and a scripted adapter, plus throttle/cap/archive policy, projection folding, and crash recovery through `session-persistence-jsonl`.

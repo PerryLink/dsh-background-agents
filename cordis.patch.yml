@@ -2,6 +2,9 @@
 # plugin (four tools + the backgroundAgents session projection + the Web UI
 # sidebar panel). Configure the provider and lifecycle policy per profile by
 # overriding the `background-agents` row.
+#
+# Install (lib/ is committed, so no build step or allowBuilds is needed):
+#   dsh plugin --profile <name> add "github:PerryLink/dsh-background-agents#v0.1.1"
 - insert:
     - id: background-agents
       name: dsh-background-agents
