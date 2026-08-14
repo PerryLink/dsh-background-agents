@@ -108,6 +108,11 @@ export default defineConfig([
         })
         const classMap: Record<string, string> = {}
         for (const [local, exp] of Object.entries(cssExports ?? {})) classMap[local] = exp.name
+        // lightningcss may emit its exports map in environment-dependent
+        // order; the emitted literal sorts its keys so the bundle is
+        // byte-reproducible across platforms.
+        const sortedMap: Record<string, string> = {}
+        for (const key of Object.keys(classMap).sort()) sortedMap[key] = classMap[key]!
         return [
           `const css = ${JSON.stringify(code.toString())};`,
           `const tagId = ${JSON.stringify(`${PLUGIN_ID}/${fileId.split(/[\\/]/).pop()}`)};`,
@@ -118,7 +123,7 @@ export default defineConfig([
           '  tag.textContent = css;',
           '  document.head.appendChild(tag);',
           '}',
-          `export default ${JSON.stringify(classMap)};`,
+          `export default ${JSON.stringify(sortedMap)};`,
         ].join('\n')
       },
     }],
