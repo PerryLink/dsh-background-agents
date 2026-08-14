@@ -78,14 +78,19 @@ jobs:
       # No rebuild here: the test job's build-drift gate already proved the
       # committed lib/ is byte-identical to a fresh build of this tree, and
       # type declarations are not regenerable without the pinned harness.
-      - name: Publish (skips without NPM_TOKEN)
+      # The publish is idempotent: a version already on the registry (e.g. a
+      # re-pushed tag or a manual release) skips instead of failing.
+      - name: Publish (skips without NPM_TOKEN or an already-published version)
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           corepack enable
           pnpm install --frozen-lockfile
+          VERSION="$(node -p "require('./package.json').version")"
           if [ -z "$NODE_AUTH_TOKEN" ]; then
             echo "NPM_TOKEN is not configured on this repository; skipping the npm publish (git install stays the primary channel)"
+          elif [ -n "$(npm view "dsh-background-agents@${VERSION}" version 2>/dev/null)" ]; then
+            echo "dsh-background-agents@${VERSION} already exists on the registry; skipping"
           else
             npm publish
           fi

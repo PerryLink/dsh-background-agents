@@ -47,6 +47,7 @@ interface Harness {
   readonly root: Root
   readonly sendMessage: ReturnType<typeof vi.fn>
   readonly stopChild: ReturnType<typeof vi.fn>
+  readonly readResult: ReturnType<typeof vi.fn>
 }
 
 const mounts: Harness[] = []
@@ -56,6 +57,7 @@ function mount(snapshot: SessionListLike): Harness {
   document.body.appendChild(container)
   const sendMessage = vi.fn().mockResolvedValue(undefined)
   const stopChild = vi.fn().mockResolvedValue(undefined)
+  const readResult = vi.fn().mockResolvedValue({ text: 'final result text' })
   const props = {
     wide: true,
     t: ((key: string) => key) as never,
@@ -63,10 +65,11 @@ function mount(snapshot: SessionListLike): Harness {
     openChild: vi.fn().mockResolvedValue(undefined),
     stopChild,
     sendMessage,
+    readResult,
   } as unknown as Props
   const root = createRoot(container)
   root.render(<BackgroundAgentsAction {...props} />)
-  const harness = { container, root, sendMessage, stopChild }
+  const harness = { container, root, sendMessage, stopChild, readResult }
   mounts.push(harness)
   return harness
 }
@@ -170,5 +173,50 @@ describe('BackgroundAgentsAction', () => {
       const error = document.body.querySelector('[class*="error"]')
       expect(error?.textContent).toContain('SUBAGENT_X: delivery failed')
     })
+  })
+
+  it('peeks the child result through the injected history action', async () => {
+    const { container, readResult } = mount(list(false))
+    await vi.waitFor(() => { expect(container.querySelector('button')).not.toBeNull() })
+    container.querySelector('button')!.click()
+    await vi.waitFor(() => { expect(buttons('row.result').length).toBe(1) })
+
+    buttons('row.result')[0]!.click()
+    await vi.waitFor(() => { expect(readResult).toHaveBeenCalledExactlyOnceWith('parent', 'child-1') })
+    await vi.waitFor(() => {
+      const result = document.body.querySelector('[class*="resultText"]')
+      expect(result?.textContent).toBe('final result text')
+    })
+    // The button flips to the close affordance while the peek is open.
+    expect(buttons('result.close').length).toBe(1)
+    buttons('result.close')[0]!.click()
+    await vi.waitFor(() => { expect(document.body.querySelector('[class*="resultText"]')).toBeNull() })
+  })
+
+  it('surfaces a failed result peek inline', async () => {
+    const { container, readResult } = mount(list(false))
+    readResult.mockResolvedValue({ text: '', error: 'SUBAGENT_X: no transcript' })
+    await vi.waitFor(() => { expect(container.querySelector('button')).not.toBeNull() })
+    container.querySelector('button')!.click()
+    await vi.waitFor(() => { expect(buttons('row.result').length).toBe(1) })
+
+    buttons('row.result')[0]!.click()
+    await vi.waitFor(() => {
+      const error = document.body.querySelector('[class*="resultError"]')
+      expect(error?.textContent).toContain('SUBAGENT_X: no transcript')
+    })
+  })
+
+  it('moves focus into the panel on open and back to the trigger on close', async () => {
+    const { container } = mount(list(false))
+    await vi.waitFor(() => { expect(container.querySelector('button')).not.toBeNull() })
+    const trigger = container.querySelector('button')!
+    trigger.click()
+    await vi.waitFor(() => { expect(document.body.querySelector('[role="dialog"]')).not.toBeNull() })
+    expect(document.activeElement).toBe(document.body.querySelector('[role="dialog"]'))
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    await vi.waitFor(() => { expect(document.body.querySelector('[role="dialog"]')).toBeNull() })
+    expect(document.activeElement).toBe(trigger)
   })
 })

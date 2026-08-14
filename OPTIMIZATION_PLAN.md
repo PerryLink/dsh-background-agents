@@ -1,10 +1,82 @@
-# dsh-background-agents 优化提升方案（v2）
+# dsh-background-agents 优化提升方案
 
-> v2 方案基于对仓库源码、测试、构建配置、README 与 harness 本体接缝（`packages/subagent/*`、`packages/core/session`、`packages/session/session-projection`）的逐项核实。
-> v1 方案的 P0 与 P1 已随 v0.1.1（`da31785`）与 v0.2.0 落地；本文档记录完整路线图与执行状态。
-> 每条优化都标注：证据 → 具体改法 → 验收 → 风险 → 工作量（S≤半天 / M 1-2 天 / L 2-4 天）→ 优先级。
+> 本文档按版本记录路线图与执行状态:v1 方案的 P0/P1 随 v0.1.1(`da31785`)与 v0.2.0 落地,v2 方案随 v0.3.0 落地,当前执行中的是 v3 方案(v0.4.0)。每条优化都标注:证据 → 具体改法 → 验收 → 风险 → 工作量(S≤半天 / M 1-2 天 / L 2-4 天)→ 优先级。
 
-## 0. 验证基线
+---
+
+## 0. v3 方案(v0.4.0)——当前执行
+
+> 基于 v0.3.0 发布后的复查:本地 harness checkout 头 `e862f6f0ce6a`(subagent 包自 pin 起无变更,seam 稳定);基线 typecheck ✅、69/69 测试 ✅、npm 0.3.0 已发布、main 干净。
+
+### D-1 `autoArchive` 配置开关 【S】
+
+- **证据**:`idleTimeoutMinutes` 的 schema 下限是 1,归档行为**无法关闭**;长驻观察类 agent(如 repo 监控)在 2h 默认窗口后被归档,用户只能把阈值调到巨大数字来变相禁用。
+- **改法**:Config 增 `autoArchive: boolean`(默认 `true`);`sweepIdle` 在关闭时跳过归档分支(仅保留死缓存条目清理);README 配置表同步。
+- **验收**:lifecycle.spec——`autoArchive: false` 时超时子 agent 不产生 archived 事实/通知;`true` 时行为不变。
+- **风险**:无。
+
+### D-2 `bg_result` 完善:推理块回退 + label 【S】
+
+- **证据**:`sessionLastText` 只连接 text 块;思考模型的末条 assistant 消息若只有 reasoning 块(无 text),`bg_result` 返回空文本并称"尚无输出"——事实是模型确实输出了。另 `bg_result` 不回 label,父模型拿到 agentId 后还得查 `bg_list` 才能对上号。
+- **改法**:`sessionLastText` 增 `allowReasoning` 选项(仅 `bg_result` 开启):text 块为空时回退连接 reasoning 块,并置可选 `textSource: 'reasoning'`;`bg_result` 输出增可选 `label`(来自投影事实);autoReport 的进度行**不**回退(reasoning 不注入父上下文)。
+- **验收**:tools.spec——纯 reasoning 末消息返回回退文本 + `textSource: 'reasoning'` + `label`;有 text 时不带 `textSource`。
+- **风险**:无。
+
+### D-3 空白输入校验 【S】
+
+- **证据**:`background_agent` 的 `task` 与 `bg_message` 的 `message` 均为纯 string schema,空白串会被当真投递(空任务开一个空转 agent)。
+- **改法**:两个工具在执行前 trim 校验,空白即报错(错误信息点名工具与参数)。
+- **验收**:tools.spec——空白 task/message 各自 isError。
+- **风险**:无。
+
+### D-4 面板增强:结果查看 + 父会话标题 + a11y 焦点 【M】
+
+- **证据**:settled 子 agent 的完整结果目前只能离开面板(跳会话或让模型调 `bg_result`);面板聚合所有父会话,行内无父归属信息;面板是 role=dialog 但打开时不聚焦。
+- **改法**:
+  1. 行内 "Result" 按钮:经官方 `subagents.history` RPC(只读 transcript,不激活 Agent)拉取末条 assistant 文本,纯函数 `extractResultText` 解析(可测),面板内展开显示(行高上限,close 按钮)。
+  2. 快照含多个父会话时,行内显示父会话标题小字(单父会话不显示,避免噪音)。
+  3. 面板打开时聚焦容器(tabIndex=-1),关闭时焦点归还触发按钮。
+- **验收**:presenter.spec(history 事件 → 文本抽取)、action.spec(Result 按钮三态:加载/成功/错误;多父标题;焦点)。
+- **风险**:低——只读 RPC,无生命周期副作用。
+
+### D-5 工程守护:startGates 清理 + 巡检周期下限 【S】
+
+- **证据**:`startGates` 的键是父会话 id,尾门 resolve 后永不删除——长驻 fiber 每服务过一个父会话泄漏一个槽位;`idleSweepIntervalMs` 无 min,0 值会造出 1ms 热循环。
+- **改法**:finally 中尾门自比较后删除;`idleSweepIntervalMs` schema 加 `.min(1)`。
+- **验收**:tools.spec 并发 cap 测试仍过;typecheck;schema 约束测试。
+- **风险**:无。
+
+### D-6 harness pin 复核 + CI publish 幂等 【S】
+
+- **证据**:pin `8c690c7cf885` 落后本地 checkout 6 个提交,其中 `a0df6ac` 修复的正是插件所用的 log-only append 面;CI publish job 对已发布版本重复推送 tag 会红(EPUBLISHCONFLICT)。
+- **改法**:
+  1. pin 复核:本地 checkout 领先的提交(`e1611e9`…`e862f6f`)**未推送到 GitHub 上游**(`git ls-remote` 不可解析),而 `8c690c7cf885` 可解析且为远程可达的最新高程;pin 保持 `8c690c7cf885` 不变——CI 可复现优先于追新。
+  2. publish job 先查 `npm view dsh-background-agents@<version> version`,已存在则优雅跳过。
+- **风险**:低——subagent 包自 pin 起无变更,基线语义稳定。
+
+### D-7 文档五语言同步 【S】
+
+- **改法**:README(.md/.zh/.es/.pt/.hi)同步 `autoArchive` 配置行、`bg_result` 新字段、面板新按钮、tag 指向 v0.4.0、测试数;ARCHITECTURE.md 补生命周期/UI 小节;本文件记录执行状态。
+- **验收**:五份 README 的配置表行数一致。
+
+### 执行日志
+
+- [x] D-1 `autoArchive` 开关 + sweep 分支 + lifecycle.spec（关闭时不归档、死条目仍回收）
+- [x] D-2 `sessionLastText` reasoning 回退（仅 bg_result 开启）+ `bg_result` label/textSource + tools.spec（纯 reasoning 末消息回退）
+- [x] D-3 空白 task/message 校验 + tools.spec
+- [x] D-4 面板 Result 按钮（`subagent.history` 只读 RPC + `extractResultText` 纯函数）、多父会话标题消歧、对话框焦点往返 + presenter.spec/action.spec
+- [x] D-5 startGates 尾门回收 + `idleSweepIntervalMs` schema min(1)
+- [x] D-6 harness pin 复核(远程可达性校验:`8c690c7cf885` 保持)+ CI publish job 幂等(已发布版本优雅跳过)
+- [x] D-7 五语言 README + ARCHITECTURE.md 同步
+- [ ] 收尾:版本 0.4.0、重建 `lib/`、全量 typecheck/test、commit、tag `v0.4.0` 推送、npm 发布验证
+
+---
+
+## 1. v2 方案(v0.3.0)——已完成
+
+> v2 方案基于对仓库源码、测试、构建配置、README 与 harness 本体接缝(`packages/subagent/*`、`packages/core/session`、`packages/session/session-projection`)的逐项核实。
+
+## 0-v2. 验证基线（v2 记录）
 
 | 项 | 结果 |
 |---|---|
@@ -24,7 +96,7 @@
 
 ---
 
-## 1. 总路线图与执行状态
+## 1-v2. 总路线图与执行状态（v2 记录）
 
 | 版本 | 内容 | 状态 |
 |---|---|---|
@@ -54,7 +126,7 @@
 
 ---
 
-## 2. 阶段 A 详细方案（v0.3.0 工程守护）
+## 2-v2. 阶段 A 详细方案（v0.3.0 工程守护）
 
 ### A-1 cap 竞态修复 【S】
 
@@ -102,7 +174,7 @@
 
 ---
 
-## 3. 阶段 B 详细方案（v0.3.0 架构升级）
+## 3-v2. 阶段 B 详细方案（v0.3.0 架构升级）
 
 ### B-1 插件自有 ignorable 事件
 
@@ -124,7 +196,7 @@
 
 ---
 
-## 4. 阶段 C 详细方案（v0.3.0 产品增强）
+## 4-v2. 阶段 C 详细方案（v0.3.0 产品增强）
 
 ### C-1 `bg_result` 文本上限 【S】
 
@@ -148,7 +220,7 @@
 
 ---
 
-## 5. 明确不可实施 / 不做（附原因）
+## 5-v2. 明确不可实施 / 不做（附原因）
 
 | 项 | 结论 | 原因 |
 |---|---|---|
@@ -159,7 +231,7 @@
 | 面板树形渲染 | ⏸ 可选 | 全局面板聚合所有父会话，树渲染边际价值低。 |
 | 面板词典 es/pt/hi | ❌ 不可实施 | harness 客户端 `LOCALE_IDS = ['zh','en']`，第三方语言永不可选中；待 harness 扩展后再开。 |
 
-## 6. 决策记录
+## 6-v2. 决策记录（v2）
 
 1. **阶段 B 纳入路线图**：✅ 已确认（用户拍板）。
 2. **npm 发布**：CI 门控发布（tag 推送 + `NPM_TOKEN`），git 安装维持主通道；本仓库只提交 workflow，实际发布由 owner 配置 token 后自动发生。

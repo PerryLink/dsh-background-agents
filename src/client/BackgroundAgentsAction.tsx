@@ -34,6 +34,13 @@ export interface BackgroundAgentsInjected {
    * @returns an error message on failure, undefined on success.
    */
   sendMessage(parentSessionId: string, childSessionId: string, text: string): Promise<string | undefined>
+  /**
+   * Read the child's final assistant text through the official
+   * `subagent.history` RPC (a read-only transcript peek that never activates
+   * the child Agent).
+   * @returns the extracted text plus an optional error message.
+   */
+  readResult(parentSessionId: string, childSessionId: string): Promise<{ text: string; error?: string }>
 }
 
 /** Full props: the footer-action owner share, standard kit, injected actions, and locale. */
@@ -63,14 +70,26 @@ function statusLabel(status: RowStatus, t: TranslateNS<typeof NS>): string {
   }
 }
 
+/** One open result peek: the row it belongs to plus its load state. */
+interface ResultState {
+  readonly id: string
+  readonly loading: boolean
+  readonly text: string
+  readonly error?: string
+}
+
 /** One dashboard row. */
-function Row({ row, t, now, busy, composing, draft, onDraft, onOpen, onStop, onCompose, onSend, onCancel }: {
+function Row({ row, t, now, busy, showParent, composing, draft, result, onResult, onCloseResult, onDraft, onOpen, onStop, onCompose, onSend, onCancel }: {
   readonly row: AgentRow
   readonly t: TranslateNS<typeof NS>
   readonly now: number
   readonly busy: boolean
+  readonly showParent: boolean
   readonly composing: boolean
   readonly draft: string
+  readonly result: ResultState | undefined
+  readonly onResult: () => void
+  readonly onCloseResult: () => void
   readonly onDraft: (text: string) => void
   readonly onOpen: () => void
   readonly onStop: () => void
@@ -78,6 +97,7 @@ function Row({ row, t, now, busy, composing, draft, onDraft, onOpen, onStop, onC
   readonly onSend: () => void
   readonly onCancel: () => void
 }) {
+  const resultOpen = result !== undefined && result.id === row.agentId
   return (
     <li className={css.row}>
       <div className={css.rowHead}>
@@ -85,6 +105,7 @@ function Row({ row, t, now, busy, composing, draft, onDraft, onOpen, onStop, onC
         <span className={css.label} title={row.agentId}>{row.label}</span>
         <span className={css.meta}>{t('row.messages', { n: row.messageCount })} · {timeLabel(row.lastActiveAt, now, t)}</span>
       </div>
+      {showParent && row.parentTitle !== undefined && <div className={css.parentTitle}>{row.parentTitle}</div>}
       {row.lastMessage !== undefined && <div className={css.lastMessage}>{row.lastMessage}</div>}
       <div className={css.actions}>
         <button type="button" className={css.action} disabled={busy} onClick={onOpen}>{t('row.open')}</button>
@@ -97,7 +118,18 @@ function Row({ row, t, now, busy, composing, draft, onDraft, onOpen, onStop, onC
           {t('row.stop')}
         </button>
         <button type="button" className={css.action} disabled={busy || composing} onClick={onCompose}>{t('row.message')}</button>
+        <button type="button" className={css.action} disabled={busy} onClick={resultOpen ? onCloseResult : onResult}>
+          {resultOpen ? t('result.close') : t('row.result')}
+        </button>
       </div>
+      {resultOpen && result !== undefined && (
+        <div className={css.result}>
+          {result.loading && <div className={css.resultLoading}>{t('result.loading')}</div>}
+          {!result.loading && result.error !== undefined && <div className={css.resultError}>{result.error}</div>}
+          {!result.loading && result.error === undefined
+            && <div className={css.resultText}>{result.text === '' ? t('result.empty') : result.text}</div>}
+        </div>
+      )}
       {composing && (
         <div className={css.composer}>
           <input
@@ -121,28 +153,45 @@ function Row({ row, t, now, busy, composing, draft, onDraft, onOpen, onStop, onC
 
 /** The sidebar footer trigger + floating dashboard panel. */
 export function BackgroundAgentsAction({
-  wide, t, useSessions, openChild, stopChild, sendMessage,
+  wide, t, useSessions, openChild, stopChild, sendMessage, readResult,
 }: BackgroundAgentsActionProps) {
   const [open, setOpen] = useState(false)
   const [error, setError] = useState<string | undefined>(undefined)
   const [busyId, setBusyId] = useState<string | undefined>(undefined)
   const [composingId, setComposingId] = useState<string | undefined>(undefined)
   const [draft, setDraft] = useState('')
+  const [result, setResult] = useState<ResultState | undefined>(undefined)
   const [now, setNow] = useState(() => Date.now())
   const wrapRef = useRef<HTMLDivElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const wasOpenRef = useRef(false)
 
   // The client SessionProjectionMap cannot carry the plugin's key, so the
   // snapshot crosses the boundary structurally and the presenter guards the
   // projection cell at runtime.
   const rows = useSessions(snapshot => buildAgentRows(snapshot as unknown as SessionListLike))
   const runningCount = rows.filter(row => row.status === 'running').length
+  // Parent-session disambiguation: only when several parents project rows.
+  const showParent = new Set(rows.map(row => row.parentSessionId)).size > 1
 
   // Refresh the relative-time labels while the panel is open.
   useEffect(() => {
     if (!open) return
     const timer = window.setInterval(() => { setNow(Date.now()) }, 30_000)
     return () => { window.clearInterval(timer) }
+  }, [open])
+
+  // Dialog focus: move into the panel on open, hand back to the trigger on
+  // close so keyboard users keep their context. The guard skips the initial
+  // mount (never steal focus from the boot flow).
+  useEffect(() => {
+    if (open) {
+      panelRef.current?.focus()
+    } else if (wasOpenRef.current) {
+      triggerRef.current?.focus()
+    }
+    wasOpenRef.current = open
   }, [open])
 
   // Close on outside pointer-down or Escape.
@@ -176,11 +225,33 @@ export function BackgroundAgentsAction({
     }
   }
 
+  const loadResult = async (row: AgentRow): Promise<void> => {
+    setResult({ id: row.agentId, loading: true, text: '' })
+    setError(undefined)
+    try {
+      const peek = await readResult(row.parentSessionId, row.agentId)
+      setResult({
+        id: row.agentId,
+        loading: false,
+        text: peek.text,
+        ...(peek.error === undefined ? {} : { error: peek.error }),
+      })
+    } catch (failure) {
+      setResult({
+        id: row.agentId,
+        loading: false,
+        text: '',
+        error: failure instanceof Error ? failure.message : String(failure),
+      })
+    }
+  }
+
   return (
     <div className={css.triggerWrap} ref={wrapRef}>
       <Tooltip label={t('trigger.aria')} delayMs={500}>
         <button
           type="button"
+          ref={triggerRef}
           className={css.trigger}
           aria-label={t('trigger.aria')}
           aria-expanded={open}
@@ -195,7 +266,7 @@ export function BackgroundAgentsAction({
         </button>
       </Tooltip>
       {open && createPortal(
-        <div className={css.panel} role="dialog" aria-label={t('panel.title')} ref={panelRef}>
+        <div className={css.panel} role="dialog" aria-label={t('panel.title')} ref={panelRef} tabIndex={-1}>
           <div className={css.panelTitle}>{t('panel.title')}</div>
           {error !== undefined && <div className={css.error}>{error}</div>}
           {rows.length === 0
@@ -209,8 +280,12 @@ export function BackgroundAgentsAction({
                     t={t}
                     now={now}
                     busy={busyId === row.agentId}
+                    showParent={showParent}
                     composing={composingId === row.agentId}
                     draft={composingId === row.agentId ? draft : ''}
+                    result={result}
+                    onResult={() => { void loadResult(row) }}
+                    onCloseResult={() => { setResult(undefined) }}
                     onDraft={setDraft}
                     onOpen={() => { void run(next => openChild(next.parentSessionId, next.agentId), row) }}
                     onStop={() => { void run(next => stopChild(next.parentSessionId, next.agentId), row) }}

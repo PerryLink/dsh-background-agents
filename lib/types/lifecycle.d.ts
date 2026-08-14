@@ -19,6 +19,11 @@ export interface LifecycleConfig {
     readonly reportThrottleMs: number;
     /** Hard cap on the progress-line text injected per report. */
     readonly reportSummaryMaxChars: number;
+    /**
+     * Idle archive toggle: when false, the sweep leaves quiet children alone
+     * (only stale cache entries are reclaimed).
+     */
+    readonly autoArchive: boolean;
     /** Idle window after which the sweep archives a quiet child. */
     readonly idleTimeoutMinutes: number;
     /** Sweep period. */
@@ -82,9 +87,21 @@ export declare class BackgroundAgentLifecycle {
  * One line of a session's last assistant text, empty when it produced none.
  * Accepts any event-log carrier so both live sessions and persistence
  * inspections can serve the same fold.
+ * @param session - the event-log carrier.
+ * @param options.allowReasoning - when true and the selected output carries no
+ *   text block, fall back to the reasoning blocks (a thinking model's last
+ *   message may be reasoning-only). Off by default: progress lines never
+ *   inject reasoning into the parent.
+ * @param options.reasoning - set by the caller to observe which source the
+ *   fold used (text when the fallback was not needed).
  */
 export declare function sessionLastText(session: {
     events: readonly SessionEvent[];
+}, options?: {
+    allowReasoning?: boolean;
+    reasoning?: {
+        used: boolean;
+    };
 }): string;
 /** One line of the child's last assistant text, empty when it produced none. */
 export declare function childLastText(sessions: LiveSessions, childId: SessionId): string;

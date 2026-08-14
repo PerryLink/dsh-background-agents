@@ -40,6 +40,13 @@ export interface Config {
     resultMaxChars?: number;
     /** Hard cap on non-archived background agents per parent session. */
     maxBackgroundAgents?: number;
+    /**
+     * Idle archive toggle: when false, the sweep never archives quiet children
+     * (the idle window only gates the auto-archive when enabled). Disable it for
+     * workflows where a long-lived watcher agent should stay parked, not
+     * archived.
+     */
+    autoArchive?: boolean;
     /** Idle window after which the sweep archives a quiet child (`>= 1`). */
     idleTimeoutMinutes?: number;
     /** Sweep period. */
@@ -73,6 +80,7 @@ export declare const DEFAULTS: {
     readonly reportSummaryMaxChars: 300;
     readonly resultMaxChars: 4000;
     readonly maxBackgroundAgents: 4;
+    readonly autoArchive: true;
     readonly idleTimeoutMinutes: 120;
     readonly idleSweepIntervalMs: 60000;
     readonly maxLabelChars: 120;

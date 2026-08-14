@@ -11,6 +11,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { ConnectionHandle } from '@deepseek-ai/dsh-api-remotes/client'
 import type { ISessions, SessionId } from '@deepseek-ai/dsh-client-runtime/client'
 import { BackgroundAgentsAction, type BackgroundAgentsInjected } from './BackgroundAgentsAction.tsx'
+import { extractResultText } from './presenter.ts'
 import { en, NS, zh, type BackgroundAgentsKey } from './locales.ts'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
@@ -86,6 +87,25 @@ export function apply(ctx: Context): void {
           return `${result.result.error.code}: ${result.result.error.message}`
         } catch (error) {
           return error instanceof Error ? error.message : String(error)
+        }
+      },
+      async readResult(parentSessionId: string, childSessionId: string): Promise<{ text: string; error?: string }> {
+        try {
+          // A read-only transcript peek through the official history RPC: the
+          // last few messages suffice for the final assistant text, and the
+          // child Agent is never activated.
+          const result = await api.subagents.history({
+            parentSessionId: parentSessionId as SessionId,
+            childSessionId: childSessionId as SessionId,
+            mode: 'continuable',
+            maxMessages: 4,
+          })
+          if (!result.result.ok) {
+            return { text: '', error: `${result.result.error.code}: ${result.result.error.message}` }
+          }
+          return { text: extractResultText(result.result.value.events) }
+        } catch (error) {
+          return { text: '', error: error instanceof Error ? error.message : String(error) }
         }
       },
     }),

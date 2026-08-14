@@ -19,9 +19,19 @@ export interface BackgroundAgentsInjected {
      * @returns an error message on failure, undefined on success.
      */
     sendMessage(parentSessionId: string, childSessionId: string, text: string): Promise<string | undefined>;
+    /**
+     * Read the child's final assistant text through the official
+     * `subagent.history` RPC (a read-only transcript peek that never activates
+     * the child Agent).
+     * @returns the extracted text plus an optional error message.
+     */
+    readResult(parentSessionId: string, childSessionId: string): Promise<{
+        text: string;
+        error?: string;
+    }>;
 }
 /** Full props: the footer-action owner share, standard kit, injected actions, and locale. */
 export type BackgroundAgentsActionProps = PropsRuntime<'sidebar.footer.action'> & BackgroundAgentsInjected & PropsLocale<typeof NS>;
 /** The sidebar footer trigger + floating dashboard panel. */
-export declare function BackgroundAgentsAction({ wide, t, useSessions, openChild, stopChild, sendMessage, }: BackgroundAgentsActionProps): import("react").JSX.Element;
+export declare function BackgroundAgentsAction({ wide, t, useSessions, openChild, stopChild, sendMessage, readResult, }: BackgroundAgentsActionProps): import("react").JSX.Element;
 //# sourceMappingURL=BackgroundAgentsAction.d.ts.map

@@ -38,6 +38,7 @@ bg_list ──▶ ctx.subagents.listChildren / listDescendants(parent)  (durable
             + ctx.agents.get(id)                 (running/idle/ready overlay)
 
 bg_result ──▶ ctx.sessions.get(child) → sessionPersistence.load(child) → final assistant text
+                                                    (text blocks; reasoning fallback flagged `textSource`)
 ```
 
 The five tools are thin adapters over `startContinuable` / `followup` / `listChildren` /
@@ -48,13 +49,13 @@ log, and `bg_list` recovers through the official catalog.
 
 ## Lifecycle policies
 
-- **Cap** (`maxBackgroundAgents`): `background_agent` counts non-archived continuable children via `listChildren` minus the projection's archived set; a `SubagentError` from the listing falls back to the live registry count (never blocks starts on an unavailable catalog).
+- **Cap** (`maxBackgroundAgents`): `background_agent` counts non-archived continuable children via `listChildren` minus the projection's archived set; a `SubagentError` from the listing falls back to the live registry count (never blocks starts on an unavailable catalog). Concurrent starts of one parent serialize through a per-parent gate (count + cap-check + start in one chain), and a resolved tail gate reclaims its map slot.
 - **Throttle** (`reportThrottleMs`): per child, per process; the first report of a child is never throttled (`-1` watermark), so a fast first turn still reports.
-- **Idle archive** (`idleTimeoutMinutes` / `idleSweepIntervalMs`): the sweep archives quiet children — inject the archived notice, request interruption of a resident activation through `ctx.subagents.interrupt` (official semantics; fire-and-return), and stop observing. A child whose live agent is mid-turn is left alone: a long tool execution emits no session events and would otherwise read as idle. `bg_message` wakes an archived child back into tracking.
+- **Idle archive** (`autoArchive` / `idleTimeoutMinutes` / `idleSweepIntervalMs`): when `autoArchive` is on, the sweep archives quiet children — inject the archived notice, request interruption of a resident activation through `ctx.subagents.interrupt` (official semantics; fire-and-return), and stop observing. A child whose live agent is mid-turn is left alone: a long tool execution emits no session events and would otherwise read as idle. `bg_message` wakes an archived child back into tracking. With `autoArchive: false` the sweep never archives (long-lived watcher agents stay parked) and only reclaims cache entries whose parent and child agents are both gone.
 
 ## Web UI
 
-The client half registers into the `sidebar.footer.action` slot (the one list hole the sidebar shell declares): a trigger with a live running-count badge opens a floating panel. All rows derive from the `backgroundAgents` projection values riding the session-list snapshot — zero RPC. Jump, message, and stop go through the official client APIs: `sessions.refreshSubagents` + `sessions.openSubagent` (jump), `api.subagents.prompt` with `mode: 'continuable'` (message — a queued delivery whose answer is the child's next turn), and `api.subagents.interrupt` with the durable parent/child address (stop). The presenter (`src/client/presenter.ts`) is a pure function of the snapshot — testable without a DOM.
+The client half registers into the `sidebar.footer.action` slot (the one list hole the sidebar shell declares): a trigger with a live running-count badge opens a floating panel. All rows derive from the `backgroundAgents` projection values riding the session-list snapshot — zero RPC for the rows themselves. Jump, message, stop, and the result peek go through the official client APIs: `sessions.refreshSubagents` + `sessions.openSubagent` (jump), `api.subagents.prompt` with `mode: 'continuable'` (message — a queued delivery whose answer is the child's next turn), `api.subagents.interrupt` with the durable parent/child address (stop), and the read-only `api.subagents.history` tail page (result — the last assistant text, extracted by a pure presenter function, never activating the child Agent). Rows carry the parent session title for disambiguation when several parents project agents; panel open/close moves focus into the dialog and back to the trigger. The presenter (`src/client/presenter.ts`) is a pure function of the snapshot — testable without a DOM.
 
 ## Boundaries
 

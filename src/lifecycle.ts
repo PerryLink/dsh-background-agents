@@ -26,6 +26,11 @@ export interface LifecycleConfig {
   readonly reportThrottleMs: number
   /** Hard cap on the progress-line text injected per report. */
   readonly reportSummaryMaxChars: number
+  /**
+   * Idle archive toggle: when false, the sweep leaves quiet children alone
+   * (only stale cache entries are reclaimed).
+   */
+  readonly autoArchive: boolean
   /** Idle window after which the sweep archives a quiet child. */
   readonly idleTimeoutMinutes: number
   /** Sweep period. */
@@ -144,15 +149,33 @@ export class BackgroundAgentLifecycle {
  * One line of a session's last assistant text, empty when it produced none.
  * Accepts any event-log carrier so both live sessions and persistence
  * inspections can serve the same fold.
+ * @param session - the event-log carrier.
+ * @param options.allowReasoning - when true and the selected output carries no
+ *   text block, fall back to the reasoning blocks (a thinking model's last
+ *   message may be reasoning-only). Off by default: progress lines never
+ *   inject reasoning into the parent.
+ * @param options.reasoning - set by the caller to observe which source the
+ *   fold used (text when the fallback was not needed).
  */
-export function sessionLastText(session: { events: readonly SessionEvent[] }): string {
+export function sessionLastText(
+  session: { events: readonly SessionEvent[] },
+  options: { allowReasoning?: boolean; reasoning?: { used: boolean } } = {},
+): string {
   const output = finalAssistantOutput(session.events)
   if (output === undefined) return ''
-  return output
+  const text = output
     .filter((block): block is Extract<(typeof output)[number], { type: 'text' }> => block.type === 'text')
     .map(block => block.text)
     .join('')
     .trim()
+  if (text !== '' || options.allowReasoning !== true) return text
+  const reasoning = output
+    .filter((block): block is Extract<(typeof output)[number], { type: 'reasoning' }> => block.type === 'reasoning')
+    .map(block => block.text)
+    .join('')
+    .trim()
+  if (options.reasoning !== undefined) options.reasoning.used = reasoning !== ''
+  return reasoning
 }
 
 /** One line of the child's last assistant text, empty when it produced none. */
@@ -286,7 +309,7 @@ export function sweepIdle(
       lifecycle.delete(child.childId)
       continue
     }
-    if (now - child.lastActivityAt >= timeoutMs) {
+    if (config.autoArchive && now - child.lastActivityAt >= timeoutMs) {
       try {
         archiveChild(ctx, agents, config, lifecycle, child)
       } catch (error) {

@@ -15,18 +15,18 @@ DSH 内置的后台 *jobs* 是"发后即忘"的工具执行：能读输出、能
 - **`background_agent`** —— 从任意会话启动一个持久化、可继续的子 agent。它在自己的上下文里干活，立即返回稳定 agent id，会话永久可续。可选逐子 scoping：`tool_filter`（从子 agent 视野移除工具——只收不扩）、`persona`（专属系统提示词人格）、`max_depth`（再委派深度上限）；`childProvider`/`childModel` 配置其模型路由。
 - **`bg_message`** —— 给它派新活、纠偏，或唤醒已结束的 agent。消息走官方 FIFO inbox，agent 的回应就是它的下一轮。
 - **`bg_list`** —— 状态总览：label、模式、activity（`running` / `idle` / `ready` / `settled` / `archived`）、消息数、最近活跃时间。重启后能通过官方持久化子代理目录恢复。`recursive: true` 列出整棵后代树（带 `parentId`/`depth`）。
-- **`bg_result`** —— 取回子 agent 最近一次 assistant 输出全文 + 当前 activity（比 settled 通知摘要更全）。
+- **`bg_result`** —— 取回子 agent 最近一次 assistant 输出全文 + 当前 label 与 activity（比 settled 通知摘要更全）；思考模型的末条消息若无 text 块，回退到 reasoning 块并以 `textSource: 'reasoning'` 标注。
 - **`bg_stop`** —— 请求中断当前轮。发后即返：收尾交给官方控制面，agent 保持可唤醒。
 - **autoReport** —— 每个子轮结束后，向父会话注入一行节流进度（模型可见、来源标记 `{ kind: 'plugin', plugin: 'dsh-background-agents' }`）；最终结果由官方 settled 通知送达。`reportDelivery: wakeup` 让每行进度在父 agent 空闲时直接开启一个父回合。
-- **空闲归档** —— 超过 `idleTimeoutMinutes` 无活动的 agent 自动归档并通知；`bg_message` 可以再唤醒它。
+- **空闲归档** —— 超过 `idleTimeoutMinutes` 无活动的 agent 自动归档并通知；`bg_message` 可以再唤醒它。设 `autoArchive: false` 可让安静的观察型 agent 驻留而非归档。
 - **`backgroundAgents` 投影单元** —— 折叠父会话日志得到仪表盘行（agentId、label、activity、最后消息摘要、创建时间）。一切事实都能从持久化日志重建，无独立数据库。
-- **Web UI 面板** —— Web GUI 侧栏新增"后台 agent"入口：实时状态、一键跳到子会话、停止按钮，以及经官方 `subagent.prompt` RPC 发消息排队新回合的按钮。
+- **Web UI 面板** —— Web GUI 侧栏新增"后台 agent"入口：实时状态、一键跳到子会话、停止按钮、经官方 `subagent.prompt` RPC 发消息排队新回合的按钮，以及经只读 `subagent.history` RPC 查看子 agent 最终文本的结果按钮；多父会话时行内显示父会话标题以消歧。
 
 ## 快速开始
 
 ```sh
 # 在 harness checkout 或任意 dsh CLI 可用处（web 或 headless）
-dsh plugin --profile <name> add "github:PerryLink/dsh-background-agents#v0.3.0"
+dsh plugin --profile <name> add "github:PerryLink/dsh-background-agents#v0.4.0"
 ```
 
 bundle patch 自带插件行，`dsh plugin add` 会把它组合进 profile 的层栈（`dsh.profile.bundles`）。建议使用 pin 了 ref 的 git 源：本仓库已提交构建产物（`lib/`），git 安装无需构建步骤、无需 `allowBuilds`。包也已发布到 npm——`pnpm add dsh-background-agents` 同样可用（每次 tag 推送由 CI 自动发布）。
@@ -65,6 +65,7 @@ bg_stop <agentId>
 | `reportSummaryMaxChars` | `300` | 注入进度行文本的硬上限（显式省略号截断） |
 | `resultMaxChars` | `4000` | `bg_result` 返回文本的硬上限（省略号截断并置 `truncated` 标志） |
 | `maxBackgroundAgents` | `4` | 每个父会话非归档后台 agent 的硬上限；预算为该会话**全部** continuable 直属子代理共享（含内置 `subagent` 工具启动的） |
+| `autoArchive` | `true` | 空闲归档开关：设为 `false` 后巡检永不归档安静的子 agent（空闲窗口仅保留死缓存条目回收） |
 | `idleTimeoutMinutes` | `120` | 空闲窗口：超时后归档并通知（`>= 1`） |
 | `idleSweepIntervalMs` | `60000` | 归档巡检周期 |
 | `maxLabelChars` | `120` | 展示标签上限（省略号截断） |
@@ -114,7 +115,7 @@ harness 核心自带一组 subagent 工具（`subagent`、`send_message`、`inte
 ```sh
 pnpm install        # 仅工具链；harness 包通过相邻 checkout 解析
 pnpm run typecheck  # strict TS，node + client 双程序
-pnpm test           # 69 个单元 + 端到端测试（真实 subagent seam + 脚本化 LLM + jsdom 面板）
+pnpm test           # 83 个单元 + 端到端测试（真实 subagent seam + 脚本化 LLM + jsdom 面板）
 pnpm run build      # lib/index.js（node 半）+ lib/client.js（Web client bundle）
 pnpm run gen-aliases  # checkout 移动后重新映射 harness 包路径
 ```

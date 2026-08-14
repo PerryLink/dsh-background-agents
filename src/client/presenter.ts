@@ -23,6 +23,8 @@ export interface AgentRow {
   readonly agentId: string
   /** Display label: the projection label, else the child's session title. */
   readonly label: string
+  /** The parent session's display title, for disambiguation when several parents project rows. */
+  readonly parentTitle?: string
   readonly status: RowStatus
   /** Accepted deliveries: the initial task plus every follow-up. */
   readonly messageCount: number
@@ -81,6 +83,7 @@ export function buildAgentRows(list: SessionListLike): AgentRow[] {
         parentSessionId: parent.id,
         agentId: entry.agentId,
         label: entry.label === '' ? (child?.displayTitle ?? entry.agentId) : entry.label,
+        ...(parent.displayTitle === undefined ? {} : { parentTitle: parent.displayTitle }),
         status: rowStatus(entry, child?.running === true),
         messageCount: entry.messageCount,
         ...(entry.lastMessage === undefined ? {} : { lastMessage: entry.lastMessage }),
@@ -120,4 +123,38 @@ export function relativeTime(at: number, now: number): RelativeTime {
   if (diff < 30 * DAY) return { unit: 'days', n: Math.floor(diff / DAY) }
   if (diff < 365 * DAY) return { unit: 'months', n: Math.floor(diff / (30 * DAY)) }
   return { unit: 'years', n: Math.floor(diff / (365 * DAY)) }
+}
+
+/** One history page entry as the wire delivers it (structural; the client bundle never imports host types). */
+export interface HistoryEntryLike {
+  readonly event: {
+    readonly type: string
+    readonly data?: unknown
+  }
+}
+
+/**
+ * Extract the final assistant text from one history page. Scans forward for
+ * the last assistant message that carries a text block; reasoning-only
+ * messages are skipped (bg_result owns the reasoning fallback, the panel
+ * shows plain text). Returns '' when the page has none — the caller renders
+ * its own empty state.
+ * @param entries - one `subagent.history` page's entries.
+ * @returns the joined text of the last assistant text message.
+ */
+export function extractResultText(entries: readonly HistoryEntryLike[]): string {
+  let text = ''
+  for (const entry of entries) {
+    if (entry.event.type !== 'assistant/message') continue
+    const message = (entry.event.data as { message?: { content?: unknown } } | undefined)?.message
+    if (message === undefined || !Array.isArray(message.content)) continue
+    const joined = message.content
+      .filter((block): block is { type: 'text'; text: string } =>
+        typeof block === 'object' && block !== null && (block as { type?: unknown }).type === 'text')
+      .map(block => block.text)
+      .join('')
+      .trim()
+    if (joined !== '') text = joined
+  }
+  return text
 }

@@ -13,7 +13,7 @@ import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import SubagentRuntime from '@deepseek-ai/dsh-subagent'
 import * as SubagentSpawn from '@deepseek-ai/dsh-subagent-spawn-in-process'
 import * as plugin from '../src/index.ts'
-import { MockAdapter, textResponse } from './mock-adapter.ts'
+import { MockAdapter, reasoningResponse, textResponse } from './mock-adapter.ts'
 
 const testToolSignal = new AbortController().signal
 
@@ -136,6 +136,28 @@ describe('dsh-background-agents tools', () => {
     const result = await callTool(ctx, 'background_agent', { task: 'x' }, parent)
     expect(result.isError).toBe(true)
     expect(text(result)).toContain('no subagent provider registered')
+  })
+
+  it('rejects a blank task instead of starting an aimless child', async () => {
+    const { ctx, parent } = await setup()
+    const result = await callTool(ctx, 'background_agent', { task: '   \n  ' }, parent)
+    expect(result.isError).toBe(true)
+    expect(text(result)).toContain('non-empty task')
+    // Nothing was created for the rejected start.
+    const listing = await callTool(ctx, 'bg_list', {}, parent)
+    expect(valueOf<{ agents: unknown[] }>(listing).agents).toHaveLength(0)
+  })
+
+  it('rejects a blank bg_message instead of delivering an empty turn', async () => {
+    const { ctx, parent } = await setup()
+    ctx.llm.registerAdapter(['mock'], new MockAdapter([textResponse('first answer')]))
+    const started = await callTool(ctx, 'background_agent', { task: 'write one line' }, parent)
+    expect(started.isError).toBe(false)
+    const childId = valueOf<{ agentId: string }>(started).agentId
+
+    const result = await callTool(ctx, 'bg_message', { agent_id: childId, message: '  \t ' }, parent)
+    expect(result.isError).toBe(true)
+    expect(text(result)).toContain('non-empty message')
   })
 
   it('delivers a follow-up through the official seam with coordinator attribution', async () => {
@@ -284,9 +306,11 @@ describe('dsh-background-agents tools', () => {
     expect(result.isError).toBe(false)
     // The structured registered fact lands even for direct tool execution and
     // the official settled account folds over it, so the activity reads the
-    // durable settled state instead of the live-catalog fallback.
-    expect(valueOf<{ agentId: string; activity: string; text?: string }>(result)).toEqual({
+    // durable settled state instead of the live-catalog fallback. The label
+    // rides the same fact.
+    expect(valueOf<{ agentId: string; label: string; activity: string; text?: string }>(result)).toEqual({
       agentId: childId,
+      label: 'answer one thing',
       activity: 'settled',
       text: 'final answer text',
     })
@@ -294,6 +318,22 @@ describe('dsh-background-agents tools', () => {
     const ghost = await callTool(ctx, 'bg_result', { agent_id: 'ghost-child' }, parent)
     expect(ghost.isError).toBe(true)
     expect(text(ghost)).toContain('not one of this conversation\'s tracked children')
+  })
+
+  it('bg_result falls back to reasoning blocks when the final message carried no text', async () => {
+    const { ctx, parent } = await setup()
+    ctx.llm.registerAdapter(['mock'], new MockAdapter([reasoningResponse('thinking about the answer')]))
+    const started = await callTool(ctx, 'background_agent', { task: 'think about it', label: 'thinker' }, parent)
+    expect(started.isError).toBe(false)
+    const childId = valueOf<{ agentId: string }>(started).agentId
+    await vi.waitFor(() => { expect(ctx.agents.get(SessionId(childId))).toBeUndefined() }, { timeout: 5_000 })
+
+    const result = await callTool(ctx, 'bg_result', { agent_id: childId }, parent)
+    expect(result.isError).toBe(false)
+    expect(valueOf<{ text?: string; textSource?: string }>(result)).toMatchObject({
+      text: 'thinking about the answer',
+      textSource: 'reasoning',
+    })
   })
 
   it('bg_result ellipsizes over-long text by resultMaxChars and flags truncation', async () => {

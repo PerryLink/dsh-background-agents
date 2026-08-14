@@ -18,6 +18,8 @@ export interface AgentRow {
     readonly agentId: string;
     /** Display label: the projection label, else the child's session title. */
     readonly label: string;
+    /** The parent session's display title, for disambiguation when several parents project rows. */
+    readonly parentTitle?: string;
     readonly status: RowStatus;
     /** Accepted deliveries: the initial task plus every follow-up. */
     readonly messageCount: number;
@@ -67,4 +69,21 @@ export interface RelativeTime {
  * @returns the bucket and magnitude.
  */
 export declare function relativeTime(at: number, now: number): RelativeTime;
+/** One history page entry as the wire delivers it (structural; the client bundle never imports host types). */
+export interface HistoryEntryLike {
+    readonly event: {
+        readonly type: string;
+        readonly data?: unknown;
+    };
+}
+/**
+ * Extract the final assistant text from one history page. Scans forward for
+ * the last assistant message that carries a text block; reasoning-only
+ * messages are skipped (bg_result owns the reasoning fallback, the panel
+ * shows plain text). Returns '' when the page has none — the caller renders
+ * its own empty state.
+ * @param entries - one `subagent.history` page's entries.
+ * @returns the joined text of the last assistant text message.
+ */
+export declare function extractResultText(entries: readonly HistoryEntryLike[]): string;
 //# sourceMappingURL=presenter.d.ts.map

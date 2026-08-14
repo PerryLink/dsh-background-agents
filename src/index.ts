@@ -47,6 +47,13 @@ export interface Config {
   resultMaxChars?: number
   /** Hard cap on non-archived background agents per parent session. */
   maxBackgroundAgents?: number
+  /**
+   * Idle archive toggle: when false, the sweep never archives quiet children
+   * (the idle window only gates the auto-archive when enabled). Disable it for
+   * workflows where a long-lived watcher agent should stay parked, not
+   * archived.
+   */
+  autoArchive?: boolean
   /** Idle window after which the sweep archives a quiet child (`>= 1`). */
   idleTimeoutMinutes?: number
   /** Sweep period. */
@@ -81,6 +88,7 @@ export const DEFAULTS = {
   reportSummaryMaxChars: 300,
   resultMaxChars: 4_000,
   maxBackgroundAgents: 4,
+  autoArchive: true,
   idleTimeoutMinutes: 120,
   idleSweepIntervalMs: 60_000,
   maxLabelChars: 120,
@@ -95,9 +103,11 @@ export const Config: Schema<Config> = Schema.object({
   // 0 would erase every bg_result answer; the schema forbids it.
   resultMaxChars: Schema.natural().min(1).max(Number.MAX_SAFE_INTEGER).default(DEFAULTS.resultMaxChars),
   maxBackgroundAgents: Schema.natural().max(Number.MAX_SAFE_INTEGER).default(DEFAULTS.maxBackgroundAgents),
+  autoArchive: Schema.boolean().default(DEFAULTS.autoArchive),
   // 0 would archive any quiet child on the next sweep pass; the schema forbids it.
   idleTimeoutMinutes: Schema.natural().min(1).max(Number.MAX_SAFE_INTEGER).default(DEFAULTS.idleTimeoutMinutes),
-  idleSweepIntervalMs: Schema.natural().max(Number.MAX_SAFE_INTEGER).default(DEFAULTS.idleSweepIntervalMs),
+  // 0 would turn the sweep into a 1ms hot loop; the schema forbids it.
+  idleSweepIntervalMs: Schema.natural().min(1).max(Number.MAX_SAFE_INTEGER).default(DEFAULTS.idleSweepIntervalMs),
   maxLabelChars: Schema.natural().max(Number.MAX_SAFE_INTEGER).default(DEFAULTS.maxLabelChars),
   reportDelivery: Schema.union([
     Schema.const('quiet'),
@@ -125,6 +135,7 @@ export function apply(ctx: Context, config: Config): void {
     reportSummaryMaxChars: config.reportSummaryMaxChars ?? DEFAULTS.reportSummaryMaxChars,
     resultMaxChars: config.resultMaxChars ?? DEFAULTS.resultMaxChars,
     maxBackgroundAgents: config.maxBackgroundAgents ?? DEFAULTS.maxBackgroundAgents,
+    autoArchive: config.autoArchive ?? DEFAULTS.autoArchive,
     idleTimeoutMinutes: config.idleTimeoutMinutes ?? DEFAULTS.idleTimeoutMinutes,
     idleSweepIntervalMs: config.idleSweepIntervalMs ?? DEFAULTS.idleSweepIntervalMs,
     maxLabelChars: config.maxLabelChars ?? DEFAULTS.maxLabelChars,

@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import { SubagentError } from '@deepseek-ai/dsh-subagent'
 import {
-  BackgroundAgentLifecycle, countBackgroundAgents, reportProgress, sweepIdle,
+  BackgroundAgentLifecycle, countBackgroundAgents, reportProgress, sessionLastText, sweepIdle,
   type LifecycleConfig, type LiveAgents, type LiveSessions,
 } from '../src/lifecycle.ts'
 import { parseNotice } from '../src/vocabulary.ts'
@@ -15,6 +15,7 @@ function policy(over: Partial<LifecycleConfig> = {}): LifecycleConfig {
     autoReport: true,
     reportThrottleMs: 15_000,
     reportSummaryMaxChars: 120,
+    autoArchive: true,
     idleTimeoutMinutes: 120,
     idleSweepIntervalMs: 60_000,
     reportDelivery: 'quiet',
@@ -40,6 +41,23 @@ function childSessionWithAssistant(text: string): { events: unknown[] } {
     id: 'msg-1',
     role: 'assistant',
     content: [{ type: 'text', text }],
+    source: { kind: 'model', provider: 'mock', model: 'mock' },
+  }
+  return {
+    events: [{
+      type: 'assistant/message',
+      seq: 0,
+      time: 1,
+      data: { turn: 1, step: 1, message },
+    }],
+  }
+}
+
+function childSessionWithReasoning(text: string): { events: unknown[] } {
+  const message = {
+    id: 'msg-1',
+    role: 'assistant',
+    content: [{ type: 'reasoning', text }],
     source: { kind: 'model', provider: 'mock', model: 'mock' },
   }
   return {
@@ -199,6 +217,29 @@ describe('idle sweep', () => {
     expect(inject).not.toHaveBeenCalled()
   })
 
+  it('never archives when autoArchive is off, but still reclaims dead cache entries', () => {
+    const lifecycle = new BackgroundAgentLifecycle()
+    lifecycle.register(childId, parentId, 'writer', 0)
+    const inject = vi.fn()
+    const parent: FakeParent = { id: parentId, inject, followup: vi.fn(), session: { append: vi.fn() } }
+    const interrupt = vi.fn()
+    const childAgent = { id: childId, status: 'idle' }
+    const agentFace = { get: (id: SessionId) => (id === childId ? childAgent : parent) } as unknown as LiveAgents
+
+    sweepIdle(fakeCtx(interrupt), agentFace, policy({ autoArchive: false }), lifecycle, 121 * 60_000)
+
+    // The quiet child survives the idle window: no archive fact, no notice,
+    // no interrupt request.
+    expect(lifecycle.get(childId)!.archived).toBe(false)
+    expect(interrupt).not.toHaveBeenCalled()
+    expect(inject).not.toHaveBeenCalled()
+    expect(parent.session.append).not.toHaveBeenCalled()
+
+    // The dead-entry reclamation branch still runs: both agents gone -> drop.
+    sweepIdle(fakeCtx(interrupt), { get: () => undefined }, policy({ autoArchive: false }), lifecycle, 1_000)
+    expect(lifecycle.has(childId)).toBe(false)
+  })
+
   it('drops cache entries whose parent and child agents are both gone', () => {
     const lifecycle = new BackgroundAgentLifecycle()
     lifecycle.register(childId, parentId, 'writer', 0)
@@ -213,6 +254,28 @@ describe('idle sweep', () => {
     lifecycle.archive(childId)
     sweepIdle(fakeCtx(vi.fn()), { get: () => undefined }, policy(), lifecycle, 1_000)
     expect(lifecycle.has(childId)).toBe(false)
+  })
+})
+
+describe('sessionLastText extraction', () => {
+  it('returns the text blocks by default', () => {
+    expect(sessionLastText(childSessionWithAssistant('final answer') as never)).toBe('final answer')
+  })
+
+  it('returns empty for a reasoning-only message without the fallback', () => {
+    expect(sessionLastText(childSessionWithReasoning('thinking hard') as never)).toBe('')
+  })
+
+  it('falls back to reasoning blocks when allowed and flags the source', () => {
+    const reasoning = { used: false }
+    expect(sessionLastText(childSessionWithReasoning('thinking hard') as never, { allowReasoning: true, reasoning })).toBe('thinking hard')
+    expect(reasoning.used).toBe(true)
+  })
+
+  it('does not flag the source when the fallback finds no reasoning either', () => {
+    const reasoning = { used: false }
+    expect(sessionLastText({ events: [] } as never, { allowReasoning: true, reasoning })).toBe('')
+    expect(reasoning.used).toBe(false)
   })
 })
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildAgentRows, relativeTime, rowStatus } from '../src/client/presenter.ts'
+import { buildAgentRows, extractResultText, relativeTime, rowStatus } from '../src/client/presenter.ts'
 import type { BackgroundAgentEntry } from '../src/projection-schema.ts'
 import { noticeLine, parseNotice, PLUGIN, isBackgroundAgentsMeta } from '../src/vocabulary.ts'
 
@@ -71,6 +71,41 @@ describe('client presenter', () => {
     expect(relativeTime(at, at + 2 * 86_400_000)).toEqual({ unit: 'days', n: 2 })
     expect(relativeTime(at, at + 45 * 86_400_000)).toEqual({ unit: 'months', n: 1 })
     expect(relativeTime(at, at + 400 * 86_400_000)).toEqual({ unit: 'years', n: 1 })
+  })
+
+  it('carries the parent title on every row for disambiguation', () => {
+    const rows = buildAgentRows(list({ agents: [entry()] }))
+    expect(rows[0]!.parentTitle).toBe('parent session')
+    const bare = buildAgentRows(list({ agents: [entry()] }, {
+      parent: { id: 'parent', running: false, projectionValues: { backgroundAgents: { agents: [entry()] } } },
+    }))
+    expect(bare[0]!.parentTitle).toBeUndefined()
+  })
+
+  it('extracts the last assistant text from a history page', () => {
+    const assistant = (blocks: unknown[]) => ({
+      event: {
+        type: 'assistant/message',
+        data: { message: { content: blocks } },
+      },
+    })
+    expect(extractResultText([
+      { event: { type: 'user/message', data: {} } },
+      assistant([{ type: 'text', text: 'first' }]),
+      assistant([{ type: 'text', text: '  second  ' }]),
+    ])).toBe('second')
+  })
+
+  it('skips reasoning-only messages and empty pages', () => {
+    const reasoningOnly = {
+      event: {
+        type: 'assistant/message',
+        data: { message: { content: [{ type: 'reasoning', text: 'thinking' }] } },
+      },
+    }
+    expect(extractResultText([reasoningOnly])).toBe('')
+    expect(extractResultText([])).toBe('')
+    expect(extractResultText([{ event: { type: 'tool/result', data: {} } }])).toBe('')
   })
 })
 

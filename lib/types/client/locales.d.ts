@@ -14,7 +14,11 @@ export declare const zh: {
     readonly 'row.open': "打开会话";
     readonly 'row.stop': "停止";
     readonly 'row.message': "发消息";
+    readonly 'row.result': "查看结果";
     readonly 'row.messages': "{n} 条消息";
+    readonly 'result.loading': "加载中…";
+    readonly 'result.empty': "该 agent 还没有输出文本";
+    readonly 'result.close': "收起";
     readonly 'message.placeholder': "发给该 agent 的消息…";
     readonly 'message.send': "发送";
     readonly 'message.cancel': "取消";

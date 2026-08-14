@@ -316,7 +316,8 @@ export function registerBackgroundAgentTools(
       // (success or failure), so the next caller counts this attempt.
       const previous = startGates.get(parent.id) ?? Promise.resolve()
       let releaseGate: () => void = () => {}
-      startGates.set(parent.id, new Promise<void>(resolve => { releaseGate = resolve }))
+      const gate = new Promise<void>(resolve => { releaseGate = resolve })
+      startGates.set(parent.id, gate)
       try {
         await previous
         const count = await countBackgroundAgents(ctx, parent, lifecycle, exec.signal)
@@ -325,6 +326,10 @@ export function registerBackgroundAgentTools(
             `background agent limit reached: maxBackgroundAgents=${config.maxBackgroundAgents} non-archived agents; `
             + 'bg_stop one or wait for one to settle before starting more',
           )
+        }
+        const task = args.task.trim()
+        if (task === '') {
+          throw new Error('background_agent requires a non-empty task')
         }
         const label = labelOf(args, config)
         const toolFilter = validateToolFilter(args.tool_filter, config)
@@ -342,7 +347,7 @@ export function registerBackgroundAgentTools(
           provider: config.provider,
           label,
           request: {
-            prompt: [{ type: 'text', text: args.task }] as ContentBlock[],
+            prompt: [{ type: 'text', text: task }] as ContentBlock[],
             parent,
             ...(toolFilter !== undefined ? { toolFilter } : {}),
             ...(persona !== undefined ? { persona } : {}),
@@ -358,6 +363,10 @@ export function registerBackgroundAgentTools(
         return { agentId: started.childId, messageId: started.messageId }
       } finally {
         releaseGate()
+        // Reclaim the map slot once this gate is the tail: keys are parent
+        // ids, and a resolved tail with no successor would otherwise live
+        // for the fiber's lifetime.
+        if (startGates.get(parent.id) === gate) startGates.delete(parent.id)
       }
     },
   }))
@@ -408,11 +417,15 @@ export function registerBackgroundAgentTools(
         // Parent authority requires an exact live calling agent.
         throw new Error('bg_message requires a calling agent (exec.agent was undefined)')
       }
+      const message = args.message.trim()
+      if (message === '') {
+        throw new Error('bg_message requires a non-empty message')
+      }
       const childId = SessionId(args.agent_id)
       const messageId = await ctx.subagents.followup(
         parent,
         childId,
-        [{ type: 'text', text: args.message }] as ContentBlock[],
+        [{ type: 'text', text: message }] as ContentBlock[],
         {
           source: { kind: 'coordinator', form: 'relay', senderSessionId: parent.id },
           signal: exec.signal,
@@ -581,8 +594,9 @@ export function registerBackgroundAgentTools(
   ctx.tools.register(defineTool({
     name: 'bg_result',
     description:
-      'Read the latest result text of a background agent by its agent id: the final assistant output of its '
-      + 'child session, plus its current activity. The official settled notice only carries a summary, so use '
+      'Read the latest result of a background agent by its agent id: the final assistant output text of its '
+      + 'child session (reasoning blocks when the final message carried no text, flagged with textSource), plus '
+      + 'its label and current activity. The official settled notice only carries a summary, so use '
       + 'this to fetch the full closing text of a settled agent, or the latest output of one that is still '
       + 'working. An agent id that is not one of this conversation\'s tracked children is an error.',
     parameters: {
@@ -598,6 +612,7 @@ export function registerBackgroundAgentTools(
         additionalProperties: false,
         properties: {
           agentId: { type: 'string', required: true },
+          label: { type: 'string' },
           activity: {
             type: 'string',
             required: true,
@@ -608,13 +623,21 @@ export function registerBackgroundAgentTools(
             type: 'boolean',
             description: 'True when the text was ellipsized by resultMaxChars.',
           },
+          textSource: {
+            type: 'string',
+            enum: ['reasoning'],
+            description:
+              'Present only when the selected output carried no text block and the text is the reasoning fallback.',
+          },
         },
       },
       render: (_args, value) => [{
         type: 'text',
         text: value.text === undefined
           ? `background agent ${value.agentId} has produced no assistant output yet`
-          : value.text,
+          : value.textSource === 'reasoning'
+            ? `background agent ${value.agentId} reasoning (no final text): ${value.text}`
+            : value.text,
       }],
     },
     isConcurrencySafe: () => true,
@@ -649,14 +672,21 @@ export function registerBackgroundAgentTools(
         const persistence = ctx.get('sessionPersistence')
         if (persistence !== undefined) session = await persistence.load(childId)
       }
-      const text = session === undefined ? '' : sessionLastText(session)
+      // A thinking model's last message may carry reasoning blocks only; the
+      // fallback keeps bg_result honest instead of reporting "no output".
+      const reasoning = { used: false }
+      const text = session === undefined
+        ? ''
+        : sessionLastText(session, { allowReasoning: true, reasoning })
       const truncated = text.length > config.resultMaxChars
       const capped = truncated ? `${text.slice(0, config.resultMaxChars - 1)}…` : text
       return {
         agentId: childId,
+        ...(fact.label === '' ? {} : { label: fact.label }),
         activity: activityOf(ctx, childId, fact),
         ...(capped === '' ? {} : { text: capped }),
         ...(truncated ? { truncated: true } : {}),
+        ...(reasoning.used ? { textSource: 'reasoning' as const } : {}),
       }
     },
   }))
