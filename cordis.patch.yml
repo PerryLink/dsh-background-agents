@@ -1,4 +1,4 @@
-﻿# dsh-background-agents bundle patch: mount the interactive background-agent
+# dsh-background-agents bundle patch: mount the interactive background-agent
 # plugin (five tools + the backgroundAgents session projection + the Web UI
 # sidebar panel). Configure the provider and lifecycle policy per profile by
 # overriding the `background-agents` row.

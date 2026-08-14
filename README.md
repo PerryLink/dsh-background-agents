@@ -1,4 +1,4 @@
-﻿# dsh-background-agents
+# dsh-background-agents
 
 > Interactive, long-session background agents for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness). Start a durable child agent that keeps working while you keep talking 鈥?watch its progress, steer it with messages, and stop it, all without leaving your session.
 
@@ -29,7 +29,7 @@ DSH's built-in background *jobs* are fire-and-forget tool executions: you can re
 dsh plugin --profile <name> add "github:PerryLink/dsh-background-agents#v0.3.0"
 ```
 
-The bundle patch carries the plugin row, so `dsh plugin add` composes it into your profile's layer stack (`dsh.profile.bundles`). Prefer the git source with a pinned ref: the repo commits its build output (`lib/`), so git installs need no build step and no `allowBuilds` entry. (CI publishes tag pushes to npm when the repository configures an `NPM_TOKEN` secret; after that, plain `pnpm add dsh-background-agents` works too.)
+The bundle patch carries the plugin row, so `dsh plugin add` composes it into your profile's layer stack (`dsh.profile.bundles`). Prefer the git source with a pinned ref: the repo commits its build output (`lib/`), so git installs need no build step and no `allowBuilds` entry. The package is also published to npm — plain `pnpm add dsh-background-agents` works (CI publishes every tag push).
 
 The row that lands in your profile (override `config` per profile in `cordis.patch.yml`):
 
