@@ -4,8 +4,9 @@
  * child whose conversation stays open; progress lines are injected into the
  * parent after each child turn (throttled, optional); `bg_message` delivers
  * later turns; `bg_list` merges the official child catalog with this
- * plugin's dashboard projection; `bg_stop` requests interruption. The Web UI
- * sidebar gains a background-agent panel through the client half, fed by the
+ * plugin's dashboard projection; `bg_result` reads a child's latest result
+ * text; `bg_stop` requests interruption. The Web UI sidebar gains a
+ * background-agent panel through the client half, fed by the
  * `backgroundAgents` session projection.
  *
  * Everything the plugin writes is durable through channels the harness
@@ -43,6 +44,21 @@ export interface Config {
     idleSweepIntervalMs?: number;
     /** Display-label cap (creation labels ellipsize). */
     maxLabelChars?: number;
+    /**
+     * Progress delivery policy: `quiet` appends the line to the parent's next
+     * model request; `wakeup` starts a parent turn when the parent is idle
+     * (queues into its inbox when busy). Pair `wakeup` with a generous
+     * `reportThrottleMs`.
+     */
+    reportDelivery?: 'quiet' | 'wakeup';
+    /** Provider route for child model requests; default inherits the parent's. */
+    childProvider?: string;
+    /** Model id for child model requests; default inherits the parent's. */
+    childModel?: string;
+    /** Config ceiling for a start's optional `max_depth` argument. */
+    maxChildDepth?: number;
+    /** Allowlist for `tool_filter` names a start may scope; empty/absent = no limit. */
+    allowedChildTools?: string[];
 }
 /**
  * The single source of truth for every optional policy default: the schema
@@ -57,6 +73,7 @@ export declare const DEFAULTS: {
     readonly idleTimeoutMinutes: 120;
     readonly idleSweepIntervalMs: 60000;
     readonly maxLabelChars: 120;
+    readonly reportDelivery: "quiet";
 };
 export declare const Config: Schema<Config>;
 /**

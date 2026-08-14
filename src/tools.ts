@@ -1,11 +1,14 @@
 /**
- * The four model-facing tools: `background_agent` starts a durable continuable
- * child through the official seam, `bg_message` delivers one later turn,
+ * The five model-facing tools: `background_agent` starts a durable continuable
+ * child through the official seam (with optional per-child tool scoping,
+ * persona, depth cap, and model route), `bg_message` delivers one later turn,
  * `bg_list` merges the official child catalog with this plugin's projection
- * facts, and `bg_stop` requests interruption. Every execution path is a thin
- * adapter over `ctx.subagents` — the plugin performs no lifecycle routing of
- * its own, and every durable fact rides official `tool/result` replay
- * metadata or injected `user/message` notices (see `vocabulary.ts`).
+ * facts (optionally as the descendant tree), `bg_result` reads a child's
+ * latest result text, and `bg_stop` requests interruption. Every execution
+ * path is a thin adapter over `ctx.subagents` — the plugin performs no
+ * lifecycle routing of its own, and every durable fact rides official
+ * `tool/result` replay metadata or injected `user/message` notices (see
+ * `vocabulary.ts`).
  *
  * @module dsh-background-agents/tools
  */
@@ -14,9 +17,9 @@ import type { Context } from '@deepseek-ai/cordis'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { ContentBlock } from '@deepseek-ai/dsh-llm'
-import { SessionId } from '@deepseek-ai/dsh-session'
-import { SubagentError } from '@deepseek-ai/dsh-subagent'
-import { countBackgroundAgents, type BackgroundAgentLifecycle } from './lifecycle.ts'
+import { SessionId, type SessionEvent } from '@deepseek-ai/dsh-session'
+import { SubagentError, type SubagentDescendantListEntry, type SubagentListEntry } from '@deepseek-ai/dsh-subagent'
+import { countBackgroundAgents, sessionLastText, type BackgroundAgentLifecycle } from './lifecycle.ts'
 import { isBackgroundAgentsProjection } from './projection-schema.ts'
 import { PLUGIN } from './vocabulary.ts'
 
@@ -28,6 +31,14 @@ export interface ToolConfig {
   readonly maxBackgroundAgents: number
   /** Display-label cap; longer labels ellipsize. */
   readonly maxLabelChars: number
+  /** Provider route for child model requests; undefined inherits the parent's. */
+  readonly childProvider: string | undefined
+  /** Model id for child model requests; undefined inherits the parent's. */
+  readonly childModel: string | undefined
+  /** Config ceiling for a start's optional `max_depth` argument. */
+  readonly maxChildDepth: number | undefined
+  /** Allowlist for `tool_filter` names; empty/absent = no limit. */
+  readonly allowedChildTools: string[] | undefined
 }
 
 /** One bg_list row's activity vocabulary. */
@@ -39,6 +50,10 @@ export interface BgListAgent {
   label: string
   mode: 'continuable'
   activity: BgListActivity
+  /** Durable direct parent (present only in recursive listings). */
+  parentId?: string
+  /** Edge distance from the listed root (present only in recursive listings). */
+  depth?: number
   messageCount?: number
   lastMessage?: string
   createdAt?: number
@@ -80,13 +95,94 @@ function labelOf(args: { task: string; label?: string }, config: ToolConfig): st
   return boundLabel(explicit === undefined || explicit === '' ? firstLine(args.task) : explicit, config.maxLabelChars)
 }
 
+/** One validated per-child tool filter, or undefined when none was requested. */
+export interface ValidatedToolFilter {
+  readonly allow?: string[]
+  readonly deny?: string[]
+}
+
+/**
+ * Validate one `tool_filter` argument against the deployment allowlist. The
+ * official descriptor rejects a filter without at least one of `allow`/`deny`,
+ * so the tool fails fast with the same rule plus the allowlist check.
+ * @param raw - the raw argument (already JSON-validated by defineTool).
+ * @param config - the deployment policy carrying `allowedChildTools`.
+ * @returns the trimmed filter, or undefined when the caller passed none.
+ */
+export function validateToolFilter(
+  raw: { allow?: string[]; deny?: string[] } | undefined,
+  config: ToolConfig,
+): ValidatedToolFilter | undefined {
+  if (raw === undefined) return undefined
+  const allow = raw.allow?.filter(name => name.trim() !== '')
+  const deny = raw.deny?.filter(name => name.trim() !== '')
+  if ((allow === undefined || allow.length === 0) && (deny === undefined || deny.length === 0)) {
+    throw new Error('tool_filter must declare allow and/or deny with at least one tool name')
+  }
+  const limit = config.allowedChildTools
+  if (limit !== undefined && limit.length > 0) {
+    for (const name of [...(allow ?? []), ...(deny ?? [])]) {
+      if (!limit.includes(name)) {
+        throw new Error(`tool_filter names "${name}", outside allowedChildTools: ${limit.join(', ')}`)
+      }
+    }
+  }
+  return {
+    ...(allow !== undefined && allow.length > 0 ? { allow } : {}),
+    ...(deny !== undefined && deny.length > 0 ? { deny } : {}),
+  }
+}
+
+/**
+ * Validate one `max_depth` argument against the deployment ceiling. The seam
+ * enforces the same non-negative-safe-integer rule at start; the tool fails
+ * fast first and adds the configured ceiling.
+ */
+export function validateMaxDepth(raw: number | undefined, config: ToolConfig): number | undefined {
+  if (raw === undefined) return undefined
+  if (!Number.isSafeInteger(raw) || raw < 0) {
+    throw new Error(`max_depth must be a non-negative safe integer, got ${String(raw)}`)
+  }
+  if (config.maxChildDepth !== undefined && raw > config.maxChildDepth) {
+    throw new Error(`max_depth ${raw} exceeds the configured maxChildDepth=${config.maxChildDepth}`)
+  }
+  return raw
+}
+
+/** One projection fact row, as served by the parent's snapshot. */
+type FactEntry = NonNullable<ReturnType<typeof isBackgroundAgentsProjection>>['agents'][number]
+
 /** Read one parent's projection facts, guarded against an unmounted registry. */
-function factsFor(ctx: Context, parent: Agent): Map<string, NonNullable<ReturnType<typeof isBackgroundAgentsProjection>>['agents'][number]> {
+function factsFor(ctx: Context, parent: Agent): Map<string, FactEntry> {
   const registry = ctx.get('sessionProjections')
   if (registry === undefined) return new Map()
   const value = registry.snapshot(parent.session).values.backgroundAgents
   const projection = isBackgroundAgentsProjection(value)
   return new Map((projection?.agents ?? []).map(entry => [entry.agentId, entry]))
+}
+
+/**
+ * Build one bg_list row from a catalog entry's identity, overlaying the
+ * parent's projection facts and the live agent registry. Kept separate from
+ * the listing loops because `SubagentDescendantListEntry` is a strict
+ * superset of `SubagentListEntry`: forming their union would let TypeScript
+ * reduce the descendant members away, erasing `parentId`/`depth`.
+ */
+function buildRow(ctx: Context, facts: Map<string, FactEntry>, id: SessionId, label: string): BgListAgent {
+  const fact = facts.get(id)
+  const row: BgListAgent = {
+    agentId: id,
+    label,
+    mode: 'continuable',
+    activity: fact === undefined ? activityOf(ctx, id, fallbackFact(id)) : activityOf(ctx, id, fact),
+  }
+  if (fact !== undefined) {
+    if (fact.messageCount !== undefined) row.messageCount = fact.messageCount
+    if (fact.lastMessage !== undefined) row.lastMessage = fact.lastMessage
+    if (fact.createdAt !== undefined) row.createdAt = fact.createdAt
+    if (fact.lastActiveAt !== undefined) row.lastActiveAt = fact.lastActiveAt
+  }
+  return row
 }
 
 /** Derive one row's activity from the durable fact and the live agent registry. */
@@ -120,9 +216,12 @@ export function registerBackgroundAgentTools(
       'Start a background agent: a durable child agent session that keeps working while this conversation '
       + 'continues. It receives the task as its first message, runs it in its own context, and returns a stable '
       + 'agent id immediately. Track it with bg_list, watch its progress lines appear in this conversation '
-      + '(autoReport), send it more work any time with bg_message, and request a stop with bg_stop. Progress '
-      + 'summaries are injected into this conversation after each of its turns and its final outcome arrives as '
-      + 'a notice when it settles. Use this for long-running or parallel objectives you want to steer over time.',
+      + '(autoReport), send it more work any time with bg_message, read its settled result text with bg_result, '
+      + 'and request a stop with bg_stop. Progress summaries are injected into this conversation after each of '
+      + 'its turns and its final outcome arrives as a notice when it settles. Use this for long-running or '
+      + 'parallel objectives you want to steer over time. Optionally scope the child: tool_filter removes tools '
+      + 'from its view (never grants new ones), persona gives it a dedicated system-prompt persona, and '
+      + 'max_depth caps its further delegation.',
     parameters: {
       task: {
         type: 'string',
@@ -135,6 +234,38 @@ export function registerBackgroundAgentTools(
         type: 'string',
         description:
           'Optional short display label (defaults to the task\'s first line, bounded by maxLabelChars).',
+      },
+      tool_filter: {
+        type: 'object',
+        additionalProperties: false,
+        description:
+          'Optional tool scoping for the child: keep only the listed tools (allow) or remove them (deny). At '
+          + 'least one of allow/deny with a tool name is required. Names must come from the deployment '
+          + 'allowlist when one is configured (allowedChildTools). This can only restrict — never grant.',
+        properties: {
+          allow: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Global tool names that stay visible to the child; everything else is removed.',
+          },
+          deny: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Global tool names removed from the child\'s visibility.',
+          },
+        },
+      },
+      persona: {
+        type: 'string',
+        description:
+          'Optional per-child persona: a dedicated system-prompt section shadowing the deployment persona for '
+          + 'this child alone.',
+      },
+      max_depth: {
+        type: 'number',
+        description:
+          'Optional absolute cap on this child\'s further delegation depth (non-negative integer). Bounded by '
+          + 'the configured maxChildDepth ceiling.',
       },
     },
     output: {
@@ -179,10 +310,28 @@ export function registerBackgroundAgentTools(
         )
       }
       const label = labelOf(args, config)
+      const toolFilter = validateToolFilter(args.tool_filter, config)
+      const maxDepth = validateMaxDepth(args.max_depth, config)
+      const persona = args.persona === undefined || args.persona.trim() === ''
+        ? undefined
+        : args.persona.trim()
+      const agentOptions = config.childProvider !== undefined || config.childModel !== undefined
+        ? {
+          ...(config.childProvider !== undefined ? { provider: config.childProvider } : {}),
+          ...(config.childModel !== undefined ? { model: config.childModel } : {}),
+        }
+        : undefined
       const started = await ctx.subagents.startContinuable({
         provider: config.provider,
         label,
-        request: { prompt: [{ type: 'text', text: args.task }] as ContentBlock[], parent },
+        request: {
+          prompt: [{ type: 'text', text: args.task }] as ContentBlock[],
+          parent,
+          ...(toolFilter !== undefined ? { toolFilter } : {}),
+          ...(persona !== undefined ? { persona } : {}),
+          ...(maxDepth !== undefined ? { maxDepth } : {}),
+          ...(agentOptions !== undefined ? { agentOptions } : {}),
+        },
         signal: exec.signal,
       })
       lifecycle.register(started.childId, parent.id, label, Date.now())
@@ -262,9 +411,17 @@ export function registerBackgroundAgentTools(
       + 'running means the agent is working right now, idle means it is loaded but between turns, ready means it '
       + 'exists only in storage (resumable via bg_message), settled means its activation ended, and archived '
       + 'means the idle sweep parked it. Children the catalog could not read are reported as diagnostics instead '
-      + 'of being dropped. When the catalog itself is unavailable the result is an explicit unrecoverable marker, '
-      + 'never a fabricated empty list.',
-    parameters: {},
+      + 'of being dropped. With recursive: true the listing is the descendant tree (every row gains parentId and '
+      + 'depth), where only direct children carry the dashboard facts. When the catalog itself is unavailable the '
+      + 'result is an explicit unrecoverable marker, never a fabricated empty list.',
+    parameters: {
+      recursive: {
+        type: 'boolean',
+        description:
+          'List the whole descendant tree of this conversation (rows gain parentId and depth) instead of direct '
+          + 'children only. Defaults to false.',
+      },
+    },
     output: {
       schema: {
         oneOf: [
@@ -288,6 +445,8 @@ export function registerBackgroundAgentTools(
                       required: true,
                       enum: ['running', 'idle', 'ready', 'settled', 'archived'],
                     },
+                    parentId: { type: 'string' },
+                    depth: { type: 'number' },
                     messageCount: { type: 'number' },
                     lastMessage: { type: 'string' },
                     createdAt: { type: 'number' },
@@ -340,50 +499,134 @@ export function registerBackgroundAgentTools(
       },
     },
     isConcurrencySafe: () => true,
-    async execute(_args, exec) {
+    async execute(args, exec) {
       const parent = exec.agent
       if (!parent) {
         // Non-agent callers have no session whose children could be listed.
         throw new Error('bg_list requires a calling agent (exec.agent was undefined)')
       }
-      let entries
-      try {
-        entries = await ctx.subagents.listChildren(parent.id, exec.signal)
-      } catch (error) {
-        // An unavailable catalog is reported as an explicit marker — never a
-        // fabricated empty listing that would read as "no agents".
-        if (error instanceof SubagentError) {
-          return { kind: 'unrecoverable' as const, code: error.code, message: error.message }
-        }
-        throw error
-      }
       const facts = factsFor(ctx, parent)
       const agents: BgListAgent[] = []
       const diagnostics: BgListDiagnostic[] = []
-      for (const entry of entries) {
-        if (entry.kind === 'diagnostic') {
-          diagnostics.push({ agentId: entry.id, reason: entry.reason })
-          continue
+      if (args.recursive === true) {
+        let entries: SubagentDescendantListEntry[]
+        try {
+          entries = await ctx.subagents.listDescendants(parent.id, exec.signal)
+        } catch (error) {
+          if (error instanceof SubagentError) {
+            return { kind: 'unrecoverable' as const, code: error.code, message: error.message }
+          }
+          throw error
         }
-        // One-shot children cannot be continued by bg_message; the listing
-        // keeps only the resumable conversation this tool set manages.
-        if (entry.mode !== 'continuable') continue
-        const fact = facts.get(entry.id)
-        const row: BgListAgent = {
-          agentId: entry.id,
-          label: entry.label,
-          mode: 'continuable',
-          activity: fact === undefined ? activityOf(ctx, entry.id, fallbackFact(entry.id)) : activityOf(ctx, entry.id, fact),
+        for (const entry of entries) {
+          if (entry.kind === 'diagnostic') {
+            diagnostics.push({ agentId: entry.id, reason: entry.reason })
+            continue
+          }
+          // One-shot children cannot be continued by bg_message; the tree
+          // keeps only the resumable conversation this tool set manages.
+          if (entry.mode !== 'continuable') continue
+          const row = buildRow(ctx, facts, entry.id, entry.label)
+          row.parentId = entry.parentId
+          row.depth = entry.depth
+          agents.push(row)
         }
-        if (fact !== undefined) {
-          if (fact.messageCount !== undefined) row.messageCount = fact.messageCount
-          if (fact.lastMessage !== undefined) row.lastMessage = fact.lastMessage
-          if (fact.createdAt !== undefined) row.createdAt = fact.createdAt
-          if (fact.lastActiveAt !== undefined) row.lastActiveAt = fact.lastActiveAt
+      } else {
+        let entries: SubagentListEntry[]
+        try {
+          entries = await ctx.subagents.listChildren(parent.id, exec.signal)
+        } catch (error) {
+          if (error instanceof SubagentError) {
+            return { kind: 'unrecoverable' as const, code: error.code, message: error.message }
+          }
+          throw error
         }
-        agents.push(row)
+        for (const entry of entries) {
+          if (entry.kind === 'diagnostic') {
+            diagnostics.push({ agentId: entry.id, reason: entry.reason })
+            continue
+          }
+          if (entry.mode !== 'continuable') continue
+          agents.push(buildRow(ctx, facts, entry.id, entry.label))
+        }
       }
       return { kind: 'listing' as const, agents, diagnostics }
+    },
+  }))
+
+  ctx.tools.register(defineTool({
+    name: 'bg_result',
+    description:
+      'Read the latest result text of a background agent by its agent id: the final assistant output of its '
+      + 'child session, plus its current activity. The official settled notice only carries a summary, so use '
+      + 'this to fetch the full closing text of a settled agent, or the latest output of one that is still '
+      + 'working. An agent id that is not one of this conversation\'s tracked children is an error.',
+    parameters: {
+      agent_id: {
+        type: 'string',
+        required: true,
+        description: 'The agent id returned when the background agent was started.',
+      },
+    },
+    output: {
+      schema: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          agentId: { type: 'string', required: true },
+          activity: {
+            type: 'string',
+            required: true,
+            enum: ['running', 'idle', 'ready', 'settled', 'archived'],
+          },
+          text: { type: 'string' },
+        },
+      },
+      render: (_args, value) => [{
+        type: 'text',
+        text: value.text === undefined
+          ? `background agent ${value.agentId} has produced no assistant output yet`
+          : value.text,
+      }],
+    },
+    isConcurrencySafe: () => true,
+    async execute(args, exec) {
+      const parent = exec.agent
+      if (!parent) {
+        // Fact lookup requires the calling session's own projection.
+        throw new Error('bg_result requires a calling agent (exec.agent was undefined)')
+      }
+      const childId = SessionId(args.agent_id)
+      // The official catalog is the authority for "is one of this parent's
+      // children"; the projection fact (when present) supplies the activity.
+      // A catalog outage must not disable a fact-backed read, so discovery is
+      // best-effort and the fact map is the fallback authority.
+      let known = factsFor(ctx, parent).has(childId)
+      if (!known) {
+        try {
+          const entries = await ctx.subagents.listChildren(parent.id, exec.signal)
+          known = entries.some(entry => entry.kind === 'child' && entry.mode === 'continuable' && entry.id === childId)
+        } catch (error) {
+          if (!(error instanceof SubagentError)) throw error
+        }
+      }
+      if (!known) {
+        throw new Error(`background agent ${childId} is not one of this conversation's tracked children`)
+      }
+      const fact = factsFor(ctx, parent).get(childId) ?? fallbackFact(childId)
+      // Settled children leave the live session store, so the durable log is
+      // the text source of record; a persistence read failure is loud.
+      let session: { events: readonly SessionEvent[] } | undefined = ctx.sessions.get(childId)
+      if (session === undefined) {
+        const persistence = ctx.get('sessionPersistence')
+        if (persistence !== undefined) session = await persistence.load(childId)
+      }
+      const text = session === undefined ? '' : sessionLastText(session)
+      return {
+        agentId: childId,
+        activity: activityOf(ctx, childId, fact),
+        ...(text === '' ? {} : { text }),
+      }
     },
   }))
 

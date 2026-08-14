@@ -28,6 +28,12 @@ export interface BackgroundAgentsInjected {
    * @returns an error message on failure, undefined on success.
    */
   stopChild(parentSessionId: string, childSessionId: string): Promise<string | undefined>
+  /**
+   * Queue one message as the child's next turn through the official
+   * `subagent.prompt` RPC (wakes a settled child).
+   * @returns an error message on failure, undefined on success.
+   */
+  sendMessage(parentSessionId: string, childSessionId: string, text: string): Promise<string | undefined>
 }
 
 /** Full props: the footer-action owner share, standard kit, injected actions, and locale. */
@@ -58,13 +64,19 @@ function statusLabel(status: RowStatus, t: TranslateNS<typeof NS>): string {
 }
 
 /** One dashboard row. */
-function Row({ row, t, now, busy, onOpen, onStop }: {
+function Row({ row, t, now, busy, composing, draft, onDraft, onOpen, onStop, onCompose, onSend, onCancel }: {
   readonly row: AgentRow
   readonly t: TranslateNS<typeof NS>
   readonly now: number
   readonly busy: boolean
+  readonly composing: boolean
+  readonly draft: string
+  readonly onDraft: (text: string) => void
   readonly onOpen: () => void
   readonly onStop: () => void
+  readonly onCompose: () => void
+  readonly onSend: () => void
+  readonly onCancel: () => void
 }) {
   return (
     <li className={css.row}>
@@ -84,18 +96,38 @@ function Row({ row, t, now, busy, onOpen, onStop }: {
         >
           {t('row.stop')}
         </button>
+        <button type="button" className={css.action} disabled={busy || composing} onClick={onCompose}>{t('row.message')}</button>
       </div>
+      {composing && (
+        <div className={css.composer}>
+          <input
+            className={css.composerInput}
+            value={draft}
+            placeholder={t('message.placeholder')}
+            onChange={event => { onDraft(event.target.value) }}
+            onKeyDown={event => {
+              if (event.key === 'Enter' && draft.trim() !== '' && !busy) onSend()
+            }}
+          />
+          <button type="button" className={css.action} disabled={busy || draft.trim() === ''} onClick={onSend}>
+            {t('message.send')}
+          </button>
+          <button type="button" className={css.action} disabled={busy} onClick={onCancel}>{t('message.cancel')}</button>
+        </div>
+      )}
     </li>
   )
 }
 
 /** The sidebar footer trigger + floating dashboard panel. */
 export function BackgroundAgentsAction({
-  wide, t, useSessions, openChild, stopChild,
+  wide, t, useSessions, openChild, stopChild, sendMessage,
 }: BackgroundAgentsActionProps) {
   const [open, setOpen] = useState(false)
   const [error, setError] = useState<string | undefined>(undefined)
   const [busyId, setBusyId] = useState<string | undefined>(undefined)
+  const [composingId, setComposingId] = useState<string | undefined>(undefined)
+  const [draft, setDraft] = useState('')
   const [now, setNow] = useState(() => Date.now())
   const wrapRef = useRef<HTMLDivElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
@@ -177,8 +209,26 @@ export function BackgroundAgentsAction({
                     t={t}
                     now={now}
                     busy={busyId === row.agentId}
+                    composing={composingId === row.agentId}
+                    draft={composingId === row.agentId ? draft : ''}
+                    onDraft={setDraft}
                     onOpen={() => { void run(next => openChild(next.parentSessionId, next.agentId), row) }}
                     onStop={() => { void run(next => stopChild(next.parentSessionId, next.agentId), row) }}
+                    onCompose={() => {
+                      setComposingId(row.agentId)
+                      setDraft('')
+                      setError(undefined)
+                    }}
+                    onSend={() => {
+                      const text = draft.trim()
+                      if (text === '') return
+                      void run(async next => {
+                        const failure = await sendMessage(next.parentSessionId, next.agentId, text)
+                        if (failure === undefined) setComposingId(undefined)
+                        return failure
+                      }, row)
+                    }}
+                    onCancel={() => { setComposingId(undefined) }}
                   />
                 ))}
               </ul>

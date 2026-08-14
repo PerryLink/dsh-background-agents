@@ -71,6 +71,23 @@ export function apply(ctx: Context): void {
           return error instanceof Error ? error.message : String(error)
         }
       },
+      async sendMessage(parentSessionId: string, childSessionId: string, text: string): Promise<string | undefined> {
+        try {
+          // The same wire RPC the shipped subagent catalog uses: a queued
+          // delivery that wakes the child (its next turn answers).
+          const result = await api.subagents.prompt({
+            parentSessionId: parentSessionId as SessionId,
+            childSessionId: childSessionId as SessionId,
+            mode: 'continuable',
+            content: [{ type: 'text', text }],
+            clientTimeZone: new Intl.DateTimeFormat().resolvedOptions().timeZone,
+          })
+          if (result.result.ok) return undefined
+          return `${result.result.error.code}: ${result.result.error.message}`
+        } catch (error) {
+          return error instanceof Error ? error.message : String(error)
+        }
+      },
     }),
   }, BackgroundAgentsAction))
 }

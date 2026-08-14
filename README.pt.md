@@ -12,20 +12,21 @@ Os *jobs* em segundo plano do DSH são execuções de ferramentas do tipo "dispa
 
 ## O que você ganha
 
-- **`background_agent`** — inicia um agente filho durável e continuável a partir de qualquer sessão. Ele trabalha no próprio contexto, devolve um id estável na hora e mantém a conversa aberta para sempre.
+- **`background_agent`** — inicia um agente filho durável e continuável a partir de qualquer sessão. Ele trabalha no próprio contexto, devolve um id estável na hora e mantém a conversa aberta para sempre. Escopo opcional por filho: `tool_filter` (remove ferramentas da visão do filho — nunca concede novas), `persona` (uma persona dedicada de system-prompt) e `max_depth` (teto de profundidade de delegação); `childProvider`/`childModel` roteiam suas requisições de modelo.
 - **`bg_message`** — envie mais trabalho, correções, ou acorde um agente assentado. Entrega pelo inbox FIFO oficial; a resposta do agente é o próximo turno dele.
-- **`bg_list`** — estado dos seus agentes: rótulo, modo, atividade (`running` / `idle` / `ready` / `settled` / `archived`), contagem de mensagens, última atividade. Recupera filhos persistidos após reinício.
+- **`bg_list`** — estado dos seus agentes: rótulo, modo, atividade (`running` / `idle` / `ready` / `settled` / `archived`), contagem de mensagens, última atividade. Recupera filhos persistidos após reinício. `recursive: true` lista a árvore descendente inteira com `parentId`/`depth`.
+- **`bg_result`** — lê o último texto de saída do assistente de um filho mais sua atividade, além do resumo do aviso de assentamento.
 - **`bg_stop`** — solicita a interrupção do turno atual. Dispara e retorna: o desligamento oficial conclui o trabalho; o agente continua retomável.
-- **autoReport** — após cada turno do filho, uma linha de progresso limitada é injetada na sua sessão (visível ao modelo, com origem do plugin). O resultado final chega pelo aviso oficial de assentamento.
+- **autoReport** — após cada turno do filho, uma linha de progresso limitada é injetada na sua sessão (visível ao modelo, com origem do plugin). O resultado final chega pelo aviso oficial de assentamento. `reportDelivery: wakeup` faz cada linha abrir um turno do pai quando ele está ocioso.
 - **Arquivamento por inatividade** — agentes quietos além de `idleTimeoutMinutes` são arquivados com aviso e pedido de parada; `bg_message` os acorda de novo.
 - **Projeção `backgroundAgents`** — uma unidade de projeção de sessão que dobra o log do pai em linhas de painel (id do agente, rótulo, atividade, resumo da última mensagem, hora de criação). Tudo se reconstrói a partir do log durável, sem banco de dados separado.
-- **Painel Web UI** — uma entrada "Background agents" na barra lateral da Web GUI com estado ao vivo, salto de um clique para a sessão filha e botão de parada.
+- **Painel Web UI** — uma entrada "Background agents" na barra lateral da Web GUI com estado ao vivo, salto de um clique para a sessão filha, um botão de parada e um botão de mensagem que enfileira um novo turno pelo RPC oficial `subagent.prompt`.
 
 ## Início rápido
 
 ```sh
 # a partir do checkout do harness ou de onde o CLI dsh estiver (web ou headless)
-dsh plugin --profile <name> add "github:PerryLink/dsh-background-agents#v0.1.1"
+dsh plugin --profile <name> add "github:PerryLink/dsh-background-agents#v0.2.0"
 ```
 
 O patch do bundle carrega a linha do plugin, então o `dsh plugin add` a compõe na pilha de camadas do perfil (`dsh.profile.bundles`). Prefira a fonte git com uma ref fixada: o repo versiona a saída do build (`lib/`), então instalações git não precisam de etapa de build nem de entrada `allowBuilds`. (Quando o pacote for publicado no npm, `pnpm add dsh-background-agents` também funcionará.)
@@ -59,12 +60,17 @@ Todo parâmetro ajustável é um campo `Config` validado — mude no `cordis.yml
 |---|---|---|
 | `provider` | *(obrigatório)* | nome do provedor `ctx.subagents` para inícios continuáveis (`spawn`) |
 | `autoReport` | `true` | injeta uma linha de progresso no pai após cada turno do filho |
+| `reportDelivery` | `quiet` | `quiet` anexa a linha à próxima requisição de modelo do pai; `wakeup` abre um turno do pai quando ocioso (enfileira se ocupado) |
 | `reportThrottleMs` | `15000` | intervalo mínimo entre duas injeções de progresso de um filho |
 | `reportSummaryMaxChars` | `300` | teto rígido do texto da linha de progresso (com reticências) |
 | `maxBackgroundAgents` | `4` | teto rígido de agentes não arquivados por sessão pai |
 | `idleTimeoutMinutes` | `120` | janela de inatividade após a qual um filho quieto é arquivado e notificado (`>= 1`) |
 | `idleSweepIntervalMs` | `60000` | período da varredura de arquivamento |
 | `maxLabelChars` | `120` | teto do rótulo exibido (com reticências) |
+| `childProvider` | *(herdar)* | rota de provedor para as requisições de modelo do filho |
+| `childModel` | *(herdar)* | id de modelo para as requisições de modelo do filho |
+| `maxChildDepth` | *(nenhum)* | teto de configuração para o argumento `max_depth` de um início |
+| `allowedChildTools` | *(nenhum)* | lista branca de nomes para `tool_filter`; vazia/ausente = sem limite |
 
 ## Como funciona — e por que sobrevive a reinícios
 
@@ -93,7 +99,7 @@ Fora do escopo: disparo agendado (o seam de schedule existe), agentes remotos/en
 ```sh
 pnpm install        # apenas ferramentas; pacotes do harness resolvem contra um checkout irmão
 pnpm run typecheck  # TS estrito, programas node + client
-pnpm test           # 48 testes unitários e ponta a ponta (seam real de subagentes, LLM roteirizado)
+pnpm test           # 60 testes unitários e ponta a ponta (seam real de subagentes, LLM roteirizado, painel jsdom)
 pnpm run build      # lib/index.js (metade node) + lib/client.js (bundle web)
 pnpm run gen-aliases  # re-mapeia caminhos de pacotes do harness quando o checkout se move
 ```

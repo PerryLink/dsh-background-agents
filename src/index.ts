@@ -4,8 +4,9 @@
  * child whose conversation stays open; progress lines are injected into the
  * parent after each child turn (throttled, optional); `bg_message` delivers
  * later turns; `bg_list` merges the official child catalog with this
- * plugin's dashboard projection; `bg_stop` requests interruption. The Web UI
- * sidebar gains a background-agent panel through the client half, fed by the
+ * plugin's dashboard projection; `bg_result` reads a child's latest result
+ * text; `bg_stop` requests interruption. The Web UI sidebar gains a
+ * background-agent panel through the client half, fed by the
  * `backgroundAgents` session projection.
  *
  * Everything the plugin writes is durable through channels the harness
@@ -50,6 +51,21 @@ export interface Config {
   idleSweepIntervalMs?: number
   /** Display-label cap (creation labels ellipsize). */
   maxLabelChars?: number
+  /**
+   * Progress delivery policy: `quiet` appends the line to the parent's next
+   * model request; `wakeup` starts a parent turn when the parent is idle
+   * (queues into its inbox when busy). Pair `wakeup` with a generous
+   * `reportThrottleMs`.
+   */
+  reportDelivery?: 'quiet' | 'wakeup'
+  /** Provider route for child model requests; default inherits the parent's. */
+  childProvider?: string
+  /** Model id for child model requests; default inherits the parent's. */
+  childModel?: string
+  /** Config ceiling for a start's optional `max_depth` argument. */
+  maxChildDepth?: number
+  /** Allowlist for `tool_filter` names a start may scope; empty/absent = no limit. */
+  allowedChildTools?: string[]
 }
 
 /**
@@ -65,6 +81,7 @@ export const DEFAULTS = {
   idleTimeoutMinutes: 120,
   idleSweepIntervalMs: 60_000,
   maxLabelChars: 120,
+  reportDelivery: 'quiet',
 } as const
 
 export const Config: Schema<Config> = Schema.object({
@@ -77,6 +94,14 @@ export const Config: Schema<Config> = Schema.object({
   idleTimeoutMinutes: Schema.natural().min(1).max(Number.MAX_SAFE_INTEGER).default(DEFAULTS.idleTimeoutMinutes),
   idleSweepIntervalMs: Schema.natural().max(Number.MAX_SAFE_INTEGER).default(DEFAULTS.idleSweepIntervalMs),
   maxLabelChars: Schema.natural().max(Number.MAX_SAFE_INTEGER).default(DEFAULTS.maxLabelChars),
+  reportDelivery: Schema.union([
+    Schema.const('quiet'),
+    Schema.const('wakeup'),
+  ]).default(DEFAULTS.reportDelivery),
+  childProvider: Schema.string(),
+  childModel: Schema.string(),
+  maxChildDepth: Schema.natural(),
+  allowedChildTools: Schema.array(Schema.string()),
 })
 
 /**
@@ -86,10 +111,9 @@ export const Config: Schema<Config> = Schema.object({
  * @param config - provider and lifecycle policy (Schemastery-validated).
  */
 export function apply(ctx: Context, config: Config): void {
-  // Direct apply() bypasses Schemastery's constraints; a loader-omitted field
-  // keeps its documented default (the shared DEFAULTS constant) instead of
-  // failing at load.
-  const policy: Required<Config> = {
+  // Direct apply() bypasses Schemastery's constraints; every loader-omitted
+  // field keeps its documented default from the shared DEFAULTS constant.
+  const policy = {
     provider: config.provider,
     autoReport: config.autoReport ?? DEFAULTS.autoReport,
     reportThrottleMs: config.reportThrottleMs ?? DEFAULTS.reportThrottleMs,
@@ -98,6 +122,11 @@ export function apply(ctx: Context, config: Config): void {
     idleTimeoutMinutes: config.idleTimeoutMinutes ?? DEFAULTS.idleTimeoutMinutes,
     idleSweepIntervalMs: config.idleSweepIntervalMs ?? DEFAULTS.idleSweepIntervalMs,
     maxLabelChars: config.maxLabelChars ?? DEFAULTS.maxLabelChars,
+    reportDelivery: config.reportDelivery ?? DEFAULTS.reportDelivery,
+    childProvider: config.childProvider,
+    childModel: config.childModel,
+    maxChildDepth: config.maxChildDepth,
+    allowedChildTools: config.allowedChildTools,
   }
   if (policy.provider.trim() === '') {
     throw new Error('dsh-background-agents: `provider` must name a registered subagent provider')
@@ -141,8 +170,8 @@ export function apply(ctx: Context, config: Config): void {
       text:
         'Track every background agent id you start. You are notified in-session when a background agent '
         + 'completes a turn (autoReport) and when it settles — do not busy-poll bg_list. Keep working on '
-        + 'independent steps, use bg_message to steer an agent instead of waiting for it, and bg_stop agents '
-        + 'that stopped mattering.',
+        + 'independent steps, use bg_message to steer an agent instead of waiting for it, read settled results '
+        + 'with bg_result, and bg_stop agents that stopped mattering.',
     })
   })
 }

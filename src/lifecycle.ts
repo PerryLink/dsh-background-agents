@@ -12,7 +12,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { boundContextSummary, createUserMessage } from '@deepseek-ai/dsh-llm'
-import type { Session, SessionId } from '@deepseek-ai/dsh-session'
+import type { Session, SessionEvent, SessionId } from '@deepseek-ai/dsh-session'
 import type { AgentRegistry } from '@deepseek-ai/dsh-agent'
 import { finalAssistantOutput, SubagentError } from '@deepseek-ai/dsh-subagent'
 import { isBackgroundAgentsProjection } from './projection-schema.ts'
@@ -29,6 +29,11 @@ export interface LifecycleConfig {
   readonly idleTimeoutMinutes: number
   /** Sweep period. */
   readonly idleSweepIntervalMs: number
+  /**
+   * Progress delivery: `quiet` appends the notice to the parent's next model
+   * request; `wakeup` starts a parent turn when idle (queues when busy).
+   */
+  readonly reportDelivery: 'quiet' | 'wakeup'
 }
 
 /** One tracked child: live bookkeeping only. */
@@ -134,10 +139,12 @@ export class BackgroundAgentLifecycle {
   }
 }
 
-/** One line of the child's last assistant text, empty when it produced none. */
-function childLastText(sessions: LiveSessions, childId: SessionId): string {
-  const session = sessions.get(childId)
-  if (session === undefined) return ''
+/**
+ * One line of a session's last assistant text, empty when it produced none.
+ * Accepts any event-log carrier so both live sessions and persistence
+ * inspections can serve the same fold.
+ */
+export function sessionLastText(session: { events: readonly SessionEvent[] }): string {
   const output = finalAssistantOutput(session.events)
   if (output === undefined) return ''
   return output
@@ -145,6 +152,13 @@ function childLastText(sessions: LiveSessions, childId: SessionId): string {
     .map(block => block.text)
     .join('')
     .trim()
+}
+
+/** One line of the child's last assistant text, empty when it produced none. */
+export function childLastText(sessions: LiveSessions, childId: SessionId): string {
+  const session = sessions.get(childId)
+  if (session === undefined) return ''
+  return sessionLastText(session)
 }
 
 /** Bound one line to the configured report cap with an explicit ellipsis. */
@@ -158,6 +172,9 @@ function boundLine(line: string, max: number): string {
  * notice (source `{ kind: 'plugin', plugin: 'dsh-background-agents' }`) whose
  * canonical prefix lets the projection fold the durable fact back out of the
  * parent log. Honours the per-child throttle and the parent's presence.
+ * `wakeup` delivery starts a parent turn through `Agent.followup` (queued
+ * when the parent is busy); `quiet` delivery appends to the parent's next
+ * request through `Agent.inject`.
  * @returns true when a report was emitted.
  */
 export function reportProgress(
@@ -176,7 +193,7 @@ export function reportProgress(
   const line = text === ''
     ? `${child.label} completed a turn (no assistant output)`
     : `${child.label} completed a turn: ${boundLine(text, config.reportSummaryMaxChars)}`
-  parent.inject(createUserMessage({
+  const message = createUserMessage({
     content: [{ type: 'text', text: noticeLine(child.childId, 'progress', line) }],
     source: {
       kind: 'plugin',
@@ -184,7 +201,12 @@ export function reportProgress(
       form: 'notice',
       summary: boundContextSummary(`${child.label} progress`),
     },
-  }))
+  })
+  if (config.reportDelivery === 'wakeup') {
+    parent.followup(message)
+  } else {
+    parent.inject(message)
+  }
   lifecycle.noteReport(child.childId, now)
   return true
 }

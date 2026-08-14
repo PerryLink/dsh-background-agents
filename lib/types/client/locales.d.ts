@@ -13,7 +13,11 @@ export declare const zh: {
     readonly 'status.archived': "已归档";
     readonly 'row.open': "打开会话";
     readonly 'row.stop': "停止";
+    readonly 'row.message': "发消息";
     readonly 'row.messages': "{n} 条消息";
+    readonly 'message.placeholder': "发给该 agent 的消息…";
+    readonly 'message.send': "发送";
+    readonly 'message.cancel': "取消";
     readonly 'time.now': "刚刚";
     readonly 'time.minutes': "{n} 分钟前";
     readonly 'time.hours': "{n} 小时前";

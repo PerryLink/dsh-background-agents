@@ -27,17 +27,25 @@ background_agent ──▶ ctx.subagents.startContinuable() ──▶ durable ch
       └─ tool/result.meta ────┘ (folded by the projection)
 
 child turn ends ──▶ session/event ──▶ lifecycle observer (throttle)
-                        └─▶ parent.inject(progress notice) ──▶ parent log
+                        └─▶ parent.inject / parent.followup (progress notice) ──▶ parent log
+                                                      (quiet: next-request append; wakeup: new parent
+                                                       turn, FIFO-inbox queued when the parent is busy)
 
 child settles ──▶ continuation manager ──▶ parent notice (subagent-settled)
                                              └─▶ parent log
 
-bg_list ──▶ ctx.subagents.listChildren(parent)   (durable catalog, live-first)
+bg_list ──▶ ctx.subagents.listChildren / listDescendants(parent)  (durable catalog, live-first)
             + ctx.sessionProjections.snapshot(parent).backgroundAgents (facts)
             + ctx.agents.get(id)                 (running/idle/ready overlay)
+
+bg_result ──▶ ctx.sessions.get(child) → sessionPersistence.load(child) → final assistant text
 ```
 
-The in-memory `BackgroundAgentLifecycle` is a cache of tracked children: throttle watermarks, idle watermarks, and archive state. Losing it (crash, reload) costs only throttles and timers — the durable facts live in the parent log, and `bg_list` recovers through the official catalog.
+The five tools are thin adapters over `startContinuable` / `followup` / `listChildren` /
+`listDescendants` / `interrupt`. The in-memory `BackgroundAgentLifecycle` is a cache of
+tracked children: throttle watermarks, idle watermarks, and archive state. Losing it
+(crash, reload) costs only throttles and timers — the durable facts live in the parent
+log, and `bg_list` recovers through the official catalog.
 
 ## Lifecycle policies
 
@@ -47,7 +55,7 @@ The in-memory `BackgroundAgentLifecycle` is a cache of tracked children: throttl
 
 ## Web UI
 
-The client half registers into the `sidebar.footer.action` slot (the one list hole the sidebar shell declares): a trigger with a live running-count badge opens a floating panel. All rows derive from the `backgroundAgents` projection values riding the session-list snapshot — zero RPC. Jump and stop go through the official client APIs: `sessions.refreshSubagents` + `sessions.openSubagent` (jump), and `api.subagents.interrupt` with the durable parent/child address (stop). The presenter (`src/client/presenter.ts`) is a pure function of the snapshot — testable without a DOM.
+The client half registers into the `sidebar.footer.action` slot (the one list hole the sidebar shell declares): a trigger with a live running-count badge opens a floating panel. All rows derive from the `backgroundAgents` projection values riding the session-list snapshot — zero RPC. Jump, message, and stop go through the official client APIs: `sessions.refreshSubagents` + `sessions.openSubagent` (jump), `api.subagents.prompt` with `mode: 'continuable'` (message — a queued delivery whose answer is the child's next turn), and `api.subagents.interrupt` with the durable parent/child address (stop). The presenter (`src/client/presenter.ts`) is a pure function of the snapshot — testable without a DOM.
 
 ## Boundaries
 

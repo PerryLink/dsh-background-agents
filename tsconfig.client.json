@@ -3,6 +3,6 @@
   "compilerOptions": {
     "noEmit": true
   },
-  "include": ["src/client", "src/vocabulary.ts", "src/projection-schema.ts", "tests/presenter.spec.ts"],
+  "include": ["src/client", "src/vocabulary.ts", "src/projection-schema.ts", "tests/presenter.spec.ts", "tests/action.spec.tsx"],
   "exclude": []
 }

@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
 import { CallId } from '@deepseek-ai/dsh-llm'
+import { defineTool } from '@deepseek-ai/dsh-tools'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
 import { SessionId } from '@deepseek-ai/dsh-session'
@@ -63,13 +64,13 @@ function valueOf<T>(result: { value?: unknown }): T {
 }
 
 describe('dsh-background-agents tools', () => {
-  it('registers the four tools with their canonical parameter sets', async () => {
+  it('registers the five tools with their canonical parameter sets', async () => {
     const { ctx } = await setup()
     const names = ctx.tools.schemas().map(schema => schema.name)
-    expect(names).toEqual(expect.arrayContaining(['background_agent', 'bg_message', 'bg_list', 'bg_stop']))
+    expect(names).toEqual(expect.arrayContaining(['background_agent', 'bg_message', 'bg_list', 'bg_result', 'bg_stop']))
     const start = ctx.tools.schemas().find(schema => schema.name === 'background_agent')!
     const props = (start.parameters as { properties?: Record<string, unknown> }).properties ?? {}
-    expect(Object.keys(props).sort()).toEqual(['label', 'task'])
+    expect(Object.keys(props).sort()).toEqual(['label', 'max_depth', 'persona', 'task', 'tool_filter'])
     const stop = ctx.tools.schemas().find(schema => schema.name === 'bg_stop')!
     expect(Object.keys((stop.parameters as { properties: Record<string, unknown> }).properties)).toEqual(['agent_id'])
   })
@@ -193,6 +194,113 @@ describe('dsh-background-agents tools', () => {
       mode: 'continuable',
       activity: 'ready',
     })
+  })
+
+  it('rejects a tool_filter without allow or deny', async () => {
+    const { ctx, parent } = await setup()
+    const result = await callTool(ctx, 'background_agent', { task: 'x', tool_filter: {} }, parent)
+    expect(result.isError).toBe(true)
+    expect(text(result)).toContain('tool_filter must declare allow and/or deny')
+  })
+
+  it('rejects tool_filter names outside allowedChildTools', async () => {
+    const { ctx, parent } = await setup({ allowedChildTools: ['read'] })
+    const result = await callTool(ctx, 'background_agent', { task: 'x', tool_filter: { deny: ['edit'] } }, parent)
+    expect(result.isError).toBe(true)
+    expect(text(result)).toContain('outside allowedChildTools')
+  })
+
+  it('rejects max_depth that is not a non-negative integer or exceeds the ceiling', async () => {
+    const { ctx, parent } = await setup({ maxChildDepth: 2 })
+    const fractional = await callTool(ctx, 'background_agent', { task: 'x', max_depth: 1.5 }, parent)
+    expect(fractional.isError).toBe(true)
+    expect(text(fractional)).toContain('non-negative safe integer')
+    const over = await callTool(ctx, 'background_agent', { task: 'x', max_depth: 5 }, parent)
+    expect(over.isError).toBe(true)
+    expect(text(over)).toContain('maxChildDepth=2')
+  })
+
+  it('passes tool_filter, persona, max_depth, and the configured child route to the official start', async () => {
+    const { ctx, parent } = await setup({ childProvider: 'mock', childModel: 'cheap-model', maxChildDepth: 3 })
+    // The seam validates filter names loudly, so the scoped tool must exist.
+    ctx.tools.register(defineTool({
+      name: 'read',
+      description: 'fixture tool for tool_filter tests',
+      parameters: {},
+      output: { schema: { type: 'string' }, render: () => [{ type: 'text', text: 'ok' }] },
+      isConcurrencySafe: () => true,
+      execute: async () => 'ok',
+    }))
+    const spy = vi.spyOn(ctx.subagents, 'startContinuable')
+    const result = await callTool(ctx, 'background_agent', {
+      task: 'scoped work',
+      tool_filter: { allow: ['read'], deny: [] },
+      persona: 'researcher',
+      max_depth: 2,
+    }, parent)
+    expect(result.isError).toBe(false)
+    expect(spy).toHaveBeenCalledTimes(1)
+    const spec = spy.mock.calls[0]![0]
+    expect(spec.request.toolFilter).toEqual({ allow: ['read'] })
+    expect(spec.request.persona).toBe('researcher')
+    expect(spec.request.maxDepth).toBe(2)
+    expect(spec.request.agentOptions).toEqual({ provider: 'mock', model: 'cheap-model' })
+  })
+
+  it('bg_result reads the settled child\'s final text and errors for untracked ids', async () => {
+    const { ctx, parent } = await setup()
+    ctx.llm.registerAdapter(['mock'], new MockAdapter([textResponse('final answer text')]))
+    const started = await callTool(ctx, 'background_agent', { task: 'answer one thing' }, parent)
+    expect(started.isError).toBe(false)
+    const childId = valueOf<{ agentId: string }>(started).agentId
+    await vi.waitFor(() => { expect(ctx.agents.get(SessionId(childId))).toBeUndefined() }, { timeout: 5_000 })
+
+    const result = await callTool(ctx, 'bg_result', { agent_id: childId }, parent)
+    expect(result.isError).toBe(false)
+    // Direct tool execution appends no parent turn, so the projection fact is
+    // absent and the activity falls back to the live catalog view ('ready').
+    expect(valueOf<{ agentId: string; activity: string; text?: string }>(result)).toEqual({
+      agentId: childId,
+      activity: 'ready',
+      text: 'final answer text',
+    })
+
+    const ghost = await callTool(ctx, 'bg_result', { agent_id: 'ghost-child' }, parent)
+    expect(ghost.isError).toBe(true)
+    expect(text(ghost)).toContain('not one of this conversation\'s tracked children')
+  })
+
+  it('lists the descendant tree with parentId and depth when recursive', async () => {
+    const { ctx, parent } = await setup()
+    ctx.llm.registerAdapter(['mock'], new MockAdapter(['hang', 'hang']))
+    const childStart = await callTool(ctx, 'background_agent', { task: 'root task' }, parent)
+    expect(childStart.isError).toBe(false)
+    const childId = valueOf<{ agentId: string }>(childStart).agentId
+    await vi.waitFor(() => { expect(ctx.agents.get(SessionId(childId))?.status).toBe('running') }, { timeout: 5_000 })
+    const childAgent = ctx.agents.get(SessionId(childId))!
+    // A background agent is itself an agent: it starts a grandchild of its own.
+    const grand = await ctx.subagents.startContinuable({
+      provider: 'spawn',
+      label: 'grand',
+      request: { prompt: [{ type: 'text', text: 'grand task' }], parent: childAgent },
+      signal: testToolSignal,
+    })
+    expect(typeof grand.childId).toBe('string')
+
+    const listing = await callTool(ctx, 'bg_list', { recursive: true }, parent)
+    expect(listing.isError).toBe(false)
+    const value = valueOf<{ kind: string; agents: Array<{ agentId: string; parentId?: string; depth?: number }> }>(listing)
+    expect(value.kind).toBe('listing')
+    expect(value.agents).toHaveLength(2)
+    const childRow = value.agents.find(row => row.agentId === childId)!
+    expect(childRow).toMatchObject({ depth: 1, parentId: parent.id })
+    const grandRow = value.agents.find(row => row.agentId === grand.childId)!
+    expect(grandRow).toMatchObject({ depth: 2, parentId: childId })
+
+    const direct = await callTool(ctx, 'bg_list', {}, parent)
+    const directValue = valueOf<{ agents: Array<{ parentId?: string; depth?: number }> }>(direct)
+    expect(directValue.agents).toHaveLength(1)
+    expect(directValue.agents[0]!.parentId).toBeUndefined()
   })
 
   it('reports not-found for an agent id outside this parent\'s children', async () => {

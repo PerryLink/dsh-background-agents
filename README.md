@@ -12,20 +12,21 @@ DSH's built-in background *jobs* are fire-and-forget tool executions: you can re
 
 ## What you get
 
-- **`background_agent`** — start a durable, continuable child agent from any session. It runs in its own context, returns a stable agent id immediately, and keeps its conversation open forever.
+- **`background_agent`** — start a durable, continuable child agent from any session. It runs in its own context, returns a stable agent id immediately, and keeps its conversation open forever. Optional per-child scoping: `tool_filter` (removes tools from the child's view — never grants new ones), `persona` (a dedicated system-prompt persona), and `max_depth` (a delegation-depth cap); `childProvider`/`childModel` config route its model requests.
 - **`bg_message`** — send it more work, corrections, or wake a settled agent. Delivered through the official FIFO inbox; the agent's answer is its next turn.
-- **`bg_list`** — status of your agents: label, mode, activity (`running` / `idle` / `ready` / `settled` / `archived`), message count, last activity time. Recovers persisted children after a restart.
+- **`bg_list`** — status of your agents: label, mode, activity (`running` / `idle` / `ready` / `settled` / `archived`), message count, last activity time. Recovers persisted children after a restart. `recursive: true` lists the whole descendant tree with `parentId`/`depth`.
+- **`bg_result`** — fetch a child's latest assistant output text plus its activity, beyond the settled-notice summary.
 - **`bg_stop`** — request interruption of the current turn. Fire-and-return: official teardown finishes the job; the agent stays resumable.
-- **autoReport** — after every child turn, one throttled progress line is injected into your session (model-visible, plugin-sourced). Its final outcome arrives via the official settled notice.
+- **autoReport** — after every child turn, one throttled progress line is injected into your session (model-visible, plugin-sourced). Its final outcome arrives via the official settled notice. `reportDelivery: wakeup` makes each line start a parent turn when the parent is idle.
 - **Idle archive** — agents quiet past `idleTimeoutMinutes` are archived with a notice and a stop request; `bg_message` wakes them back up.
 - **`backgroundAgents` projection** — a session-projection unit that folds the parent log into dashboard rows (agent id, label, activity, last message summary, created time). Everything reconstructs from the durable log — no separate database.
-- **Web UI panel** — a "Background agents" entry in the Web GUI sidebar with live status, one-click jump into the child session, and a stop button.
+- **Web UI panel** — a "Background agents" entry in the Web GUI sidebar with live status, one-click jump into the child session, a stop button, and a message button that queues a new turn through the official `subagent.prompt` RPC.
 
 ## Quick start
 
 ```sh
 # from the harness checkout or wherever the dsh CLI lives (web or headless)
-dsh plugin --profile <name> add "github:PerryLink/dsh-background-agents#v0.1.1"
+dsh plugin --profile <name> add "github:PerryLink/dsh-background-agents#v0.2.0"
 ```
 
 The bundle patch carries the plugin row, so `dsh plugin add` composes it into your profile's layer stack (`dsh.profile.bundles`). Prefer the git source with a pinned ref: the repo commits its build output (`lib/`), so git installs need no build step and no `allowBuilds` entry. (Once the package is published to npm, plain `pnpm add dsh-background-agents` works too.)
@@ -59,12 +60,17 @@ Every tunable is a validated `Config` field — change it in `cordis.yml`, never
 |---|---|---|
 | `provider` | *(required)* | `ctx.subagents` provider name for continuable starts (`spawn`) |
 | `autoReport` | `true` | inject one progress line into the parent after each child turn |
+| `reportDelivery` | `quiet` | `quiet` appends the line to the parent's next model request; `wakeup` starts a parent turn when idle (queues when busy) |
 | `reportThrottleMs` | `15000` | minimum gap between two progress injections for one child |
 | `reportSummaryMaxChars` | `300` | hard cap on the injected progress-line text (ellipsized) |
 | `maxBackgroundAgents` | `4` | hard cap on non-archived background agents per parent session |
 | `idleTimeoutMinutes` | `120` | idle window after which a quiet child is archived and notified (`>= 1`) |
 | `idleSweepIntervalMs` | `60000` | archive sweep period |
 | `maxLabelChars` | `120` | display-label cap (ellipsized) |
+| `childProvider` | *(inherit)* | provider route for child model requests |
+| `childModel` | *(inherit)* | model id for child model requests |
+| `maxChildDepth` | *(none)* | config ceiling for a start's `max_depth` argument |
+| `allowedChildTools` | *(none)* | allowlist for `tool_filter` names; empty/absent = no limit |
 
 ## How it works — and why it survives restarts
 
@@ -93,7 +99,7 @@ Not in scope: scheduled triggering (the schedule seam exists), cross-machine/rem
 ```sh
 pnpm install        # tooling only; harness packages resolve against a sibling checkout
 pnpm run typecheck  # strict TS, node + client programs
-pnpm test           # 48 unit + end-to-end tests (real subagent seam, scripted LLM)
+pnpm test           # 60 unit + end-to-end tests (real subagent seam, scripted LLM, jsdom panel)
 pnpm run build      # lib/index.js (node half) + lib/client.js (web client bundle)
 pnpm run gen-aliases  # re-map harness package paths after the checkout moves
 ```

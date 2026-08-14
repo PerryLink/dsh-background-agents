@@ -10,7 +10,7 @@
  */
 import type { Context } from '@deepseek-ai/cordis';
 import type { Agent } from '@deepseek-ai/dsh-agent';
-import type { Session, SessionId } from '@deepseek-ai/dsh-session';
+import type { Session, SessionEvent, SessionId } from '@deepseek-ai/dsh-session';
 import type { AgentRegistry } from '@deepseek-ai/dsh-agent';
 /** Tunables the lifecycle honors; every threshold is a validated Config field. */
 export interface LifecycleConfig {
@@ -23,6 +23,11 @@ export interface LifecycleConfig {
     readonly idleTimeoutMinutes: number;
     /** Sweep period. */
     readonly idleSweepIntervalMs: number;
+    /**
+     * Progress delivery: `quiet` appends the notice to the parent's next model
+     * request; `wakeup` starts a parent turn when idle (queues when busy).
+     */
+    readonly reportDelivery: 'quiet' | 'wakeup';
 }
 /** One tracked child: live bookkeeping only. */
 export interface TrackedChild {
@@ -74,10 +79,23 @@ export declare class BackgroundAgentLifecycle {
     activeCountFor(parentSessionId: SessionId): number;
 }
 /**
+ * One line of a session's last assistant text, empty when it produced none.
+ * Accepts any event-log carrier so both live sessions and persistence
+ * inspections can serve the same fold.
+ */
+export declare function sessionLastText(session: {
+    events: readonly SessionEvent[];
+}): string;
+/** One line of the child's last assistant text, empty when it produced none. */
+export declare function childLastText(sessions: LiveSessions, childId: SessionId): string;
+/**
  * Report one completed child turn into the parent: a model-visible injected
  * notice (source `{ kind: 'plugin', plugin: 'dsh-background-agents' }`) whose
  * canonical prefix lets the projection fold the durable fact back out of the
  * parent log. Honours the per-child throttle and the parent's presence.
+ * `wakeup` delivery starts a parent turn through `Agent.followup` (queued
+ * when the parent is busy); `quiet` delivery appends to the parent's next
+ * request through `Agent.inject`.
  * @returns true when a report was emitted.
  */
 export declare function reportProgress(agents: LiveAgents, sessions: LiveSessions, config: LifecycleConfig, lifecycle: BackgroundAgentLifecycle, child: TrackedChild, now: number): boolean;
