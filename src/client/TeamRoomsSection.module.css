@@ -1,0 +1,272 @@
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+}
+
+.title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.intro {
+  margin: 0;
+  opacity: 0.75;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.noSession {
+  margin: 0;
+  opacity: 0.6;
+  font-size: 12px;
+}
+
+.forms {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.formRow {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.input {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 8px;
+  font: inherit;
+  font-size: 12.5px;
+  border: 1px solid color-mix(in srgb, currentColor 22%, transparent);
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+}
+
+.action {
+  padding: 5px 10px;
+  font: inherit;
+  font-size: 12px;
+  border: 1px solid color-mix(in srgb, currentColor 22%, transparent);
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.action:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.error {
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid #d92d20;
+  border-radius: 6px;
+  color: #d92d20;
+  font-size: 12.5px;
+}
+
+.empty {
+  opacity: 0.6;
+  font-size: 12.5px;
+  padding: 6px 0;
+}
+
+.room {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, currentColor 16%, transparent);
+  border-radius: 10px;
+}
+
+.roomHead {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.roomName {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.roomId {
+  font-size: 11px;
+  opacity: 0.55;
+  word-break: break-all;
+}
+
+.blockTitle {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.7;
+}
+
+.memberList,
+.taskList,
+.timelineList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.member {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 12.5px;
+}
+
+.memberDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+}
+
+.memberLive {
+  background: #12b76a;
+}
+
+.memberOffline {
+  background: color-mix(in srgb, currentColor 30%, transparent);
+}
+
+.memberId {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.memberMeta {
+  opacity: 0.6;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.taskAdd,
+.composerRow {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.task {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 8px;
+  border: 1px solid color-mix(in srgb, currentColor 12%, transparent);
+  border-radius: 8px;
+}
+
+.task-todo {
+  border-left: 3px solid #f79009;
+}
+
+.task-in-progress {
+  border-left: 3px solid #2e90fa;
+}
+
+.task-done {
+  border-left: 3px solid #12b76a;
+  opacity: 0.65;
+}
+
+.taskHead {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+
+.taskStatus {
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.75;
+}
+
+.taskTitle {
+  font-size: 12.5px;
+  font-weight: 500;
+  flex: 1;
+  min-width: 0;
+}
+
+.taskAssignee {
+  font-size: 11px;
+  opacity: 0.6;
+  word-break: break-all;
+}
+
+.taskDesc {
+  font-size: 12px;
+  opacity: 0.75;
+}
+
+.taskActions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.assignInput {
+  flex: 1;
+  min-width: 90px;
+  padding: 3px 6px;
+  font: inherit;
+  font-size: 11.5px;
+  border: 1px solid color-mix(in srgb, currentColor 18%, transparent);
+  border-radius: 5px;
+  background: transparent;
+  color: inherit;
+}
+
+.timelineRow {
+  display: flex;
+  gap: 8px;
+  font-size: 11.5px;
+  line-height: 1.4;
+}
+
+.timelineKind {
+  flex: none;
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  opacity: 0.6;
+  padding-top: 1px;
+}
+
+.timelineText {
+  min-width: 0;
+  word-break: break-word;
+}
+
+.busy {
+  font-size: 11.5px;
+  opacity: 0.7;
+}

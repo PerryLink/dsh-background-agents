@@ -1,12 +1,44 @@
 # dsh-background-agents bundle patch: mount the interactive background-agent
-# plugin (five tools + the backgroundAgents session projection + the Web UI
-# sidebar panel). Configure the provider and lifecycle policy per profile by
+# plugin plus its persistent team rooms.
+#
+# The room half persists through the harness's storage domain (SQLite or
+# JSONL backend — the deployment chooses; zero extra services). Inserting the
+# storage rows by id is safe on top of a web profile (which composes them in
+# box with the same config: the later write wins per row id) and completes a
+# bare headless profile. On harness builds without the storage packages the
+# rows simply fail to load and the team-room half stays dormant: the
+# background-agent core still mounts, and the room_* tools plus the /room
+# command activate once a storage domain appears.
+#
+# Configure the provider, lifecycle policy, and room limits per profile by
 # overriding the `background-agents` row.
 #
 # Install (lib/ is committed, so no build step or allowBuilds is needed):
-#   dsh plugin --profile <name> add "github:PerryLink/dsh-background-agents#v0.3.0"
+#   dsh plugin --profile <name> add "github:PerryLink/dsh-background-agents#v0.5.0"
 - insert:
+    - id: storage
+      name: '@deepseek-ai/dsh-storage'
+
+    - id: storage-json
+      name: '@deepseek-ai/dsh-storage-json'
+      config:
+        root: !!js dshHomePath('storages')
+
+    - id: storage-domain
+      name: '@deepseek-ai/dsh-storage-domain'
+      config:
+        backend: json
+
     - id: background-agents
       name: dsh-background-agents
       config:
         provider: spawn
+        # ── room policy (schema defaults shown for reference) ──────────────
+        # maxRooms: 16            # hard cap on rooms across the profile
+        # maxMembersPerRoom: 8    # hard cap on members per room
+        # maxRoomsPerMember: 4    # hard cap on rooms one session may join
+        # busRetention: 200       # bus messages kept per room (retention window)
+        # timelineRetention: 500  # timeline events kept per room
+        # taskRetention: 50       # completed tasks kept per room
+        # maxMessageChars: 4000   # hard cap on one message's text
+        # injectRoomBrief: true   # one-line role statement brief on join/resume
