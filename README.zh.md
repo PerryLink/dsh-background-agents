@@ -7,6 +7,9 @@
 [![license](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](./LICENSE)
 [![topic: dsh-plugin](https://img.shields.io/badge/topic-dsh--plugin-4d6bfe)](https://github.com/topics/dsh-plugin)
 [![topic: dsh](https://img.shields.io/badge/topic-dsh-4d6bfe)](https://github.com/topics/dsh)
+[![npm version](https://img.shields.io/npm/v/dsh-background-agents)](https://www.npmjs.com/package/dsh-background-agents)
+[![npm downloads](https://img.shields.io/npm/dm/dsh-background-agents)](https://www.npmjs.com/package/dsh-background-agents)
+[![CI](https://img.shields.io/github/actions/workflow/status/PerryLink/dsh-background-agents/ci.yml?branch=main&label=CI)](https://github.com/PerryLink/dsh-background-agents/actions)
 
 DSH 内置的后台 *jobs* 是"发后即忘"的工具执行：能读输出、能杀掉，但没法跟它对话。`dsh-background-agents` 把它升级为官 subagent seam 上的**完整后台 agent 会话**——一个可继续（continuable）的子会话，随时可发消息、可干预、可中断；它每完成一轮，就有一条节流过的进度摘要注入父会话，模型和人都看得见。
 
@@ -128,6 +131,14 @@ pnpm dsh --profile headless --patch dev/cordis.yml "【父会话】驱动后台 
 ```
 
 测试覆盖全路径——启动、列、消息、停止——基于**真实** `SubagentRuntime` + 进程内 spawn 提供方 + 脚本化适配器；另有节流/上限/归档策略、投影折叠、以及经 `session-persistence-jsonl` 的崩溃恢复用例。
+
+## 👥 贡献者
+
+感谢所有为 `dsh-background-agents` 做出贡献的人：
+
+- [PerryLink](https://github.com/PerryLink) — 作者与维护者：基于官方 subagent 接缝的后台 agent 运行时、Web UI 侧边栏面板、会话投影、文档、CI/CD 与发布。
+
+想要参与？请查看 [issue 模板](.github/ISSUE_TEMPLATE/) 与 [安全策略](SECURITY.md) — 欢迎中英文 PR。
 
 ## 许可证
 

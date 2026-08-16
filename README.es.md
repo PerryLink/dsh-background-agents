@@ -7,6 +7,9 @@
 [![license](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](./LICENSE)
 [![topic: dsh-plugin](https://img.shields.io/badge/topic-dsh--plugin-4d6bfe)](https://github.com/topics/dsh-plugin)
 [![topic: dsh](https://img.shields.io/badge/topic-dsh-4d6bfe)](https://github.com/topics/dsh)
+[![npm version](https://img.shields.io/npm/v/dsh-background-agents)](https://www.npmjs.com/package/dsh-background-agents)
+[![npm downloads](https://img.shields.io/npm/dm/dsh-background-agents)](https://www.npmjs.com/package/dsh-background-agents)
+[![CI](https://img.shields.io/github/actions/workflow/status/PerryLink/dsh-background-agents/ci.yml?branch=main&label=CI)](https://github.com/PerryLink/dsh-background-agents/actions)
 
 Los *jobs* en segundo plano de DSH son ejecuciones de herramientas de "lanzar y olvidar": puedes leer su salida y matarlos, pero no puedes hablar con ellos. `dsh-background-agents` los convierte en **sesiones completas de agente en segundo plano** sobre el seam oficial de subagentes: una conversación hija continuable a la que puedes enviar mensajes, corregir e interrumpir en cualquier momento, mientras una línea de progreso inyectada tras cada turno te mantiene (y mantiene al modelo) al tanto.
 
@@ -126,6 +129,14 @@ Una demo extremo a extremo sin clave mueve una sesión padre real y un hijo de f
 $env:DSH_HOME = 'D:/deepseek-harness/Project/Plugins/dsh-background-agents/dev/dsh-home'
 pnpm dsh --profile headless --patch dev/cordis.yml "【父会话】驱动后台 agent 演示"
 ```
+
+## 👥 Contribuidores
+
+Gracias a todas las personas que han contribuido a `dsh-background-agents`:
+
+- [PerryLink](https://github.com/PerryLink) — autor y mantenedor: el runtime de agentes en segundo plano sobre el seam oficial de subagentes, el panel lateral de la Web UI, la proyección de sesión, documentación, CI/CD y releases.
+
+¿Quieres ayudar? Consulta las [plantillas de issues](.github/ISSUE_TEMPLATE/) y la [política de seguridad](SECURITY.md) — PRs bienvenidos en inglés o chino.
 
 ## Licencia
 

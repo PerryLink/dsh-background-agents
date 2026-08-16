@@ -7,6 +7,9 @@
 [![license](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](./LICENSE)
 [![topic: dsh-plugin](https://img.shields.io/badge/topic-dsh--plugin-4d6bfe)](https://github.com/topics/dsh-plugin)
 [![topic: dsh](https://img.shields.io/badge/topic-dsh-4d6bfe)](https://github.com/topics/dsh)
+[![npm version](https://img.shields.io/npm/v/dsh-background-agents)](https://www.npmjs.com/package/dsh-background-agents)
+[![npm downloads](https://img.shields.io/npm/dm/dsh-background-agents)](https://www.npmjs.com/package/dsh-background-agents)
+[![CI](https://img.shields.io/github/actions/workflow/status/PerryLink/dsh-background-agents/ci.yml?branch=main&label=CI)](https://github.com/PerryLink/dsh-background-agents/actions)
 
 DSH's built-in background *jobs* are fire-and-forget tool executions: you can read output and kill them, but you cannot talk to them. `dsh-background-agents` upgrades that to **full background agent sessions** on the official subagent seam —a continuable child conversation you can message, steer, and interrupt at any time, while an injected progress line after each of its turns keeps you (and the model) in the loop.
 
@@ -128,6 +131,14 @@ pnpm dsh --profile headless --patch dev/cordis.yml "銆愮埗浼氳瘽銆戦┍�
 ```
 
 The test suite covers the full path —start, list, message, stop —against the **real** `SubagentRuntime` with the in-process spawn provider and a scripted adapter, plus throttle/cap/archive policy, projection folding, and crash recovery through `session-persistence-jsonl`.
+
+## 👥 Contributors
+
+Thanks to everyone who has contributed to `dsh-background-agents`:
+
+- [PerryLink](https://github.com/PerryLink) — author and maintainer: the background-agent runtime on the official subagent seam, the Web UI sidebar panel, session projection, docs, CI/CD and releases.
+
+Want to help? Check the [issue templates](.github/ISSUE_TEMPLATE/) and the [security policy](SECURITY.md) — PRs are welcome in English or Chinese.
 
 ## License
 

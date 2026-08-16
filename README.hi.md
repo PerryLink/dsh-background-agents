@@ -7,6 +7,9 @@
 [![license](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](./LICENSE)
 [![topic: dsh-plugin](https://img.shields.io/badge/topic-dsh--plugin-4d6bfe)](https://github.com/topics/dsh-plugin)
 [![topic: dsh](https://img.shields.io/badge/topic-dsh-4d6bfe)](https://github.com/topics/dsh)
+[![npm version](https://img.shields.io/npm/v/dsh-background-agents)](https://www.npmjs.com/package/dsh-background-agents)
+[![npm downloads](https://img.shields.io/npm/dm/dsh-background-agents)](https://www.npmjs.com/package/dsh-background-agents)
+[![CI](https://img.shields.io/github/actions/workflow/status/PerryLink/dsh-background-agents/ci.yml?branch=main&label=CI)](https://github.com/PerryLink/dsh-background-agents/actions)
 
 DSH के बिल्ट-इन बैकग्राउंड *jobs* "चलाओ और भूल जाओ" वाले टूल निष्पादन हैं: आप आउटपुट पढ़ सकते हैं और उन्हें मार सकते हैं, लेकिन उनसे बात नहीं कर सकते। `dsh-background-agents` इसे आधिकारिक सबएजेंट सीम पर **पूर्ण बैकग्राउंड एजेंट सत्रों** में बदल देता है — एक कंटिन्यूएबल चाइल्ड वार्तालाप जिसे आप कभी भी संदेश भेज सकते हैं, सुधार सकते हैं और बाधित कर सकते हैं, जबकि हर टर्न के बाद इंजेक्ट की गई एक प्रगति पंक्ति आपको (और मॉडल को) अद्यतन रखती है।
 
@@ -126,6 +129,14 @@ pnpm run gen-aliases  # चेकआउट हिलने पर harness पै
 $env:DSH_HOME = 'D:/deepseek-harness/Project/Plugins/dsh-background-agents/dev/dsh-home'
 pnpm dsh --profile headless --patch dev/cordis.yml "【父会话】驱动后台 agent 演示"
 ```
+
+## 👥 योगदानकर्ता
+
+`dsh-background-agents` में योगदान देने वाले सभी लोगों का धन्यवाद:
+
+- [PerryLink](https://github.com/PerryLink) — लेखक और मेंटेनर: आधिकारिक सबएजेंट सीम पर बैकग्राउंड-एजेंट रनटाइम, वेब UI साइडबार पैनल, सेशन प्रोजेक्शन, दस्तावेज़, CI/CD और रिलीज़।
+
+मदद करना चाहते हैं? [issue टेम्पलेट](.github/ISSUE_TEMPLATE/) और [सुरक्षा नीति](SECURITY.md) देखें — अंग्रेज़ी या चीनी में PR का स्वागत है।
 
 ## लाइसेंस
 
