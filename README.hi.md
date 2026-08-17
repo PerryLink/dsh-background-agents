@@ -33,9 +33,9 @@
 
 `dsh-background-agents` DSH के फायर-एंड-फॉरगेट बैकग्राउंड *जॉब* को दो समन्वित सतहों में बदल देता है:
 
-1. **पाँच स्टीयरिंग टूल** — `background_agent` आधिकारिक उप-एजेंट सीम पर एक टिकाऊ, जारी रहने योग्य चाइल्ड शुरू करता है (वैकल्पिक `tool_filter`, `persona`, `max_depth`, मॉडल मार्ग); `bg_message` बाद का टर्न पहुँचाता है; `bg_list` स्थिति (या वंशज ट्री) बताता है; `bg_result` नवीनतम परिणाम पाठ पढ़ता है; `bg_stop` रुकावट का अनुरोध करता है।
-2. **प्रगति और संग्रह** — `autoReport` हर चाइल्ड टर्न के बाद एक थ्रॉटल्ड प्रगति पंक्ति इंजेक्ट करता है; निष्क्रियता स्वीप शांत चाइल्ड को संग्रहीत करता है और `bg_message` उन्हें फिर जगा देता है।
-3. **डैशबोर्ड प्रोजेक्शन + वेब पैनल** — `backgroundAgents` सत्र प्रोजेक्शन पैरेंट लॉग को पंक्तियों में मोड़ता है; एक साइडबार पैनल लाइव स्थिति, जंप, संदेश, रोक और परिणाम झलक दिखाता है।
+1. **पाँच स्टीयरिंग टूल** — `background_agent` आधिकारिक उप-एजेंट सीम पर एक टिकाऊ, जारी रहने योग्य चाइल्ड शुरू करता है (वैकल्पिक `tool_filter` — टूल हटाता है, कभी नए नहीं देता; `persona`; `max_depth`; `childProvider`/`childModel` मार्ग)। `bg_message` बाद का टर्न पहुँचाता है; `bg_list` स्थिति बताता है (या `parentId`/`depth` के साथ वंशज ट्री); `bg_result` नवीनतम परिणाम पाठ पढ़ता है (रीज़निंग फ़ॉलबैक को `textSource: 'reasoning'` चिह्नित किया जाता है); `bg_stop` रुकावट का अनुरोध करता है।
+2. **प्रगति और संग्रह** — `autoReport` हर चाइल्ड टर्न के बाद एक थ्रॉटल्ड प्रगति पंक्ति इंजेक्ट करता है; `reportDelivery: wakeup` पैरेंट के निष्क्रिय होने पर पैरेंट टर्न शुरू करता है। निष्क्रियता स्वीप शांत चाइल्ड को संग्रहीत करता है और `bg_message` उन्हें फिर जगा देता है (`autoArchive: false` की स्थिति में शांत वॉचर को पार्क कर देता है)।
+3. **डैशबोर्ड प्रोजेक्शन + वेब पैनल** — `backgroundAgents` सत्र प्रोजेक्शन पैरेंट लॉग को पंक्तियों में मोड़ता है; एक साइडबार पैनल लाइव स्थिति, जंप, संदेश, रोक और परिणाम झलक दिखाता है। सब कुछ टिकाऊ लॉग से फिर से बनता है — कोई अलग डेटाबेस नहीं।
 4. **टीम रूम (v0.5.0+)** — `/room` कमांड परिवार और आठ `room_*` टूल लगातार मल्टी-एजेंट रूम बनाते हैं: सदस्य (हर एक स्वतंत्र सत्र), एक संदेश बस (निर्देशित/प्रसारण), एक साझा टास्क बोर्ड और एक साझा टाइमलाइन — `team_rooms` स्टोरेज डोमेन (SQLite या JSONL) में संग्रहीत और DSH रीस्टार्ट के बाद पुनर्प्राप्त। क्रॉस-सदस्य टास्क हैंडऑफ़ आधिकारिक अनुमोदन सीम से गुजरते हैं।
 
 ## त्वरित शुरुआत
@@ -51,7 +51,16 @@ dsh plugin --profile web add dsh-background-agents
 dsh --profile web --dump-config | grep -A4 'id: background-agents'
 ```
 
-बंडल पैच प्लगइन पंक्ति रखता है; `provider` अनिवार्य है। रेपो अपना बिल्ड आउटपुट (`lib/`) कमिट करता है, इसलिए git इंस्टॉल को बिल्ड चरण की आवश्यकता नहीं होती। टीम रूम वहीं माउंट होते हैं जहाँ स्टोरेज डोमेन (`@deepseek-ai/dsh-storage-domain`) बना हो; पाँच `bg_*` टूल इसके बिना भी काम करते हैं।
+बंडल पैच प्लगइन पंक्ति रखता है; `provider` अनिवार्य है। रेपो अपना बिल्ड आउटपुट (`lib/`) कमिट करता है, इसलिए git इंस्टॉल को बिल्ड चरण की आवश्यकता नहीं होती। प्लगइन को उप-एजेंट स्पाइन पहले से माउंट होना चाहिए (`@deepseek-ai/dsh-base` पर बना कोई भी प्रोफ़ाइल इसे रखता है)। टीम रूम वहीं माउंट होते हैं जहाँ स्टोरेज डोमेन (`@deepseek-ai/dsh-storage-domain`) बना हो; पाँच `bg_*` टूल इसके बिना भी काम करते हैं।
+
+फिर, किसी भी सत्र में, बस मॉडल से कहें — या टूल सीधे कॉल करें:
+
+```
+background_agent "watch the repo for test failures and keep me posted" (label: test-watch)
+bg_list
+bg_message <agentId> "also check the snapshot tests now"
+bg_stop <agentId>
+```
 
 ## इंस्टॉल और अनइंस्टॉल
 
@@ -96,7 +105,7 @@ dsh --profile web --dump-config | grep -A4 'id: background-agents'
 |---|---|---|
 | `background_agent` | टूल | टिकाऊ, जारी रहने योग्य चाइल्ड शुरू करें (label, `tool_filter`, `persona`, `max_depth`) |
 | `bg_message` | टूल | agent id से चाइल्ड को बाद का टर्न पहुँचाएँ |
-| `bg_list` | टूल | आपके एजेंटों की स्थिति (या `recursive: true` से ट्री) |
+| `bg_list` | टूल | आपके एजेंटों की स्थिति (या `recursive: true` से वंशज ट्री) |
 | `bg_result` | टूल | चाइल्ड का नवीनतम असिस्टेंट आउटपुट पाठ लें |
 | `bg_stop` | टूल | वर्तमान टर्न की रुकावट का अनुरोध करें |
 | `/room` | कमांड | `create\|join\|leave\|list\|send\|tasks\|task add\|assign\|claim\|done\|delete` |
@@ -106,6 +115,43 @@ dsh --profile web --dump-config | grep -A4 'id: background-agents'
 | `backgroundAgents` प्रोजेक्शन | सत्र प्रोजेक्शन | पैरेंट लॉग से मोड़ी गई डैशबोर्ड पंक्तियाँ |
 | `teamRoom` प्रोजेक्शन | सत्र प्रोजेक्शन | `team-room/fact` ईवेंट से मोड़ी गई साझा टाइमलाइन |
 | वेब साइडबार पैनल | क्लाइंट | लाइव स्थिति, जंप, संदेश, रोक, परिणाम झलक |
+
+## यह कैसे काम करता है — और रीस्टार्ट के बाद क्यों बचा रहता है
+
+सब कुछ आधिकारिक उप-एजेंट सीम पर चलता है: `startContinuable`, `followup`, `interrupt`, `listChildren` — प्लगइन अपना कोई लाइफ़साइकल रूटिंग नहीं करता, कभी किसी दूसरे सत्र के `Agent` को नहीं छूता, और कभी किसी प्रोसेस ट्री को नहीं मारता (रोक = *रुकावट का अनुरोध*; टियरडाउन कंटिन्यूएशन मैनेजर का काम है)।
+
+प्लगइन हर तथ्य को **एक संरचित चैनल और एक मॉडल-दृश्य चैनल** के ज़रिए लिखता है:
+
+- **`background-agents/fact` संरचित तथ्य ईवेंट** — पंजीकृत / संदेश / रोक / प्रगति / संग्रहीत तथ्य, पैरेंट लॉग में केवल-लॉग रिकॉर्ड के रूप में जोड़े जाते हैं और लिफ़ाफ़े का `ignorable: true` मार्कर रखते हैं; जो पाठक उस प्रकार को नहीं जानते वे लॉग को अस्वीकार करने के बजाय रिकॉर्ड छोड़ देते हैं।
+- **`tool/result` रीप्ले मेटाडेटा** — संरचित चैनल से पहले लिखे गए लॉग में वही तथ्य (केवल तभी मोड़े जाते हैं जब किसी पंक्ति के पास कोई संरचित प्रोवेनेंस न हो)।
+- **इंजेक्ट किए गए `user/message` नोटिस** (मॉडल-दृश्य), स्रोत `{ kind: 'plugin', plugin: 'dsh-background-agents' }` — थ्रॉटल्ड प्रगति पंक्तियाँ और संग्रह नोटिस (कैनोनिकल उपसर्ग `[background-agent <id>] …`)।
+- **आधिकारिक `subagent-settled` नोटिस** — चाइल्ड का टिकाऊ "settled" तथ्य।
+- टीम रूम वही अनुशासन दर्शाते हैं: हर डिलीवर किया गया रूम संदेश सदस्य के अपने लॉग में एक टिकाऊ `user/message` होता है, और साझा टाइमलाइन `team_rooms` स्टोरेज डोमेन में केवल-लॉग `team-room/fact` ईवेंट के रूप में प्रतिबिम्बित होती है।
+
+`backgroundAgents` प्रोजेक्शन संरचित चैनल को मोड़ता है और पुराने फ़ोल्ड को बनाए रखता है; डैशबोर्ड मान और `bg_list` तथ्य हर बार खोलने पर मानव-पठनीय नोटिस पाठ को पार्स किए बिना फिर से बनते हैं। जब कैटलॉग स्वयं उपलब्ध न हो, तो `bg_list` एक स्पष्ट **`unrecoverable`** मार्कर लौटाता है — यह कभी खाली सूची नहीं गढ़ता।
+
+## बिल्ट-इन उप-एजेंट टूल से इसका संबंध
+
+harness कोर अपने स्वयं के उप-एजेंट टूल रखता है (`subagent`, `send_message`, `interrupt_agent` और चाइल्ड-साइड `report` टूल)। इस प्लगइन के `bg_*` टूल उनके **सत्र-स्कोप्ड साथी** हैं; दोनों को एक साथ माउंट किया जा सकता है:
+
+| बिल्ट-इन टूल | यह प्लगइन | अंतर |
+|---|---|---|
+| `subagent` (`backgroundMode: 'continuable'`) | `background_agent` | वही `startContinuable` सीम; यह प्लगइन प्रति-चाइल्ड tool_filter/persona/max_depth सत्यापन और प्रति-सत्र सीमा जोड़ता है |
+| `send_message` | `bg_message` | वही डिलीवरी सिमेंटिक्स; `bg_message` इस वार्तालाप के बैकग्राउंड एजेंटों को संबोधित करता है और प्रोजेक्शन तथ्य बनाए रखता है |
+| `interrupt_agent` | `bg_stop` | वही रुकावट सिमेंटिक्स; `bg_stop` एक संरचित रोक तथ्य भी रिकॉर्ड करता है |
+| चाइल्ड-साइड `report` टूल | autoReport | बिल्ट-इन को चाइल्ड मॉडल स्वयं कॉल करता है; यह प्लगइन **हर चाइल्ड टर्न के बाद स्वचालित रूप से** थ्रॉटल्ड प्रगति इंजेक्ट करता है |
+
+कोर टूल में जो नहीं है: `bg_list`, `bg_result`, निष्क्रिय संग्रह, और प्रति-पैरेंट मोड़ा गया पैनल प्रोजेक्शन।
+
+दायरे में नहीं: शेड्यूल्ड ट्रिगरिंग (शेड्यूल सीम मौजूद है), क्रॉस-मशीन/रिमोट एजेंट, और आधिकारिक उप-एजेंट एक्टिवेशन कॉन्ट्रैक्ट में कोई बदलाव।
+
+## यह प्लगइन नहीं है
+
+| प्रोजेक्ट | यह क्या करता है | सीमा |
+|---|---|---|
+| [titanwings/dsh-automation](https://github.com/titanwings/dsh-automation) | नए एजेंट सत्रों में शेड्यूल्ड कोडिंग कार्य | यह **कब** कार्य चलते हैं इसका मालिक है (शेड्यूलिंग)। यह प्लगइन एक लंबी वार्तालाप की **इंटरैक्टिव स्टीयरिंग** का मालिक है — कोई शेड्यूलर सीम नहीं, कोई cron नहीं। |
+| [vlln/dsh-task-status](https://github.com/vlln/dsh-task-status) | बैकग्राउंड *जॉब* के लिए स्टेटस बार (प्रगति + आउटपुट टेल) | यह टूल-स्तर के जॉब **दिखाता** है। यह प्लगइन **एजेंट सत्र** बनाता और चलाता है; इसका डैशबोर्ड उसका एक पैनल है, उत्पाद नहीं। |
+| [YYTbit/dsh-plugin-agent-dashboard](https://github.com/YYTbit/dsh-plugin-agent-dashboard) | मल्टी-एजेंट डैशबोर्ड स्किल | प्रदर्शन-उन्मुख। इस प्लगइन की पंक्तियाँ **कार्रवाई योग्य** हैं: चाइल्ड सत्र में जाएँ, संदेश भेजें, रोकें — आधिकारिक कंट्रोल प्लेन के ज़रिए। |
 
 ## अनुमतियाँ और डेटा
 
@@ -139,13 +185,42 @@ pnpm run build      # lib/index.js (node आधा) + lib/client.js (वेब �
 pnpm run gen-aliases  # चेकआउट हिलने के बाद harness पैकेज पथ फिर मैप करें
 ```
 
+एक बिना-कुंजी एंड-टू-एंड डेमो एक वास्तविक पैरेंट सत्र और एक बैकग्राउंड चाइल्ड को एक नियतात्मक स्क्रिप्टेड LLM के ज़रिए चलाता है (कोई API key नहीं; `dev/` gitignore में है — पथों को अपने checkout के अनुसार बदलें):
+
+```powershell
+$env:DSH_HOME = 'D:/deepseek-harness/Project/Plugins/dsh-background-agents/dev/dsh-home'
+pnpm dsh --profile headless --patch dev/cordis.yml "【父会话】驱动后台 agent 演示"
+```
+
 ## विषय
 
 `dsh`, `dsh-plugin`, `deepseek-harness`, `subagent`, `background-agent`, `background-agents`, `agent-dashboard`, `conversation-steering`, `team-rooms`, `multi-agent`, `message-bus`, `task-board`, `collaboration`
 
 ## योगदानकर्ता
 
-- [@PerryLink](https://github.com/PerryLink) — निर्माता और अनुरक्षक: आधिकारिक उप-एजेंट सीम पर बैकग्राउंड-एजेंट रनटाइम, टीम-रूम हब, वेब साइडबार पैनल, सत्र प्रोजेक्शन, दस्तावेज़, CI/CD और रिलीज़।
+- [@PerryLink](https://github.com/PerryLink) — निर्माता और अनुरक्षक: आधिकारिक उप-एजेंट सीम पर बैकग्राउंड-एजेंट रनटाइम, टीम-रूम हब, वेब UI साइडबार पैनल, सत्र प्रोजेक्शन, दस्तावेज़, CI/CD और रिलीज़।
+
+## PerryLink DSH प्लगइन परिवार
+
+यह प्रोजेक्ट [PerryLink](https://github.com/PerryLink) द्वारा अनुरक्षित DeepSeek Harness प्लगइन में से एक है। अगर यह आपकी मदद करता है, तो संभवतः बाकी भी करेंगे:
+
+| प्लगइन | एक-पंक्ति परिचय |
+|---|---|
+| [dsh-mcp-panel](https://github.com/PerryLink/dsh-mcp-panel) | केवल-पठन MCP रनटाइम पैनल: /mcp कमांड + स्थिति, टूल और त्रुटियों वाला सेटिंग्स टैब |
+| [dsh-doublecheck](https://github.com/PerryLink/dsh-doublecheck) | इंजीनियरिंग-अनुशासन गार्ड: आवश्यकताओं की पूछताछ, टेस्ट गेट, प्रतिकूल समीक्षा |
+| **[dsh-background-agents](https://github.com/PerryLink/dsh-background-agents)** | वेब UI साइडबार, मैसेजिंग और रुकावट के साथ टिकाऊ बैकग्राउंड चाइल्ड एजेंट |
+| [dsh-lsp-actions](https://github.com/PerryLink/dsh-lsp-actions) | भाषा सर्वर पर LSP निदान, फ़ॉर्मेटिंग, कंप्लीशन, कोड एक्शन और नाम बदलना |
+| [dsh-output-styles](https://github.com/PerryLink/dsh-output-styles) | Claude Code outputStyles-समतुल्य रनटाइम शैली स्विचिंग |
+| [dsh-checkpoint-rewind](https://github.com/PerryLink/dsh-checkpoint-rewind) | Claude Code /rewind-समतुल्य: स्नैपशॉट, सत्र फ़ोर्क, एक-बार रीस्टोर |
+| [dsh-permission-rules](https://github.com/PerryLink/dsh-permission-rules) | ऑडिट के साथ Claude Code-शैली घोषणात्मक allow/deny/ask अनुमति नियम |
+| [dsh-auto-review](https://github.com/PerryLink/dsh-auto-review) | अनुमोदन श्रृंखला पर दूसरे-मॉडल की स्वतः समीक्षा, डिफ़ॉल्ट रूप से विफल-बंद |
+| [dsh-memento](https://github.com/PerryLink/dsh-memento) | अनुमोदन-गेटेड क्रॉस-सत्र मेमोरी: ctx.memory सीम + SQLite + memory टूल |
+| [dsh-skill-pack-security](https://github.com/PerryLink/dsh-skill-pack-security) | सुरक्षा-ऑडिट स्किल पैक: गुप्त स्कैन, निर्भरता और आपूर्ति-श्रृंखला समीक्षा |
+| [dsh-session-pin](https://github.com/PerryLink/dsh-session-pin) | वेब साइडबार में टिकाऊ क्रम के साथ सत्र पिन करें |
+| [dsh-composer-history](https://github.com/PerryLink/dsh-composer-history) | वेब कंपोज़र के लिए टर्मिनल-शैली इनपुट इतिहास: एरो, Ctrl+R खोज |
+| [dsh-github](https://github.com/PerryLink/dsh-github) | DSH के लिए GitHub PR/issues एकीकरण, हर लेखन अनुमोदन से गेटेड |
+| [dsh-plugin-guide](https://github.com/PerryLink/dsh-plugin-guide) | ऑन-डिमांड एजेंट स्किल के रूप में प्लगइन-विकास ज्ञान आधार |
+| [dsh-claude-move](https://github.com/PerryLink/dsh-claude-move) | Claude Code सत्र, मेमोरी, स्किल और CLAUDE.md को DSH में माइग्रेट करें |
 
 ## लाइसेंस
 
