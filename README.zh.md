@@ -1,167 +1,152 @@
-# dsh-background-agents
+<div align="center">
 
-> 为 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 提供可交互的长会话后台 agent。启动一个持久化子 agent，它自己干活、你继续聊天——随时查看进度、发消息干预、请求停止，全程不离开当前会话。
+# 👥 dsh-background-agents
 
-[English](./README.md) · [中文](./README.zh.md) · [Español](./README.es.md) · [Português](./README.pt.md) · [हिन्दी](./README.hi.md)
+**为 DeepSeek Harness 提供可交互的长会话后台代理，以及持久化的多代理团队房间 —— 启动一个持久的子代理，它一边工作，你一边继续对话。**
 
-[![license](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](./LICENSE)
-[![topic: dsh-plugin](https://img.shields.io/badge/topic-dsh--plugin-4d6bfe)](https://github.com/topics/dsh-plugin)
-[![topic: dsh](https://img.shields.io/badge/topic-dsh-4d6bfe)](https://github.com/topics/dsh)
+*在会话之间操控活跃对话、协调一个团队；一切都通过 Harness 自身的存储跨重启存活。*
+
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
+[![DSH plugin](https://img.shields.io/badge/dsh-plugin-✅-green)](https://github.com/topics/dsh-plugin)
+[![Node](https://img.shields.io/badge/node-%5E22.19%20%7C%7C%20%3E%3D24-brightgreen.svg)](#)
+[![CI](https://img.shields.io/github/actions/workflow/status/PerryLink/dsh-background-agents/ci.yml?branch=main&label=CI)](https://github.com/PerryLink/dsh-background-agents/actions)
+[![Version](https://img.shields.io/github/v/tag/PerryLink/dsh-background-agents?label=version)](https://github.com/PerryLink/dsh-background-agents/releases)
 [![npm version](https://img.shields.io/npm/v/dsh-background-agents)](https://www.npmjs.com/package/dsh-background-agents)
 [![npm downloads](https://img.shields.io/npm/dm/dsh-background-agents)](https://www.npmjs.com/package/dsh-background-agents)
-[![CI](https://img.shields.io/github/actions/workflow/status/PerryLink/dsh-background-agents/ci.yml?branch=main&label=CI)](https://github.com/PerryLink/dsh-background-agents/actions)
 
-DSH 内置的后台 *jobs* 是"发后即忘"的工具执行：能读输出、能杀掉，但没法跟它对话。`dsh-background-agents` 把它升级为官 subagent seam 上的**完整后台 agent 会话**——一个可继续（continuable）的子会话，随时可发消息、可干预、可中断；它每完成一轮，就有一条节流过的进度摘要注入父会话，模型和人都看得见。
+[English](README.md) · [简体中文](README.zh.md) · [Español](README.es.md) · [Português](README.pt.md) · [हिन्दी](README.hi.md)
 
-## 你得到什么
+</div>
 
-- **`background_agent`** —— 从任意会话启动一个持久化、可继续的子 agent。它在自己的上下文里干活，立即返回稳定 agent id，会话永久可续。可选逐子 scoping：`tool_filter`（从子 agent 视野移除工具——只收不扩）、`persona`（专属系统提示词人格）、`max_depth`（再委派深度上限）；`childProvider`/`childModel` 配置其模型路由。
-- **`bg_message`** —— 给它派新活、纠偏，或唤醒已结束的 agent。消息走官方 FIFO inbox，agent 的回应就是它的下一轮。
-- **`bg_list`** —— 状态总览：label、模式、activity（`running` / `idle` / `ready` / `settled` / `archived`）、消息数、最近活跃时间。重启后能通过官方持久化子代理目录恢复。`recursive: true` 列出整棵后代树（带 `parentId`/`depth`）。
-- **`bg_result`** —— 取回子 agent 最近一次 assistant 输出全文 + 当前 label 与 activity（比 settled 通知摘要更全）；思考模型的末条消息若无 text 块，回退到 reasoning 块并以 `textSource: 'reasoning'` 标注。
-- **`bg_stop`** —— 请求中断当前轮。发后即返：收尾交给官方控制面，agent 保持可唤醒。
-- **autoReport** —— 每个子轮结束后，向父会话注入一行节流进度（模型可见、来源标记 `{ kind: 'plugin', plugin: 'dsh-background-agents' }`）；最终结果由官方 settled 通知送达。`reportDelivery: wakeup` 让每行进度在父 agent 空闲时直接开启一个父回合。
-- **空闲归档** —— 超过 `idleTimeoutMinutes` 无活动的 agent 自动归档并通知；`bg_message` 可以再唤醒它。设 `autoArchive: false` 可让安静的观察型 agent 驻留而非归档。
-- **`backgroundAgents` 投影单元** —— 折叠父会话日志得到仪表盘行（agentId、label、activity、最后消息摘要、创建时间）。一切事实都能从持久化日志重建，无独立数据库。
-- **Web UI 面板** —— Web GUI 侧栏新增"后台 agent"入口：实时状态、一键跳到子会话、停止按钮、经官方 `subagent.prompt` RPC 发消息排队新回合的按钮，以及经只读 `subagent.history` RPC 查看子 agent 最终文本的结果按钮；多父会话时行内显示父会话标题以消歧。
+---
+
+## 兼容性
+
+| 方面 | 状态 |
+|---|---|
+| Harness | DeepSeek Harness `0.1.0-rc.6`（peer 依赖 `>=0.1.0-rc.5 <0.2.0`） |
+| Node | `^22.19.0 \|\| >=24.0.0` |
+| 平台 | 全部（宿主工具；可选 Web 侧栏面板与团队房间，依赖存储域能力） |
+| 模型 | 任意（子代理默认继承父代理路由；`childProvider`/`childModel` 可覆盖） |
+
+## 你能获得什么
+
+`dsh-background-agents` 把 DSH 即发即弃的后台 *任务* 升级为两个协作面：
+
+1. **五个操控工具** —— `background_agent` 在官方子代理接缝上启动一个持久的、可续聊的子代理（可选 `tool_filter`、`persona`、`max_depth`、模型路由）；`bg_message` 投递后续轮次；`bg_list` 报告状态（或后代树）；`bg_result` 读取最新结果文本；`bg_stop` 请求中断。
+2. **进度与归档** —— `autoReport` 在每个子代理轮次后注入一条节流的进度行；空闲清扫会把安静的代理归档，`bg_message` 再把它们唤醒。
+3. **仪表盘投影 + Web 面板** —— `backgroundAgents` 会话投影把父日志折叠成行；侧栏面板显示实时状态、跳转、消息、停止与结果预览。
+4. **团队房间（v0.5.0+）** —— `/room` 命令族加八个 `room_*` 工具构建持久化多代理房间：成员（各自是独立会话）、消息总线（定向/广播）、共享任务板与共享时间线 —— 存储在 `team_rooms` 存储域（SQLite 或 JSONL），跨 DSH 重启恢复。跨成员任务交接走官方审批接缝。
 
 ## 快速开始
 
 ```sh
-# 在 harness checkout 或任意 dsh CLI 可用处（web 或 headless）
-dsh plugin --profile <name> add "github:PerryLink/dsh-background-agents#v0.4.0"
+# 1. 将 bundle 安装到你的 profile
+dsh plugin --profile web add "github:PerryLink/dsh-background-agents#main"
+
+# 或从 npm 安装（已发布版本）
+dsh plugin --profile web add dsh-background-agents
+
+# 2. 重启并验证该行
+dsh --profile web --dump-config | grep -A4 'id: background-agents'
 ```
 
-bundle patch 自带插件行，`dsh plugin add` 会把它组合进 profile 的层栈（`dsh.profile.bundles`）。建议使用 pin 了 ref 的 git 源：本仓库已提交构建产物（`lib/`），git 安装无需构建步骤、无需 `allowBuilds`。包也已发布到 npm——`pnpm add dsh-background-agents` 同样可用（每次 tag 推送由 CI 自动发布）。
+bundle 补丁携带插件行；`provider` 为必填。该仓库提交了构建产物（`lib/`），所以 git 安装无需构建步骤。团队房间在存储域（`@deepseek-ai/dsh-storage-domain`）被组合的地方挂载；五个 `bg_*` 工具没有它也照常工作。
 
-落进 profile 的插件行（按 profile 在 `cordis.patch.yml` 里覆盖 `config`）：
+## 安装与卸载
 
-```yaml
-- insert:
-    - id: background-agents
-      name: dsh-background-agents
-      config:
-        provider: spawn        # 提供可继续子 agent 的 ctx.subagents 提供方
-```
-
-插件依赖 subagent 主干（基于 `@deepseek-ai/dsh-base` 的 profile 已内置：`dsh-subagent`、`dsh-subagent-spawn-in-process`、`dsh-session-projection`）。
-
-之后在任意会话里直接说需求即可，或手动调用工具：
-
-```
-background_agent "监控仓库的测试失败并随时汇报" (label: test-watch)
-bg_list
-bg_message <agentId> "现在再查一下快照测试"
-bg_stop <agentId>
-```
+- **git 渠道**（最新 `main`）：`dsh plugin --profile web add "github:PerryLink/dsh-background-agents#main"` —— 已提交 `lib/`，无需 `prepare` 或 `allowBuilds`。
+- **npm 渠道**（已发布版本）：`dsh plugin --profile web add dsh-background-agents`。
+- **tarball 渠道**：在本仓库执行 `pnpm pack`，然后 `dsh plugin --profile web add ./dsh-background-agents-<version>.tgz`。
+- **卸载**：`dsh plugin --profile web remove dsh-background-agents`（或从 profile 补丁中删除该行）。
 
 ## 配置
 
-所有阈值与节流参数都是经校验的 `Config` 字段——在 `cordis.yml` 改，绝不硬编码。
+每个可调项都是经过校验的 Schemastery `Config` 字段 —— 在 cordis.yml 中修改，绝不在代码里写死。仅 `provider` 为必填。
 
-| 字段 | 默认值 | 含义 |
+| 键 | 默认值 | 含义 |
 |---|---|---|
-| `provider` | *(必填)* | 启动可继续子 agent 的 `ctx.subagents` 提供方名（`spawn`） |
-| `autoReport` | `true` | 每个子轮结束后向父会话注入一行进度 |
-| `reportDelivery` | `quiet` | `quiet` 把进度行追加到父 agent 下一条模型请求；`wakeup` 在父 agent 空闲时直接开启父回合（忙碌时入队） |
-| `reportThrottleMs` | `15000` | 同一子 agent 两次进度注入的最小间隔 |
-| `reportSummaryMaxChars` | `300` | 注入进度行文本的硬上限（显式省略号截断） |
-| `resultMaxChars` | `4000` | `bg_result` 返回文本的硬上限（省略号截断并置 `truncated` 标志） |
-| `maxBackgroundAgents` | `4` | 每个父会话非归档后台 agent 的硬上限；预算为该会话**全部** continuable 直属子代理共享（含内置 `subagent` 工具启动的） |
-| `autoArchive` | `true` | 空闲归档开关：设为 `false` 后巡检永不归档安静的子 agent（空闲窗口仅保留死缓存条目回收） |
-| `idleTimeoutMinutes` | `120` | 空闲窗口：超时后归档并通知（`>= 1`） |
-| `idleSweepIntervalMs` | `60000` | 归档巡检周期 |
-| `maxLabelChars` | `120` | 展示标签上限（省略号截断） |
-| `childProvider` | *(继承)* | 子 agent 模型请求的提供方路由 |
-| `childModel` | *(继承)* | 子 agent 模型请求的模型 id |
-| `maxChildDepth` | *(无)* | 启动参数 `max_depth` 的配置天花板 |
-| `allowedChildTools` | *(无)* | `tool_filter` 可点名工具白名单；空/缺省 = 不限制 |
+| `provider` | *(必填)* | 用于可续聊启动的 `ctx.subagents` provider 名称（`spawn`） |
+| `autoReport` | `true` | 每个子代理轮次后在父会话中注入一条进度行 |
+| `reportDelivery` | `quiet` | `quiet` 把该行追加到下一次模型请求；`wakeup` 在父会话空闲时启动父轮次 |
+| `reportThrottleMs` | `15000` | 同一子代理两次进度注入之间的最小间隔 |
+| `reportSummaryMaxChars` | `300` | 注入进度行文本的硬上限（截断省略） |
+| `resultMaxChars` | `4000` | `bg_result` 文本的硬上限（截断省略，标记 `truncated`） |
+| `maxBackgroundAgents` | `4` | 每个父会话未归档后台代理的硬上限 |
+| `autoArchive` | `true` | 空闲归档开关；为 `false` 时清扫器绝不归档安静的代理 |
+| `idleTimeoutMinutes` | `120` | 安静的代理被归档前的空闲窗口（`>= 1`） |
+| `idleSweepIntervalMs` | `60000` | 归档清扫周期 |
+| `maxLabelChars` | `120` | 显示标签上限（截断省略） |
+| `childProvider` | *(继承)* | 子代理模型请求的 provider 路由 |
+| `childModel` | *(继承)* | 子代理模型请求的模型 id |
+| `maxChildDepth` | *(无)* | 启动时 `max_depth` 参数的配置上限 |
+| `allowedChildTools` | *(无)* | `tool_filter` 名称的允许列表；空/缺失 = 无限制 |
+| `maxRooms` | `16` | 整个 profile 内团队房间的硬上限 |
+| `maxMembersPerRoom` | `8` | 每个房间成员的硬上限 |
+| `maxRoomsPerMember` | `4` | 一个成员会话可加入的房间数上限 |
+| `busRetention` | `200` | 每个房间保留的消息总线条数 |
+| `timelineRetention` | `500` | 每个房间保留的时间线事件条数 |
+| `taskRetention` | `50` | 每个房间保留的已完成任务条数 |
+| `maxMessageChars` | `4000` | 单条房间消息文本的硬上限（超限拒绝，绝不截断） |
+| `injectRoomBrief` | `true` | 向成员会话注入简短房间简介（加入 + 恢复） |
 
-## 工作原理——以及为什么重启后能恢复
+## 工具与界面
 
-一切启动/消息/停止都走官方 subagent seam：`startContinuable`、`followup`、`interrupt`、`listChildren`——插件不做自己的生命周期路由，不碰别的会话的 `Agent`，不杀进程树（停止 = *请求中断*，收尾归 continuation manager）。
-
-插件写的每一条事实走**一条结构化通道 + 一条模型可见通道**：
-
-- **`background-agents/fact` 结构化事实事件**（v0.3.0 起）——以 log-only、`ignorable: true` 落进父会话日志的注册/消息/停止/进度/归档事实；不了解该类型的读取方会跳过记录而非拒绝加载，旧 harness 构建与旧版插件仍能打开新日志；
-- `tool/result` 的 **replay metadata** —— v0.3.0 前日志的同一批事实（投影仅在行尚无结构化来源时折叠）；
-- **注入的 `user/message` 通知**（模型可见），来源 `{ kind: 'plugin', plugin: 'dsh-background-agents' }` —— 节流进度行与归档通知（规范前缀 `[background-agent <id>] …`）；
-- 官方的 **`subagent-settled` 通知** —— 子 agent 的持久化"已结束"事实。
-
-`backgroundAgents` 投影单元折叠结构化通道、并为旧日志保留 legacy 折叠（行首次收到结构化事实后切换到事件来源，双通道并写的日志永不双计）。因此仪表盘与 `bg_list` 的事实能在父会话重开后完整重建，且事实不再依赖解析人类可读通知文本。当目录本身不可用（缺投影注册表或会话存储）时，`bg_list` 返回显式的 **`unrecoverable`** 标记——绝不伪造空列表。
-
-## 不是这个插件
-
-| 项目 | 做什么 | 边界 |
+| 界面 | 类型 | 说明 |
 |---|---|---|
-| [titanwings/dsh-automation](https://github.com/titanwings/dsh-automation) | 在新 agent 会话中按计划跑编码任务 | 它管任务**何时**跑（定时调度）。本插件管一条长会话的**交互式驾驭**——不做调度、不做 cron。 |
-| [vlln/dsh-task-status](https://github.com/vlln/dsh-task-status) | 后台 *jobs* 的状态条（进度 + 输出 tail） | 它**展示**工具级任务。本插件创建并驾驭 **agent 会话**；面板只是其中一面。 |
-| [YYTbit/dsh-plugin-agent-dashboard](https://github.com/YYTbit/dsh-plugin-agent-dashboard) | 多 agent 仪表盘 skill | 偏展示。本插件的行是**可操作的**：跳子会话、发消息、停止——全走官方控制面。 |
+| `background_agent` | 工具 | 启动持久的可续聊子代理（label、`tool_filter`、`persona`、`max_depth`） |
+| `bg_message` | 工具 | 按 agent id 向子代理投递后续轮次 |
+| `bg_list` | 工具 | 你的代理状态（或 `recursive: true` 的后代树） |
+| `bg_result` | 工具 | 读取子代理最新的助手输出文本 |
+| `bg_stop` | 工具 | 请求中断当前轮次 |
+| `/room` | 命令 | `create\|join\|leave\|list\|send\|tasks\|task add\|assign\|claim\|done\|delete` |
+| `room_list_rooms` / `room_post` / `room_read` | 工具 | 消息总线：名单、发帖（广播/定向）、读取历史 |
+| `room_list_tasks` / `room_create_task` / `room_claim_task` | 工具 | 共享任务板 |
+| `room_transfer_task` / `room_complete_task` | 工具 | 交接（审批门控）与完成 |
+| `backgroundAgents` 投影 | 会话投影 | 由父日志折叠出的仪表盘行 |
+| `teamRoom` 投影 | 会话投影 | 由 `team-room/fact` 事件折叠出的共享时间线 |
+| Web 侧栏面板 | 客户端 | 实时状态、跳转、消息、停止、结果预览 |
 
-## 与内置 subagent 工具的关系
+## 权限与数据
 
-harness 核心自带一组 subagent 工具（`subagent`、`send_message`、`interrupt_agent` 与子代理 `report` 工具）。本插件的 `bg_*` 工具是它们的**会话作用域补充**，可共存：
+- **权限**：workshop 清单声明 `session:append`、`subagent:spawn` 与 `tools:register`。
+- **数据**：团队房间位于 `team_rooms` 存储域（SQLite 或 JSONL —— 无需额外服务）；后台代理事实随父会话日志。无独立数据库、无网络。
+- **会话日志**：`background-agents/fact` 与 `team-room/fact` 事件以信封 `ignorable: true` 标记追加；模型可见的进度行与房间投递是真实的 `user/message` 记录。
 
-| 内置工具 | 本插件对应 | 差异 |
-|---|---|---|
-| `subagent`（`backgroundMode: 'continuable'`） | `background_agent` | 同样走 `startContinuable`；本插件另加逐子 tool_filter/persona/max_depth 校验与每会话 cap |
-| `send_message` | `bg_message` | 相同投递语义；`bg_message` 面向"本会话的 background agent"并维护投影事实 |
-| `interrupt_agent` | `bg_stop` | 相同中断语义；`bg_stop` 另落结构化 stop 事实 |
-| 子代理 `report` 工具 | autoReport | 内置版由子模型主动调用；本插件**每个子轮自动**注入节流进度 |
+## 安全边界
 
-核心工具没有的：`bg_list`、`bg_result`、空闲归档、按父会话折叠的面板投影。
+- **只用官方接缝。** 启动、消息、停止是对 `startContinuable` / `followup` / `interrupt` 的薄封装；停止是请求中断，绝不杀进程。
+- **`tool_filter` 只能收窄。** 它从子代理视野中移除工具 —— 绝不授予新工具；名称会按 `allowedChildTools` 校验。
+- **审批门控交接。** `room_transfer_task` 走官方审批接缝，没有 answerer 授权时失败关闭。
+- **模型可见 ⟺ 落盘。** 每条投递的房间消息都是成员自身日志中持久的 `user/message`；共享时间线镜像为仅日志的 `team-room/fact` 事件。
+- **无调度、无跨机代理。** 子代理是本次部署的进程内可续聊会话。
 
-不在范围内：定时触发（schedule seam 已有）；跨机/远程 agent；改动官方 subagent activation 契约。
+## 已知限制
+
+- 团队房间需要组合存储域；没有 `@deepseek-ai/dsh-storage-domain` 时，`/room` 命令与 `room_*` 工具被禁用（五个 `bg_*` 工具仍可加载）。
+- `provider` 必须指向支持可续聊的 provider（`prepareContinuable`）；缺失的 provider 会让 `background_agent` 一直失败，直到它出现。
+- `maxBackgroundAgents` 是会话所有可续聊直接子代理共享的预算，包括内置 `subagent` 工具启动的那些。
+- 一次性子代理绝不会被列出或发消息 —— `bg_list` 只保留可续聊行。
+- 子代理是进程内的：调度接缝负责「何时」，本插件负责操控一次活跃对话。
 
 ## 开发
 
 ```sh
-pnpm install        # 仅工具链；harness 包通过相邻 checkout 解析
-pnpm run typecheck  # strict TS，node + client 双程序
-pnpm test           # 83 个单元 + 端到端测试（真实 subagent seam + 脚本化 LLM + jsdom 面板）
-pnpm run build      # lib/index.js（node 半）+ lib/client.js（Web client bundle）
+pnpm install        # 仅工具链；harness 包针对同级 checkout 解析
+pnpm run typecheck  # 严格 TS，node + client 程序
+pnpm test           # vitest：单元 + 端到端测试（真实子代理接缝、脚本化 LLM、jsdom 面板）
+pnpm run build      # lib/index.js（node 半侧）+ lib/client.js（web 客户端包）
 pnpm run gen-aliases  # checkout 移动后重新映射 harness 包路径
 ```
 
-免 key 的端到端演示：用确定性脚本化 LLM 驱动真实父会话 + 后台子 agent（无需 API key；`dev/` 不入库——按你的 checkout 调整路径）：
+## 主题
 
-```powershell
-$env:DSH_HOME = 'D:/deepseek-harness/Project/Plugins/dsh-background-agents/dev/dsh-home'
-pnpm dsh --profile headless --patch dev/cordis.yml "【父会话】驱动后台 agent 演示"
-```
+`dsh`、`dsh-plugin`、`deepseek-harness`、`subagent`、`background-agent`、`background-agents`、`agent-dashboard`、`conversation-steering`、`team-rooms`、`multi-agent`、`message-bus`、`task-board`、`collaboration`
 
-测试覆盖全路径——启动、列、消息、停止——基于**真实** `SubagentRuntime` + 进程内 spawn 提供方 + 脚本化适配器；另有节流/上限/归档策略、投影折叠、以及经 `session-persistence-jsonl` 的崩溃恢复用例。
+## 贡献者
 
-## 👥 贡献者
-
-感谢所有为 `dsh-background-agents` 做出贡献的人：
-
-- [PerryLink](https://github.com/PerryLink) — 作者与维护者：基于官方 subagent 接缝的后台 agent 运行时、Web UI 侧边栏面板、会话投影、文档、CI/CD 与发布。
-
-想要参与？请查看 [issue 模板](.github/ISSUE_TEMPLATE/) 与 [安全策略](SECURITY.md) — 欢迎中英文 PR。
+- [@PerryLink](https://github.com/PerryLink) —— 创建者与维护者：官方子代理接缝上的后台代理运行时、团队房间枢纽、Web 侧栏面板、会话投影、文档、CI/CD 与发布。
 
 ## 许可证
 
-Apache License 2.0——见 [LICENSE](./LICENSE)。第三方声明：[THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md)。
-
-## PerryLink DSH 插件家族
-
-本项目是 [PerryLink](https://github.com/PerryLink) 维护的 [15 个 DeepSeek Harness 插件](https://github.com/PerryLink)之一。如果你觉得这个插件有用，其余的很可能同样有用：
-
-| 插件 | 一句话说明 |
-|---|---|
-| [dsh-mcp-panel](https://github.com/PerryLink/dsh-mcp-panel) | 只读 MCP 运行时面板：/mcp 命令 + 设置页，状态/工具/错误一览 |
-| [dsh-doublecheck](https://github.com/PerryLink/dsh-doublecheck) | 工程纪律守门：需求审讯、测试证据门、对抗评审 |
-| **[dsh-background-agents](https://github.com/PerryLink/dsh-background-agents)** | 持久化后台子代理：Web 侧边栏进度、随时留言与打断 |
-| [dsh-lsp-actions](https://github.com/PerryLink/dsh-lsp-actions) | 基于语言服务器的诊断/格式化/补全/代码动作/重命名 |
-| [dsh-output-styles](https://github.com/PerryLink/dsh-output-styles) | 对标 Claude Code outputStyles 的运行时风格切换 |
-| [dsh-checkpoint-rewind](https://github.com/PerryLink/dsh-checkpoint-rewind) | 对标 Claude Code /rewind：快照、会话 fork、一键回退 |
-| [dsh-permission-rules](https://github.com/PerryLink/dsh-permission-rules) | Claude Code 风格声明式 allow/deny/ask 权限规则，带审计 |
-| [dsh-auto-review](https://github.com/PerryLink/dsh-auto-review) | 审批链上的第二模型自动审查，默认 fail-closed |
-| [dsh-memento](https://github.com/PerryLink/dsh-memento) | 带审批门的跨会话记忆：ctx.memory + SQLite + memory 工具 |
-| [dsh-skill-pack-security](https://github.com/PerryLink/dsh-skill-pack-security) | 安全审计技能包：密钥扫描、依赖与供应链审查 |
-| [dsh-session-pin](https://github.com/PerryLink/dsh-session-pin) | 在 Web 侧边栏置顶会话，持久排序 |
-| [dsh-composer-history](https://github.com/PerryLink/dsh-composer-history) | Web 作曲器终端式输入历史：方向键、Ctrl+R 搜索 |
-| [dsh-github](https://github.com/PerryLink/dsh-github) | DSH 的 GitHub PR/issue 集成，所有写操作经审批门 |
-| [dsh-plugin-guide](https://github.com/PerryLink/dsh-plugin-guide) | 插件开发知识库，随 bundle 安装的按需 agent 技能 |
-| [dsh-claude-move](https://github.com/PerryLink/dsh-claude-move) | 把 Claude Code 会话、记忆、技能和 CLAUDE.md 迁入 DSH |
+[Apache License 2.0](LICENSE) © 2026 dsh-background-agents contributors

@@ -1,143 +1,152 @@
-# dsh-background-agents
+<div align="center">
 
-> Agentes en segundo plano interactivos y de sesión larga para [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness). Lanza un agente hijo duradero que sigue trabajando mientras tú sigues hablando: observa su progreso, dale instrucciones con mensajes y deténlo, todo sin salir de tu sesión.
+# 👥 dsh-background-agents
 
-[English](./README.md) · [中文](./README.zh.md) · [Español](./README.es.md) · [Português](./README.pt.md) · [हिन्दी](./README.hi.md)
+**Agentes de fondo interactivos de sesión larga más salas de equipo multiagente persistentes para DeepSeek Harness — lanza un agente hijo duradero que sigue trabajando mientras tú sigues hablando.**
 
-[![license](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](./LICENSE)
-[![topic: dsh-plugin](https://img.shields.io/badge/topic-dsh--plugin-4d6bfe)](https://github.com/topics/dsh-plugin)
-[![topic: dsh](https://img.shields.io/badge/topic-dsh-4d6bfe)](https://github.com/topics/dsh)
+*Dirige conversaciones en vivo y coordina un equipo entre sesiones; todo sobrevive a los reinicios mediante el almacenamiento propio del harness.*
+
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
+[![DSH plugin](https://img.shields.io/badge/dsh-plugin-✅-green)](https://github.com/topics/dsh-plugin)
+[![Node](https://img.shields.io/badge/node-%5E22.19%20%7C%7C%20%3E%3D24-brightgreen.svg)](#)
+[![CI](https://img.shields.io/github/actions/workflow/status/PerryLink/dsh-background-agents/ci.yml?branch=main&label=CI)](https://github.com/PerryLink/dsh-background-agents/actions)
+[![Version](https://img.shields.io/github/v/tag/PerryLink/dsh-background-agents?label=version)](https://github.com/PerryLink/dsh-background-agents/releases)
 [![npm version](https://img.shields.io/npm/v/dsh-background-agents)](https://www.npmjs.com/package/dsh-background-agents)
 [![npm downloads](https://img.shields.io/npm/dm/dsh-background-agents)](https://www.npmjs.com/package/dsh-background-agents)
-[![CI](https://img.shields.io/github/actions/workflow/status/PerryLink/dsh-background-agents/ci.yml?branch=main&label=CI)](https://github.com/PerryLink/dsh-background-agents/actions)
 
-Los *jobs* en segundo plano de DSH son ejecuciones de herramientas de "lanzar y olvidar": puedes leer su salida y matarlos, pero no puedes hablar con ellos. `dsh-background-agents` los convierte en **sesiones completas de agente en segundo plano** sobre el seam oficial de subagentes: una conversación hija continuable a la que puedes enviar mensajes, corregir e interrumpir en cualquier momento, mientras una línea de progreso inyectada tras cada turno te mantiene (y mantiene al modelo) al tanto.
+[English](README.md) · [简体中文](README.zh.md) · [Español](README.es.md) · [Português](README.pt.md) · [हिन्दी](README.hi.md)
+
+</div>
+
+---
+
+## Compatibilidad
+
+| Superficie | Estado |
+|---|---|
+| Harness | DeepSeek Harness `0.1.0-rc.6` (peers `>=0.1.0-rc.5 <0.2.0`) |
+| Node | `^22.19.0 \|\| >=24.0.0` |
+| Plataformas | Todas (herramientas de host; panel lateral web y salas de equipo opcionales vía la capacidad de dominio de almacenamiento) |
+| Modelo | Cualquiera (los hijos heredan la ruta del padre; `childProvider`/`childModel` la reemplazan) |
 
 ## Qué obtienes
 
-- **`background_agent`** — inicia un agente hijo duradero y continuable desde cualquier sesión. Trabaja en su propio contexto, devuelve un id estable de inmediato y mantiene su conversación abierta para siempre. Alcance opcional por hijo: `tool_filter` (quita herramientas de la vista del hijo — nunca concede nuevas), `persona` (una persona dedicada de system-prompt) y `max_depth` (tope de profundidad de delegación); `childProvider`/`childModel` enrutan sus peticiones de modelo.
-- **`bg_message`** — envíale más trabajo, correcciones, o despierta un agente asentado. Se entrega por el inbox FIFO oficial; la respuesta del agente es su siguiente turno.
-- **`bg_list`** — estado de tus agentes: etiqueta, modo, actividad (`running` / `idle` / `ready` / `settled` / `archived`), número de mensajes, última actividad. Recupera hijos persistidos tras un reinicio. `recursive: true` lista todo el árbol descendiente con `parentId`/`depth`.
-- **`bg_result`** — lee el último texto de salida del asistente de un hijo más su etiqueta y actividad, más allá del resumen del aviso de asentamiento. El mensaje final sin texto de un modelo pensante recurre a sus bloques de razonamiento, marcados `textSource: 'reasoning'`.
-- **`bg_stop`** — solicita la interrupción del turno actual. Lanza y retorna: el desmontaje oficial termina el trabajo; el agente sigue siendo reanudable.
-- **autoReport** — tras cada turno del hijo, se inyecta una línea de progreso limitada en tu sesión (visible para el modelo, con fuente del plugin). Su resultado final llega mediante el aviso oficial de asentamiento. `reportDelivery: wakeup` hace que cada línea abra un turno del padre cuando este está ocioso.
-- **Archivado por inactividad** — los agentes callados más allá de `idleTimeoutMinutes` se archivan con un aviso y una solicitud de parada; `bg_message` los despierta de nuevo. Con `autoArchive: false` los agentes observadores callados se quedan aparcados en lugar de archivarse.
-- **Proyección `backgroundAgents`** — una unidad de proyección de sesión que pliega el log del padre en filas de panel (id, etiqueta, actividad, resumen del último mensaje, hora de creación). Todo se reconstruye desde el log durable, sin base de datos aparte.
-- **Panel Web UI** — una entrada "Background agents" en la barra lateral de la Web GUI con estado en vivo, salto de un clic a la sesión hija, un botón de parada, un botón de mensaje que encola un nuevo turno por el RPC oficial `subagent.prompt`, y un botón de resultado que asoma el texto final del asistente del hijo por el RPC de solo lectura `subagent.history`. Los títulos de la sesión padre desambiguan las filas cuando varios padres proyectan agentes.
+`dsh-background-agents` convierte los *jobs* de fondo de DSH (dispara y olvida) en dos superficies coordinadas:
+
+1. **Cinco herramientas de dirección** — `background_agent` inicia un hijo duradero y continuable en la costura oficial de subagentes (`tool_filter`, `persona`, `max_depth` y ruta de modelo opcionales); `bg_message` entrega un turno posterior; `bg_list` informa el estado (o el árbol de descendientes); `bg_result` lee el último texto de resultado; `bg_stop` solicita la interrupción.
+2. **Progreso y archivado** — `autoReport` inyecta una línea de progreso con límite de frecuencia tras cada turno del hijo; el barrido de inactividad archiva los hijos callados y `bg_message` los vuelve a despertar.
+3. **Proyección de panel + panel web** — la proyección de sesión `backgroundAgents` pliega el log del padre en filas; un panel lateral muestra estado en vivo, salto, mensaje, parada y vista previa del resultado.
+4. **Salas de equipo (v0.5.0+)** — la familia de comandos `/room` más ocho herramientas `room_*` construyen salas multiagente persistentes: miembros (cada uno una sesión independiente), un bus de mensajes (dirigido/difusión), un tablero de tareas compartido y una línea de tiempo compartida — almacenados en el dominio `team_rooms` (SQLite o JSONL) y recuperados tras reinicios de DSH. Los traspasos de tareas entre miembros pasan por la costura oficial de aprobación.
 
 ## Inicio rápido
 
 ```sh
-# desde el checkout del harness o donde esté el CLI dsh (web o headless)
-dsh plugin --profile <name> add "github:PerryLink/dsh-background-agents#v0.4.0"
+# 1. instala el bundle en tu perfil
+dsh plugin --profile web add "github:PerryLink/dsh-background-agents#main"
+
+# o desde npm (versiones publicadas)
+dsh plugin --profile web add dsh-background-agents
+
+# 2. reinicia y verifica la fila
+dsh --profile web --dump-config | grep -A4 'id: background-agents'
 ```
 
-El patch del bundle lleva la fila del plugin, así que `dsh plugin add` la compone en la pila de capas de tu perfil (`dsh.profile.bundles`). Prefiere la fuente git con una ref fijada: el repo versiona su salida de build (`lib/`), así que la instalación git no necesita paso de build ni entrada `allowBuilds`. El paquete también está publicado en npm: `pnpm add dsh-background-agents` funciona igualmente (CI publica cada push de tag).
+El parche del bundle lleva la fila del plugin; `provider` es obligatorio. El repo publica su salida de build (`lib/`), así que la instalación por git no necesita paso de build. Las salas de equipo se montan donde se componga el dominio de almacenamiento (`@deepseek-ai/dsh-storage-domain`); las cinco herramientas `bg_*` funcionan sin él.
 
-La fila que aterriza en tu perfil (sobrescribe `config` por perfil en `cordis.patch.yml`):
+## Instalación y desinstalación
 
-```yaml
-- insert:
-    - id: background-agents
-      name: dsh-background-agents
-      config:
-        provider: spawn        # proveedor ctx.subagents para hijos continuables
-```
-
-El plugin necesita el esqueleto de subagentes ya montado (cualquier perfil sobre `@deepseek-ai/dsh-base` lo tiene: `dsh-subagent`, `dsh-subagent-spawn-in-process`, `dsh-session-projection`).
-
-Luego, en cualquier sesión, pídeselo al modelo o llama a las herramientas directamente:
-
-```
-background_agent "vigila el reposo en busca de fallos de test y mantenme informado" (label: test-watch)
-bg_list
-bg_message <agentId> "revisa ahora también los tests de snapshot"
-bg_stop <agentId>
-```
+- **Canal git** (último `main`): `dsh plugin --profile web add "github:PerryLink/dsh-background-agents#main"` — `lib/` commiteado, sin paso de `prepare` ni `allowBuilds`.
+- **Canal npm** (versiones publicadas): `dsh plugin --profile web add dsh-background-agents`.
+- **Canal tarball**: `pnpm pack` en este repo y luego `dsh plugin --profile web add ./dsh-background-agents-<version>.tgz`.
+- **Desinstalación**: `dsh plugin --profile web remove dsh-background-agents` (o elimina la fila del parche de perfil).
 
 ## Configuración
 
-Todo parámetro es un campo `Config` validado: cámbialo en `cordis.yml`, nunca en el código.
+Cada opción es un campo Schemastery `Config` validado — cámbialo en cordis.yml, nunca en código. Solo `provider` es obligatorio.
 
-| Campo | Por defecto | Significado |
+| Clave | Por defecto | Significado |
 |---|---|---|
-| `provider` | *(obligatorio)* | nombre del proveedor `ctx.subagents` para inicios continuables (`spawn`) |
-| `autoReport` | `true` | inyecta una línea de progreso en el padre tras cada turno del hijo |
-| `reportDelivery` | `quiet` | `quiet` añade la línea a la siguiente petición de modelo del padre; `wakeup` abre un turno del padre cuando está ocioso (encola si está ocupado) |
-| `reportThrottleMs` | `15000` | intervalo mínimo entre dos inyecciones de progreso de un hijo |
-| `reportSummaryMaxChars` | `300` | tope duro del texto de la línea de progreso (con puntos suspensivos) |
-| `resultMaxChars` | `4000` | tope duro del texto de `bg_result` (con puntos suspensivos y bandera `truncated`) |
-| `maxBackgroundAgents` | `4` | tope duro de agentes no archivados por sesión padre; el presupuesto lo comparten **todos** los hijos directos continuables de la sesión (incluidos los iniciados por la herramienta `subagent` integrada) |
-| `autoArchive` | `true` | interruptor del archivado por inactividad: en `false` el barrido nunca archiva hijos callados (la ventana de inactividad solo alimenta la recuperación de entradas de caché obsoletas) |
-| `idleTimeoutMinutes` | `120` | ventana de inactividad tras la que un hijo callado se archiva y notifica (`>= 1`) |
-| `idleSweepIntervalMs` | `60000` | periodo del barrido de archivado |
-| `maxLabelChars` | `120` | tope de la etiqueta visible (con puntos suspensivos) |
-| `childProvider` | *(heredar)* | ruta de proveedor para las peticiones de modelo del hijo |
-| `childModel` | *(heredar)* | id de modelo para las peticiones de modelo del hijo |
-| `maxChildDepth` | *(ninguno)* | techo de configuración para el argumento `max_depth` de un inicio |
-| `allowedChildTools` | *(ninguno)* | lista blanca de nombres para `tool_filter`; vacía/ausente = sin límite |
+| `provider` | *(obligatorio)* | Nombre del proveedor `ctx.subagents` para inicios continuables (`spawn`) |
+| `autoReport` | `true` | Inyecta una línea de progreso en el padre tras cada turno del hijo |
+| `reportDelivery` | `quiet` | `quiet` añade la línea a la siguiente petición del modelo; `wakeup` inicia un turno del padre cuando está inactivo |
+| `reportThrottleMs` | `15000` | Brecha mínima entre dos inyecciones de progreso de un hijo |
+| `reportSummaryMaxChars` | `300` | Límite duro del texto de la línea de progreso (con puntos suspensivos) |
+| `resultMaxChars` | `4000` | Límite duro del texto de `bg_result` (con puntos suspensivos, marcado `truncated`) |
+| `maxBackgroundAgents` | `4` | Límite duro de agentes de fondo no archivados por sesión padre |
+| `autoArchive` | `true` | Interruptor de archivado por inactividad; en `false`, el barrido nunca archiva hijos callados |
+| `idleTimeoutMinutes` | `120` | Ventana de inactividad tras la cual se archiva un hijo callado (`>= 1`) |
+| `idleSweepIntervalMs` | `60000` | Periodo del barrido de archivado |
+| `maxLabelChars` | `120` | Límite de la etiqueta de visualización (con puntos suspensivos) |
+| `childProvider` | *(heredado)* | Ruta de proveedor para las peticiones del modelo del hijo |
+| `childModel` | *(heredado)* | Id del modelo para las peticiones del hijo |
+| `maxChildDepth` | *(ninguno)* | Techo de configuración para el argumento `max_depth` de un inicio |
+| `allowedChildTools` | *(ninguna)* | Lista blanca de nombres de `tool_filter`; vacía/ausente = sin límite |
+| `maxRooms` | `16` | Límite duro de salas de equipo en el perfil |
+| `maxMembersPerRoom` | `8` | Límite duro de miembros por sala |
+| `maxRoomsPerMember` | `4` | Límite duro de salas a las que una sesión miembro puede unirse |
+| `busRetention` | `200` | Mensajes de bus conservados por sala |
+| `timelineRetention` | `500` | Eventos de línea de tiempo conservados por sala |
+| `taskRetention` | `50` | Tareas completadas conservadas por sala |
+| `maxMessageChars` | `4000` | Límite duro del texto de un mensaje de sala (rechazo por encima, nunca truncado) |
+| `injectRoomBrief` | `true` | Inyecta el resumen breve de la sala en las sesiones miembro (al unirse + al reanudar) |
 
-## Cómo funciona — y por qué sobrevive a los reinicios
+## Herramientas y superficies
 
-Todo pasa por el seam oficial de subagentes: `startContinuable`, `followup`, `interrupt`, `listChildren` — el plugin no enruta ciclos de vida propios, nunca toca el `Agent` de otra sesión y nunca mata árboles de procesos (parar = *solicitar interrupción*; el desmontaje pertenece al gestor de continuación).
-
-El plugin escribe cada hecho por **un canal estructurado y un canal visible para el modelo**:
-
-- **eventos de hecho estructurados `background-agents/fact`** (v0.3.0+) — los hechos registrado / mensaje / parada / progreso / archivado, añadidos al log del padre como registros solo-de-log con el marcador `ignorable: true`; los lectores que no conocen el tipo se saltan los registros en vez de rechazar el log, de modo que builds del harness y versiones del plugin más antiguas siguen abriendo los padres escritos por este;
-- **metadatos de reproducción** de `tool/result` — los mismos hechos en logs anteriores a v0.3.0 (plegados solo mientras una fila no tiene procedencia estructurada);
-- **avisos `user/message` inyectados** (visibles para el modelo) con fuente `{ kind: 'plugin', plugin: 'dsh-background-agents' }` — las líneas de progreso y los avisos de archivado (prefijo canónico `[background-agent <id>] …`);
-- el **aviso oficial `subagent-settled`** — el hecho durable de "asentado" del hijo.
-
-La unidad de proyección `backgroundAgents` pliega el canal estructurado y conserva los pliegues legacy para logs anteriores a v0.3.0 (una fila cambia a procedencia estructurada en su primer hecho, de modo que un log de doble canal nunca cuenta dos veces). El panel y los hechos de `bg_list` se reconstruyen en cada reapertura sin parsear el texto legible de los avisos. Si el catálogo en sí no está disponible (faltan proyecciones o el almacén de sesiones), `bg_list` devuelve un marcador explícito **`unrecoverable`**: nunca fabrica una lista vacía.
-
-## Esto no es este plugin
-
-| Proyecto | Qué hace | La frontera |
+| Superficie | Tipo | Notas |
 |---|---|---|
-| [titanwings/dsh-automation](https://github.com/titanwings/dsh-automation) | Tareas de codificación programadas en sesiones nuevas | Decide **cuándo** corren las tareas (planificación). Este plugin se ocupa del **gobierno interactivo** de una conversación larga: sin seam de planificación, sin cron. |
-| [vlln/dsh-task-status](https://github.com/vlln/dsh-task-status) | Barra de estado para *jobs* en segundo plano (progreso + salida) | **Muestra** trabajos a nivel de herramienta. Este plugin crea y gobierna **sesiones de agente**; su panel es una parte, no el producto. |
-| [YYTbit/dsh-plugin-agent-dashboard](https://github.com/YYTbit/dsh-plugin-agent-dashboard) | Skill de panel multi-agente | Orientado a mostrar. Las filas de este plugin son **accionables**: saltar a la sesión hija, enviar mensajes, parar — por el plano de control oficial. |
+| `background_agent` | herramienta | Inicia un hijo duradero y continuable (label, `tool_filter`, `persona`, `max_depth`) |
+| `bg_message` | herramienta | Entrega un turno posterior a un hijo por agent id |
+| `bg_list` | herramienta | Estado de tus agentes (o el árbol con `recursive: true`) |
+| `bg_result` | herramienta | Recupera el último texto de salida del asistente del hijo |
+| `bg_stop` | herramienta | Solicita la interrupción del turno actual |
+| `/room` | comando | `create\|join\|leave\|list\|send\|tasks\|task add\|assign\|claim\|done\|delete` |
+| `room_list_rooms` / `room_post` / `room_read` | herramientas | Bus de mensajes: lista, publicación (difusión/dirigida), lectura de historial |
+| `room_list_tasks` / `room_create_task` / `room_claim_task` | herramientas | Tablero de tareas compartido |
+| `room_transfer_task` / `room_complete_task` | herramientas | Traspaso (con aprobación) y finalización |
+| Proyección `backgroundAgents` | proyección de sesión | Filas del panel plegadas desde el log del padre |
+| Proyección `teamRoom` | proyección de sesión | Línea de tiempo compartida plegada desde eventos `team-room/fact` |
+| Panel lateral web | cliente | Estado en vivo, salto, mensaje, parada, vista previa del resultado |
 
-## Relación con las herramientas de subagente integradas
+## Permisos y datos
 
-El núcleo del harness trae sus propias herramientas de subagente (`subagent`, `send_message`, `interrupt_agent` y la herramienta `report` del hijo). Las herramientas `bg_*` de este plugin son su **compañía con alcance de sesión**; ambas pueden montarse a la vez:
+- **Permisos**: el manifiesto del workshop declara `session:append`, `subagent:spawn` y `tools:register`.
+- **Datos**: las salas de equipo viven en el dominio de almacenamiento `team_rooms` (SQLite o JSONL — sin servicios extra); los hechos de agentes de fondo viajan en el log de sesión del padre. Sin base de datos separada, sin red.
+- **Registro de sesión**: los eventos `background-agents/fact` y `team-room/fact` se añaden con el marcador de sobre `ignorable: true`; las líneas de progreso y entregas de sala visibles para el modelo son registros `user/message` reales.
 
-| Herramienta integrada | Este plugin | Diferencia |
-|---|---|---|
-| `subagent` (`backgroundMode: 'continuable'`) | `background_agent` | Mismo seam `startContinuable`; este plugin añade validación por hijo de tool_filter/persona/max_depth y el tope por sesión |
-| `send_message` | `bg_message` | Misma semántica de entrega; `bg_message` se dirige a los agentes de fondo de esta conversación y mantiene los hechos de proyección |
-| `interrupt_agent` | `bg_stop` | Misma semántica de interrupción; `bg_stop` registra además un hecho estructurado de parada |
-| herramienta `report` del hijo | autoReport | La integrada la llama el propio modelo hijo; este plugin inyecta progreso limitado tras **cada turno del hijo automáticamente** |
+## Límites de seguridad
 
-Lo que las herramientas del núcleo no tienen: `bg_list`, `bg_result`, archivado por inactividad y la proyección de panel plegada por padre.
+- **Solo costura oficial.** Inicio, mensaje y parada son adaptadores finos sobre `startContinuable` / `followup` / `interrupt`; parar solicita interrupción y nunca mata procesos.
+- **`tool_filter` solo restringe.** Elimina herramientas de la vista del hijo — nunca concede nuevas; los nombres se validan contra `allowedChildTools`.
+- **Traspasos con aprobación.** `room_transfer_task` pasa por la costura oficial de aprobación y cierra en fallo si ningún answerer lo concede.
+- **Visible para el modelo ⟺ registrado.** Cada mensaje de sala entregado es un `user/message` duradero en el log del propio miembro; la línea de tiempo compartida se refleja como eventos `team-room/fact` solo-registro.
+- **Sin programación, sin agentes entre máquinas.** Los hijos son sesiones continuables locales al proceso del despliegue.
 
-Fuera de alcance: activación programada (el seam de schedule existe), agentes remotos/entre máquinas, y cualquier cambio al contrato oficial de activación de subagentes.
+## Limitaciones conocidas
+
+- Las salas de equipo requieren que se componga el dominio de almacenamiento; sin `@deepseek-ai/dsh-storage-domain`, el comando `/room` y las herramientas `room_*` se desactivan (las cinco `bg_*` siguen cargando).
+- `provider` debe nombrar un proveedor con capacidad continuable (`prepareContinuable`); un proveedor ausente hace que `background_agent` falle hasta que aparezca.
+- `maxBackgroundAgents` es un presupuesto compartido entre **todos** los hijos directos continuables de la sesión, incluidos los que inició la herramienta `subagent` integrada.
+- Los hijos de un solo uso nunca se listan ni reciben mensajes — `bg_list` conserva solo filas continuables.
+- Los hijos son locales al proceso: la costura de programación es dueña del "cuándo"; este plugin es dueño de dirigir una conversación en vivo.
 
 ## Desarrollo
 
 ```sh
-pnpm install        # solo herramientas; los paquetes del harness se resuelven contra un checkout hermano
+pnpm install        # solo tooling; los paquetes del harness se resuelven contra un checkout hermano
 pnpm run typecheck  # TS estricto, programas node + client
-pnpm test           # 83 tests unitarios y de extremo a extremo (seam real de subagentes, LLM guionizado, panel jsdom)
-pnpm run build      # lib/index.js (mitad node) + lib/client.js (bundle web)
-pnpm run gen-aliases  # re-mapea rutas de paquetes del harness cuando el checkout se mueve
+pnpm test           # vitest: tests unitarios + end-to-end (costura de subagente real, LLM guionado, panel jsdom)
+pnpm run build      # lib/index.js (mitad node) + lib/client.js (bundle de cliente web)
+pnpm run gen-aliases  # re-mapea las rutas de paquetes del harness tras mover el checkout
 ```
 
-Una demo extremo a extremo sin clave mueve una sesión padre real y un hijo de fondo a través de un LLM guionizado determinista (sin API key; `dev/` está gitignorado — ajusta las rutas a tu checkout):
+## Temas
 
-```powershell
-$env:DSH_HOME = 'D:/deepseek-harness/Project/Plugins/dsh-background-agents/dev/dsh-home'
-pnpm dsh --profile headless --patch dev/cordis.yml "【父会话】驱动后台 agent 演示"
-```
+`dsh`, `dsh-plugin`, `deepseek-harness`, `subagent`, `background-agent`, `background-agents`, `agent-dashboard`, `conversation-steering`, `team-rooms`, `multi-agent`, `message-bus`, `task-board`, `collaboration`
 
-## 👥 Contribuidores
+## Contribuidores
 
-Gracias a todas las personas que han contribuido a `dsh-background-agents`:
-
-- [PerryLink](https://github.com/PerryLink) — autor y mantenedor: el runtime de agentes en segundo plano sobre el seam oficial de subagentes, el panel lateral de la Web UI, la proyección de sesión, documentación, CI/CD y releases.
-
-¿Quieres ayudar? Consulta las [plantillas de issues](.github/ISSUE_TEMPLATE/) y la [política de seguridad](SECURITY.md) — PRs bienvenidos en inglés o chino.
+- [@PerryLink](https://github.com/PerryLink) — creador y mantenedor: el runtime de agentes de fondo sobre la costura oficial de subagentes, el hub de salas de equipo, el panel lateral web, las proyecciones de sesión, la documentación, CI/CD y releases.
 
 ## Licencia
 
-Apache License 2.0 — véase [LICENSE](./LICENSE). Avisos de terceros: [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md).
+[Apache License 2.0](LICENSE) © 2026 dsh-background-agents contributors

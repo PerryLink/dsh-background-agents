@@ -1,167 +1,152 @@
-# dsh-background-agents
+<div align="center">
 
-> Interactive, long-session background agents for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness). Start a durable child agent that keeps working while you keep talking —watch its progress, steer it with messages, and stop it, all without leaving your session.
+# 👥 dsh-background-agents
 
-[English](./README.md) 路 [涓枃](./README.zh.md) 路 [Espa帽ol](./README.es.md) 路 [Portugu锚s](./README.pt.md) 路 [啶灌た啶ㄠ啶︵](./README.hi.md)
+**Interactive long-session background agents plus persistent multi-agent team rooms for DeepSeek Harness — start a durable child agent that keeps working while you keep talking.**
 
-[![license](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](./LICENSE)
-[![topic: dsh-plugin](https://img.shields.io/badge/topic-dsh--plugin-4d6bfe)](https://github.com/topics/dsh-plugin)
-[![topic: dsh](https://img.shields.io/badge/topic-dsh-4d6bfe)](https://github.com/topics/dsh)
+*Steer live conversations and coordinate a team across sessions; everything survives restarts through the harness's own storage.*
+
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
+[![DSH plugin](https://img.shields.io/badge/dsh-plugin-✅-green)](https://github.com/topics/dsh-plugin)
+[![Node](https://img.shields.io/badge/node-%5E22.19%20%7C%7C%20%3E%3D24-brightgreen.svg)](#)
+[![CI](https://img.shields.io/github/actions/workflow/status/PerryLink/dsh-background-agents/ci.yml?branch=main&label=CI)](https://github.com/PerryLink/dsh-background-agents/actions)
+[![Version](https://img.shields.io/github/v/tag/PerryLink/dsh-background-agents?label=version)](https://github.com/PerryLink/dsh-background-agents/releases)
 [![npm version](https://img.shields.io/npm/v/dsh-background-agents)](https://www.npmjs.com/package/dsh-background-agents)
 [![npm downloads](https://img.shields.io/npm/dm/dsh-background-agents)](https://www.npmjs.com/package/dsh-background-agents)
-[![CI](https://img.shields.io/github/actions/workflow/status/PerryLink/dsh-background-agents/ci.yml?branch=main&label=CI)](https://github.com/PerryLink/dsh-background-agents/actions)
 
-DSH's built-in background *jobs* are fire-and-forget tool executions: you can read output and kill them, but you cannot talk to them. `dsh-background-agents` upgrades that to **full background agent sessions** on the official subagent seam —a continuable child conversation you can message, steer, and interrupt at any time, while an injected progress line after each of its turns keeps you (and the model) in the loop.
+[English](README.md) · [简体中文](README.zh.md) · [Español](README.es.md) · [Português](README.pt.md) · [हिन्दी](README.hi.md)
+
+</div>
+
+---
+
+## Compatibility
+
+| Surface | Status |
+|---|---|
+| Harness | DeepSeek Harness `0.1.0-rc.6` (peers `>=0.1.0-rc.5 <0.2.0`) |
+| Node | `^22.19.0 \|\| >=24.0.0` |
+| Platforms | All (host tools; optional Web sidebar panel and team rooms via the storage-domain capability) |
+| Model | Any (children inherit the parent's route; `childProvider`/`childModel` override) |
 
 ## What you get
 
-- **`background_agent`** —start a durable, continuable child agent from any session. It runs in its own context, returns a stable agent id immediately, and keeps its conversation open forever. Optional per-child scoping: `tool_filter` (removes tools from the child's view —never grants new ones), `persona` (a dedicated system-prompt persona), and `max_depth` (a delegation-depth cap); `childProvider`/`childModel` config route its model requests.
-- **`bg_message`** —send it more work, corrections, or wake a settled agent. Delivered through the official FIFO inbox; the agent's answer is its next turn.
-- **`bg_list`** —status of your agents: label, mode, activity (`running` / `idle` / `ready` / `settled` / `archived`), message count, last activity time. Recovers persisted children after a restart. `recursive: true` lists the whole descendant tree with `parentId`/`depth`.
-- **`bg_result`** —fetch a child's latest assistant output text plus its label and activity, beyond the settled-notice summary. A thinking model's text-less final message falls back to its reasoning blocks, flagged `textSource: 'reasoning'`.
-- **`bg_stop`** —request interruption of the current turn. Fire-and-return: official teardown finishes the job; the agent stays resumable.
-- **autoReport** —after every child turn, one throttled progress line is injected into your session (model-visible, plugin-sourced). Its final outcome arrives via the official settled notice. `reportDelivery: wakeup` makes each line start a parent turn when the parent is idle.
-- **Idle archive** —agents quiet past `idleTimeoutMinutes` are archived with a notice and a stop request; `bg_message` wakes them back up. Set `autoArchive: false` to park quiet watcher agents instead of archiving them.
-- **`backgroundAgents` projection** —a session-projection unit that folds the parent log into dashboard rows (agent id, label, activity, last message summary, created time). Everything reconstructs from the durable log —no separate database.
-- **Web UI panel** —a "Background agents" entry in the Web GUI sidebar with live status, one-click jump into the child session, a stop button, a message button that queues a new turn through the official `subagent.prompt` RPC, and a result button that peeks the child's final assistant text through the read-only `subagent.history` RPC. Parent-session titles disambiguate rows when several parents project agents.
+`dsh-background-agents` upgrades DSH's fire-and-forget background *jobs* into two coordinated surfaces:
+
+1. **Five steering tools** — `background_agent` starts a durable, continuable child on the official subagent seam (optional `tool_filter`, `persona`, `max_depth`, model route); `bg_message` delivers a later turn; `bg_list` reports status (or the descendant tree); `bg_result` reads the latest result text; `bg_stop` requests interruption.
+2. **Progress and archive** — `autoReport` injects one throttled progress line after each child turn; the idle sweep archives quiet children and `bg_message` wakes them back up.
+3. **Dashboard projection + Web panel** — the `backgroundAgents` session projection folds the parent log into rows; a sidebar panel shows live status, jump, message, stop, and result peek.
+4. **Team rooms (v0.5.0+)** — the `/room` command family plus eight `room_*` tools build persistent multi-agent rooms: members (each an independent session), a message bus (directed/broadcast), a shared task board, and a shared timeline — stored in the `team_rooms` storage domain (SQLite or JSONL) and recovered across DSH restarts. Cross-member task handoffs route through the official approval seam.
 
 ## Quick start
 
 ```sh
-# from the harness checkout or wherever the dsh CLI lives (web or headless)
-dsh plugin --profile <name> add "github:PerryLink/dsh-background-agents#v0.4.0"
+# 1. install the bundle into your profile
+dsh plugin --profile web add "github:PerryLink/dsh-background-agents#main"
+
+# or from npm (published releases)
+dsh plugin --profile web add dsh-background-agents
+
+# 2. restart and verify the row
+dsh --profile web --dump-config | grep -A4 'id: background-agents'
 ```
 
-The bundle patch carries the plugin row, so `dsh plugin add` composes it into your profile's layer stack (`dsh.profile.bundles`). Prefer the git source with a pinned ref: the repo commits its build output (`lib/`), so git installs need no build step and no `allowBuilds` entry. The package is also published to npm — plain `pnpm add dsh-background-agents` works (CI publishes every tag push).
+The bundle patch carries the plugin row; `provider` is required. The repo commits its build output (`lib/`), so git installs need no build step. Team rooms mount wherever the storage domain is composed (`@deepseek-ai/dsh-storage-domain`); the five `bg_*` tools work without it.
 
-The row that lands in your profile (override `config` per profile in `cordis.patch.yml`):
+## Install & uninstall
 
-```yaml
-- insert:
-    - id: background-agents
-      name: dsh-background-agents
-      config:
-        provider: spawn        # the ctx.subagents provider for continuable children
-```
-
-The plugin needs the subagent spine already mounted (any profile built on `@deepseek-ai/dsh-base` has it: `dsh-subagent`, `dsh-subagent-spawn-in-process`, `dsh-session-projection`).
-
-Then, in any session, just ask the model —or call the tools directly:
-
-```
-background_agent "watch the repo for test failures and keep me posted" (label: test-watch)
-bg_list
-bg_message <agentId> "also check the snapshot tests now"
-bg_stop <agentId>
-```
+- **git channel** (latest `main`): `dsh plugin --profile web add "github:PerryLink/dsh-background-agents#main"` — committed `lib/`, no `prepare` or `allowBuilds` step.
+- **npm channel** (published releases): `dsh plugin --profile web add dsh-background-agents`.
+- **tarball channel**: `pnpm pack` in this repo, then `dsh plugin --profile web add ./dsh-background-agents-<version>.tgz`.
+- **uninstall**: `dsh plugin --profile web remove dsh-background-agents` (or remove the row from the profile patch).
 
 ## Configuration
 
-Every tunable is a validated `Config` field —change it in `cordis.yml`, never in code.
+Every tunable is a validated Schemastery `Config` field — change it in cordis.yml, never in code. Only `provider` is required.
 
-| Field | Default | Meaning |
+| Key | Default | Meaning |
 |---|---|---|
 | `provider` | *(required)* | `ctx.subagents` provider name for continuable starts (`spawn`) |
-| `autoReport` | `true` | inject one progress line into the parent after each child turn |
-| `reportDelivery` | `quiet` | `quiet` appends the line to the parent's next model request; `wakeup` starts a parent turn when idle (queues when busy) |
-| `reportThrottleMs` | `15000` | minimum gap between two progress injections for one child |
-| `reportSummaryMaxChars` | `300` | hard cap on the injected progress-line text (ellipsized) |
-| `resultMaxChars` | `4000` | hard cap on the `bg_result` text (ellipsized, flagged `truncated`) |
-| `maxBackgroundAgents` | `4` | hard cap on non-archived background agents per parent session; the budget is shared by **every** continuable direct child of the session (including ones the built-in `subagent` tool started) |
-| `autoArchive` | `true` | idle-archive toggle: when false, the sweep never archives quiet children (the idle window then only feeds the reclamation of stale cache entries) |
-| `idleTimeoutMinutes` | `120` | idle window after which a quiet child is archived and notified (`>= 1`) |
-| `idleSweepIntervalMs` | `60000` | archive sweep period |
-| `maxLabelChars` | `120` | display-label cap (ellipsized) |
-| `childProvider` | *(inherit)* | provider route for child model requests |
-| `childModel` | *(inherit)* | model id for child model requests |
-| `maxChildDepth` | *(none)* | config ceiling for a start's `max_depth` argument |
-| `allowedChildTools` | *(none)* | allowlist for `tool_filter` names; empty/absent = no limit |
+| `autoReport` | `true` | Inject one progress line into the parent after each child turn |
+| `reportDelivery` | `quiet` | `quiet` appends the line to the next model request; `wakeup` starts a parent turn when idle |
+| `reportThrottleMs` | `15000` | Minimum gap between two progress injections for one child |
+| `reportSummaryMaxChars` | `300` | Hard cap on the injected progress-line text (ellipsized) |
+| `resultMaxChars` | `4000` | Hard cap on the `bg_result` text (ellipsized, flagged `truncated`) |
+| `maxBackgroundAgents` | `4` | Hard cap on non-archived background agents per parent session |
+| `autoArchive` | `true` | Idle-archive toggle; when `false`, the sweep never archives quiet children |
+| `idleTimeoutMinutes` | `120` | Idle window after which a quiet child is archived (`>= 1`) |
+| `idleSweepIntervalMs` | `60000` | Archive sweep period |
+| `maxLabelChars` | `120` | Display-label cap (ellipsized) |
+| `childProvider` | *(inherit)* | Provider route for child model requests |
+| `childModel` | *(inherit)* | Model id for child model requests |
+| `maxChildDepth` | *(none)* | Config ceiling for a start's `max_depth` argument |
+| `allowedChildTools` | *(none)* | Allowlist for `tool_filter` names; empty/absent = no limit |
+| `maxRooms` | `16` | Hard cap on team rooms across the profile |
+| `maxMembersPerRoom` | `8` | Hard cap on members per room |
+| `maxRoomsPerMember` | `4` | Hard cap on rooms one member session may join |
+| `busRetention` | `200` | Bus messages kept per room |
+| `timelineRetention` | `500` | Timeline events kept per room |
+| `taskRetention` | `50` | Completed tasks kept per room |
+| `maxMessageChars` | `4000` | Hard cap on one room message's text (rejected above, never truncated) |
+| `injectRoomBrief` | `true` | Inject the short room brief into member sessions (join + resume) |
 
-## How it works —and why it survives restarts
+## Tools & surfaces
 
-Everything rides the official subagent seam: `startContinuable`, `followup`, `interrupt`, `listChildren` —the plugin performs no lifecycle routing of its own, never touches another session's `Agent`, and never kills a process tree (stop = *request interruption*, teardown belongs to the continuation manager).
-
-The plugin writes every fact through **one structured channel and one model-visible channel**:
-
-- **`background-agents/fact` structured fact events** (v0.3.0+) —the registered / message / stop / progress / archived facts, appended to the parent log as log-only records with the envelope's `ignorable: true` marker; readers that do not know the type skip the records instead of refusing the log, so older harness builds and older plugin versions still open parents written by this one;
-- `tool/result` **replay metadata** —the same facts in logs written before v0.3.0 (folded only while a row has no structured provenance);
-- **injected `user/message` notices** (model-visible), source `{ kind: 'plugin', plugin: 'dsh-background-agents' }` —the throttled progress lines and archive notices (canonical `[background-agent <id>] 鈥 prefix);
-- the **official `subagent-settled` notice** —the child's durable "settled" fact.
-
-The `backgroundAgents` projection unit folds the structured channel and keeps the legacy folds for pre-v0.3.0 logs (a row switches to structured provenance on its first fact, so a dual-channel log never double-counts). The dashboard value and `bg_list` facts reconstruct on every reopen without parsing human-readable notice text. When the catalog itself is unavailable (projections or session store missing), `bg_list` returns an explicit **`unrecoverable`** marker —it never fabricates an empty list.
-
-## Not this plugin
-
-| Project | What it does | The boundary |
+| Surface | Kind | Notes |
 |---|---|---|
-| [titanwings/dsh-automation](https://github.com/titanwings/dsh-automation) | Scheduled coding tasks in fresh agent sessions | It owns **when** tasks run (scheduling). This plugin owns **interactive steering** of one long-lived conversation —no scheduler seam, no cron. |
-| [vlln/dsh-task-status](https://github.com/vlln/dsh-task-status) | Status bar for background *jobs* (progress + output tail) | It **displays** tool-level jobs. This plugin creates and steers **agent sessions**; its dashboard is one panel of it, not the product. |
-| [YYTbit/dsh-plugin-agent-dashboard](https://github.com/YYTbit/dsh-plugin-agent-dashboard) | Multi-agent dashboard skill | Display-oriented. This plugin's rows are **actionable**: jump into the child session, send messages, stop —through the official control plane. |
+| `background_agent` | tool | Start a durable, continuable child (label, `tool_filter`, `persona`, `max_depth`) |
+| `bg_message` | tool | Deliver a later turn to a child by agent id |
+| `bg_list` | tool | Status of your agents (or the descendant tree with `recursive: true`) |
+| `bg_result` | tool | Fetch a child's latest assistant output text |
+| `bg_stop` | tool | Request interruption of the current turn |
+| `/room` | command | `create\|join\|leave\|list\|send\|tasks\|task add\|assign\|claim\|done\|delete` |
+| `room_list_rooms` / `room_post` / `room_read` | tools | Message bus: roster, post (broadcast/directed), read history |
+| `room_list_tasks` / `room_create_task` / `room_claim_task` | tools | Shared task board |
+| `room_transfer_task` / `room_complete_task` | tools | Handoff (approval-gated) and completion |
+| `backgroundAgents` projection | session projection | Dashboard rows folded from the parent log |
+| `teamRoom` projection | session projection | Shared timeline folded from `team-room/fact` events |
+| Web sidebar panel | client | Live status, jump, message, stop, result peek |
 
-## How this relates to the built-in subagent tools
+## Permissions & data
 
-The harness core ships its own subagent tools (`subagent`, `send_message`, `interrupt_agent`, and the child-side `report` tool). This plugin's `bg_*` tools are their **session-scoped companions**; both can be mounted together:
+- **Permissions**: the workshop manifest declares `session:append`, `subagent:spawn`, and `tools:register`.
+- **Data**: team rooms live in the `team_rooms` storage domain (SQLite or JSONL — zero extra services); background-agent facts ride the parent session log. No separate database, no network.
+- **Session log**: `background-agents/fact` and `team-room/fact` events are appended with the envelope's `ignorable: true` marker; the model-visible progress lines and room deliveries are real `user/message` records.
 
-| Built-in tool | This plugin | Difference |
-|---|---|---|
-| `subagent` (`backgroundMode: 'continuable'`) | `background_agent` | Same `startContinuable` seam; this plugin adds per-child tool_filter/persona/max_depth validation and the per-session cap |
-| `send_message` | `bg_message` | Same delivery semantics; `bg_message` addresses this conversation's background agents and maintains the projection facts |
-| `interrupt_agent` | `bg_stop` | Same interrupt semantics; `bg_stop` also records a structured stop fact |
-| child-side `report` tool | autoReport | The built-in is called by the child model itself; this plugin injects throttled progress after **every child turn automatically** |
+## Security boundaries
 
-What the core tools lack: `bg_list`, `bg_result`, idle archiving, and the per-parent folded panel projection.
+- **Official seam only.** Start, message, and stop are thin adapters over `startContinuable` / `followup` / `interrupt`; stop requests interruption and never kills processes.
+- **`tool_filter` only restricts.** It removes tools from the child's view — never grants new ones; names are validated against `allowedChildTools`.
+- **Approval-gated handoffs.** `room_transfer_task` routes through the official approval seam and fails closed when no answerer grants it.
+- **Model-visible ⟺ logged.** Every delivered room message is a durable `user/message` in the member's own log; the shared timeline mirrors as log-only `team-room/fact` events.
+- **No scheduling, no cross-machine agents.** Children are process-local continuable sessions of the deployment.
 
-Not in scope: scheduled triggering (the schedule seam exists), cross-machine/remote agents, and any change to the official subagent activation contract.
+## Known limitations
+
+- Team rooms require the storage domain to be composed; without `@deepseek-ai/dsh-storage-domain`, the `/room` command and `room_*` tools are disabled (the five `bg_*` tools still load).
+- `provider` must name a continuable-capable provider (`prepareContinuable`); a missing provider makes `background_agent` fail until it appears.
+- `maxBackgroundAgents` is a shared budget across **every** continuable direct child of the session, including ones the built-in `subagent` tool started.
+- One-shot children are never listed or messaged — `bg_list` keeps continuable rows only.
+- Children are process-local: the schedule seam owns "when", this plugin owns steering a live conversation.
 
 ## Development
 
 ```sh
 pnpm install        # tooling only; harness packages resolve against a sibling checkout
 pnpm run typecheck  # strict TS, node + client programs
-pnpm test           # 83 unit + end-to-end tests (real subagent seam, scripted LLM, jsdom panel)
+pnpm test           # vitest: unit + end-to-end tests (real subagent seam, scripted LLM, jsdom panel)
 pnpm run build      # lib/index.js (node half) + lib/client.js (web client bundle)
 pnpm run gen-aliases  # re-map harness package paths after the checkout moves
 ```
 
-A keyless end-to-end demo drives a real parent session and a background child through a deterministic scripted LLM (no API key; `dev/` is gitignored —adapt the paths to your checkout):
+## Topics
 
-```powershell
-$env:DSH_HOME = 'D:/deepseek-harness/Project/Plugins/dsh-background-agents/dev/dsh-home'
-pnpm dsh --profile headless --patch dev/cordis.yml "銆愮埗浼氳瘽銆戦┍鍔ㄥ悗鍙?agent 婕旂ず"
-```
+`dsh`, `dsh-plugin`, `deepseek-harness`, `subagent`, `background-agent`, `background-agents`, `agent-dashboard`, `conversation-steering`, `team-rooms`, `multi-agent`, `message-bus`, `task-board`, `collaboration`
 
-The test suite covers the full path —start, list, message, stop —against the **real** `SubagentRuntime` with the in-process spawn provider and a scripted adapter, plus throttle/cap/archive policy, projection folding, and crash recovery through `session-persistence-jsonl`.
+## Contributors
 
-## 👥 Contributors
-
-Thanks to everyone who has contributed to `dsh-background-agents`:
-
-- [PerryLink](https://github.com/PerryLink) — author and maintainer: the background-agent runtime on the official subagent seam, the Web UI sidebar panel, session projection, docs, CI/CD and releases.
-
-Want to help? Check the [issue templates](.github/ISSUE_TEMPLATE/) and the [security policy](SECURITY.md) — PRs are welcome in English or Chinese.
+- [@PerryLink](https://github.com/PerryLink) — creator and maintainer: the background-agent runtime on the official subagent seam, the team-room hub, the Web UI sidebar panel, the session projections, docs, CI/CD and releases.
 
 ## License
 
-Apache License 2.0 —see [LICENSE](./LICENSE). Third-party notices: [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md).
-
-## PerryLink DSH Plugin Family
-
-This project is one of the [15 DeepSeek Harness plugins](https://github.com/PerryLink) maintained by [PerryLink](https://github.com/PerryLink). If this one helps you, the others likely will too:
-
-| Plugin | One-liner |
-|---|---|
-| [dsh-mcp-panel](https://github.com/PerryLink/dsh-mcp-panel) | Read-only MCP runtime panel: /mcp command + Settings tab with status, tools and errors |
-| [dsh-doublecheck](https://github.com/PerryLink/dsh-doublecheck) | Engineering-discipline guard: requirements grill, test gates, adversary review |
-| **[dsh-background-agents](https://github.com/PerryLink/dsh-background-agents)** | Durable background child agents with a Web UI sidebar, messaging and interrupt |
-| [dsh-lsp-actions](https://github.com/PerryLink/dsh-lsp-actions) | LSP diagnostics, formatting, completion, code actions and rename over language servers |
-| [dsh-output-styles](https://github.com/PerryLink/dsh-output-styles) | Claude Code outputStyles-equivalent runtime style switching |
-| [dsh-checkpoint-rewind](https://github.com/PerryLink/dsh-checkpoint-rewind) | Claude Code /rewind-equivalent: snapshots, session forks, one-shot restore |
-| [dsh-permission-rules](https://github.com/PerryLink/dsh-permission-rules) | Claude Code-style declarative allow/deny/ask permission rules with audit |
-| [dsh-auto-review](https://github.com/PerryLink/dsh-auto-review) | Second-model auto-review on the approval chain, fail-closed by default |
-| [dsh-memento](https://github.com/PerryLink/dsh-memento) | Approval-gated cross-session memory: ctx.memory seam + SQLite + memory tool |
-| [dsh-skill-pack-security](https://github.com/PerryLink/dsh-skill-pack-security) | Security-audit skill pack: secret scan, dependency and supply-chain review |
-| [dsh-session-pin](https://github.com/PerryLink/dsh-session-pin) | Pin sessions in the Web sidebar with durable ordering |
-| [dsh-composer-history](https://github.com/PerryLink/dsh-composer-history) | Terminal-style input history for the web composer: arrows, Ctrl+R search |
-| [dsh-github](https://github.com/PerryLink/dsh-github) | GitHub PR/issues integration for DSH, every write gated by approval |
-| [dsh-plugin-guide](https://github.com/PerryLink/dsh-plugin-guide) | Plugin-development knowledge base as an on-demand agent skill |
-| [dsh-claude-move](https://github.com/PerryLink/dsh-claude-move) | Migrate Claude Code sessions, memory, skills and CLAUDE.md into DSH |
+[Apache License 2.0](LICENSE) © 2026 dsh-background-agents contributors
