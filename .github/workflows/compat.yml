@@ -64,14 +64,15 @@ jobs:
           pnpm run build
           pnpm pack --pack-destination "$RUNNER_TEMP"
       - name: Bare install + import smoke
+        env:
+          # `pnpm init`/`pnpm add` stamp a caret packageManager that corepack
+          # rejects; ignore the project spec so the runner's pnpm is used.
+          COREPACK_ENABLE_PROJECT_SPEC: '0'
         run: |
           set -euo pipefail
           TARBALL="$(ls "$RUNNER_TEMP"/dsh-background-agents-*.tgz | head -n1)"
           mkdir -p "$RUNNER_TEMP/bare" && cd "$RUNNER_TEMP/bare"
           pnpm init >/dev/null
-          # `pnpm init` stamps a caret packageManager that corepack rejects;
-          # drop it so the bare consumer resolves pnpm deterministically.
-          pnpm pkg delete packageManager
           cat > pnpm-workspace.yaml <<'YAML'
           packages:
             - .
