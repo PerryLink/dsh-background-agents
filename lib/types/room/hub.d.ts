@@ -23,8 +23,8 @@
 import { Context, Service } from '@deepseek-ai/cordis';
 import type { Agent } from '@deepseek-ai/dsh-agent';
 import { SessionId, type Session } from '@deepseek-ai/dsh-session';
-import { type BusMessage, type RoomMember, type RoomRecord, type TaskRecord, type TimelineEvent } from './schema.ts';
-import type { FactAppender } from '../facts.ts';
+import { type BusMessage, type RoomMember, type RoomRecord, type TaskRecord, type TimelineEvent } from './schema.js';
+import type { FactAppender } from '../facts.js';
 /** Tunables the room feature honors; every threshold is a validated Config field. */
 export interface RoomConfig {
     /** Hard cap on rooms across the profile. */

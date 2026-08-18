@@ -1,5 +1,5 @@
 import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots';
-import { NS } from './locales.ts';
+import { NS } from './locales.js';
 /** Business actions supplied by the slot registration. */
 export interface BackgroundAgentsInjected {
     /**

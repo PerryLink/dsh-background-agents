@@ -428,7 +428,7 @@ export class RoomHub extends Service {
     readonly description?: string
     readonly assigneeSessionId?: SessionId
   }, now = Date.now()): Promise<TaskRecord> {
-    return this.enqueue(async () => {
+    const created = this.enqueue(async () => {
       const record = this.requireRoom(input.roomId)
       if (this.memberOf(record, input.bySessionId) === undefined) {
         throw new RoomError('not-member', `session ${input.bySessionId} is not a member of room ${input.roomId}`)
@@ -457,6 +457,12 @@ export class RoomHub extends Service {
       const next = await this.requireRooms().update(roomKey(input.roomId), current => ({
         ...current, timelineNext: current.timelineNext + 1,
       }))
+      return { task, next, event }
+    })
+    // The fact broadcast and cursor update enqueue their own write-chain
+    // links, so they must run AFTER the job above settles: calling them from
+    // inside it would capture a still-pending tail and deadlock the chain.
+    return created.then(async ({ task, next, event }) => {
       this.broadcastFact(next, this.taskCreatedFact(task, event.seq))
       await this.advanceFactsForLive(next, event.seq)
       return task
@@ -630,7 +636,10 @@ export class RoomHub extends Service {
     readonly taskId: string
     readonly toSessionId?: SessionId
   }, now: number, operation: 'claim' | 'assign' | 'complete'): Promise<TaskRecord> {
-    return this.enqueue(async () => {
+    const mutated = this.enqueue(async (): Promise<
+      | { readonly done: true; readonly task: TaskRecord }
+      | { readonly done: false; readonly task: TaskRecord; readonly nextRoom: RoomRecord; readonly event: TimelineEvent }
+    > => {
       const record = this.requireRoom(input.roomId)
       const byMember = this.memberOf(record, input.bySessionId)
       if (byMember === undefined) {
@@ -641,7 +650,7 @@ export class RoomHub extends Service {
       if (current === undefined) {
         throw new RoomError('unknown-task', `room ${input.roomId} has no task ${input.taskId}`)
       }
-      if (operation === 'complete' && current.status === 'done') return current
+      if (operation === 'complete' && current.status === 'done') return { done: true, task: current }
       if (operation === 'complete' && current.assigneeSessionId !== input.bySessionId && byMember.role !== 'owner') {
         throw new RoomError('not-assignee', `task ${input.taskId}: only the assignee or the room owner can complete it`)
       }
@@ -677,7 +686,15 @@ export class RoomHub extends Service {
       const nextRoom = await this.requireRooms().update(roomKey(input.roomId), room => ({
         ...room, timelineNext: room.timelineNext + 1,
       }))
-      const fact = this.taskMutationFact(operation, next, event.seq, input.bySessionId)
+      return { done: false, task: next, nextRoom, event }
+    })
+    // Side effects run after the write chain advances: the fact broadcast,
+    // cursor update, and (for assign) the directed delivery enqueue their own
+    // links, so calling them from inside the job would deadlock the chain.
+    return mutated.then(async (result) => {
+      if (result.done) return result.task
+      const { task, nextRoom, event } = result
+      const fact = this.taskMutationFact(operation, task, event.seq, input.bySessionId)
       this.broadcastFact(nextRoom, fact)
       await this.advanceFactsForLive(nextRoom, event.seq)
       if (operation === 'assign') {
@@ -686,10 +703,10 @@ export class RoomHub extends Service {
           roomId: input.roomId,
           senderSessionId: input.bySessionId,
           toSessionId: input.toSessionId!,
-          text: `Task assigned to you: ${next.title}`,
+          text: `Task assigned to you: ${task.title}`,
         }, now)
       }
-      return next
+      return task
     })
   }
 

@@ -54,6 +54,16 @@ jobs:
         run: pnpm run typecheck
       - name: Test
         run: pnpm test
+      - name: Coverage
+        run: pnpm run test:coverage
+      - name: Lint
+        run: pnpm run lint
+      - name: README sync (five languages)
+        run: pnpm run check:readmes
+      - name: Verify self-contained dependency specs
+        run: pnpm run verify:self-contained
+      - name: Verify built artifacts
+        run: pnpm run verify:artifacts
       - name: Build drift gate (lib/ must match the committed sources)
         run: |
           pnpm run build

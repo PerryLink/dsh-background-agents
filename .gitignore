@@ -2,3 +2,5 @@ node_modules/
 dev/
 *.log
 .DS_Store
+coverage/
+*.tgz

@@ -6,7 +6,7 @@
  *
  * @module dsh-background-agents/room-presenter
  */
-import { type TimelineEvent } from '../room/schema.ts';
+import { type TimelineEvent } from '../room/schema.js';
 /** The session-list face the presenter reads (host-sampled `running` per session). */
 export interface SessionListLike {
     byId: Record<string, {

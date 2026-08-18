@@ -12,7 +12,7 @@ import type { Context } from '@deepseek-ai/cordis';
 import type { Agent } from '@deepseek-ai/dsh-agent';
 import type { Session, SessionEvent, SessionId } from '@deepseek-ai/dsh-session';
 import type { AgentRegistry } from '@deepseek-ai/dsh-agent';
-import type { FactAppender } from './facts.ts';
+import type { FactAppender } from './facts.js';
 /** Tunables the lifecycle honors; every threshold is a validated Config field. */
 export interface LifecycleConfig {
     readonly autoReport: boolean;

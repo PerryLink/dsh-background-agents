@@ -12,8 +12,8 @@
  *   sanctioned plugin channels.
  */
 import type { Context } from '@deepseek-ai/cordis';
-import { type BackgroundAgentsKey } from './locales.ts';
-import { type TeamRoomsKey } from './room-locales.ts';
+import { type BackgroundAgentsKey } from './locales.js';
+import { type TeamRoomsKey } from './room-locales.js';
 declare module '@deepseek-ai/dsh-client-ui-slots' {
     interface LocaleNamespaceMap {
         /** Background-agent panel copy. */
@@ -22,8 +22,8 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
         teamRooms: TeamRoomsKey;
     }
 }
-export type { BackgroundAgentsActionProps, BackgroundAgentsInjected, } from './BackgroundAgentsAction.tsx';
-export type { TeamRoomsInjected, TeamRoomsSectionProps, } from './TeamRoomsSection.tsx';
+export type { BackgroundAgentsActionProps, BackgroundAgentsInjected, } from './BackgroundAgentsAction.js';
+export type { TeamRoomsInjected, TeamRoomsSectionProps, } from './TeamRoomsSection.js';
 /**
  * Required services: sessions (list + bindings), slots, locale, the wire
  * client, and the remote command executor (declared as `remote.commands`

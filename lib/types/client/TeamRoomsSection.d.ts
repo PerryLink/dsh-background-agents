@@ -1,7 +1,7 @@
 import type { PropsLocale, PropsRuntime, InjectFace } from '@deepseek-ai/dsh-client-ui-slots';
 import type { ObservableSnapshot } from '@deepseek-ai/dsh-client-runtime/client';
-import type { TeamRoomsState } from './room-presenter.ts';
-import { ROOM_NS } from './room-locales.ts';
+import type { TeamRoomsState } from './room-presenter.js';
+import { ROOM_NS } from './room-locales.js';
 /** Business actions supplied by the slot registration (all via /room command execution). */
 export interface TeamRoomsInjected {
     hooks: {

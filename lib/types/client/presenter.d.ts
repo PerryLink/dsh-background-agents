@@ -7,7 +7,7 @@
  *
  * @module dsh-background-agents/presenter
  */
-import { type BackgroundAgentEntry } from '../projection-schema.ts';
+import { type BackgroundAgentEntry } from '../projection-schema.js';
 /** Display status of one row: the durable fact overlaid with the live running bit. */
 export type RowStatus = 'running' | 'idle' | 'settled' | 'archived';
 /** One rendered dashboard row. */
