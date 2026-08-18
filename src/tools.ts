@@ -21,6 +21,7 @@ import { SessionId, type SessionEvent } from '@deepseek-ai/dsh-session'
 import { SubagentError, type SubagentDescendantListEntry, type SubagentListEntry } from '@deepseek-ai/dsh-subagent'
 import { countBackgroundAgents, sessionLastText, type BackgroundAgentLifecycle } from './lifecycle.ts'
 import { FACT_EVENT } from './events.ts'
+import type { FactAppender } from './facts.ts'
 import { isBackgroundAgentsProjection } from './projection-schema.ts'
 import { PLUGIN } from './vocabulary.ts'
 
@@ -212,6 +213,7 @@ export function registerBackgroundAgentTools(
   ctx: Context,
   config: ToolConfig,
   lifecycle: BackgroundAgentLifecycle,
+  facts: FactAppender,
 ): void {
   // Per-parent start gates: concurrent background_agent calls serialize their
   // count + cap-check + start critical section, so two racing starts cannot
@@ -359,7 +361,7 @@ export function registerBackgroundAgentTools(
         lifecycle.register(started.childId, parent.id, label, Date.now())
         // The structured fact rides the parent log next to the replay meta;
         // the projection folds it (the legacy meta fold then skips the row).
-        parent.session.append(FACT_EVENT, { kind: 'registered', agentId: started.childId, label }, { ignorable: true })
+        facts.append(parent.session, FACT_EVENT, { kind: 'registered', agentId: started.childId, label })
         return { agentId: started.childId, messageId: started.messageId }
       } finally {
         releaseGate()
@@ -434,7 +436,7 @@ export function registerBackgroundAgentTools(
       // A cold child resumed through bg_message re-enters the live tracking
       // set; the durable label stays with the projection.
       lifecycle.register(childId, parent.id, '', Date.now())
-      parent.session.append(FACT_EVENT, { kind: 'message', agentId: childId, messageId }, { ignorable: true })
+      facts.append(parent.session, FACT_EVENT, { kind: 'message', agentId: childId, messageId })
       return { messageId }
     },
   }))
@@ -752,7 +754,7 @@ export function registerBackgroundAgentTools(
       // The service authorizes the exact live caller against the target's
       // recorded lineage; the tool adds no authority of its own.
       ctx.subagents.interrupt(childId, { kind: 'ancestor', agent: parent })
-      parent.session.append(FACT_EVENT, { kind: 'stop', agentId: childId }, { ignorable: true })
+      facts.append(parent.session, FACT_EVENT, { kind: 'stop', agentId: childId })
       return { outcome: 'interrupt-requested' as const, agentId: childId }
     },
   }))

@@ -38,6 +38,7 @@ import Schema from '@deepseek-ai/schemastery'
 import { BackgroundAgentLifecycle, reportProgress, startIdleSweep } from './lifecycle.ts'
 import { backgroundAgentsProjectionDefinition } from './projection.ts'
 import { registerBackgroundAgentTools } from './tools.ts'
+import { FactAppender } from './facts.ts'
 import { RoomHub } from './room/hub.ts'
 import type { RoomConfig } from './room/hub.ts'
 import { registerRoomCommand } from './room/commands.ts'
@@ -112,6 +113,21 @@ export interface Config {
   maxMessageChars?: number
   /** Inject the short room brief into member sessions (join + resume). */
   injectRoomBrief?: boolean
+  /**
+   * How long the `team_rooms` storage-domain open may take before every
+   * room operation fails loud (`store-unavailable`) instead of hanging.
+   */
+  roomOpenTimeoutMs?: number
+  /**
+   * Force the log-only fact events (`background-agents/fact`,
+   * `team-room/fact`) even on hosts that drop the `ignorable` envelope
+   * marker (the `0.1.0-rc.6` line). Deliberately dangerous: unmarked fact
+   * events make sessions unresumable on stricter harness builds. Default
+   * `false` — the runtime detects such hosts and skips fact appends (the
+   * projections degrade to an empty fact fold; the durable store and the
+   * model-visible notices keep working).
+   */
+  allowUnmarkedFacts?: boolean
 }
 
 /**
@@ -138,6 +154,8 @@ export const DEFAULTS = {
   taskRetention: 50,
   maxMessageChars: 4_000,
   injectRoomBrief: true,
+  roomOpenTimeoutMs: 15_000,
+  allowUnmarkedFacts: false,
 } as const
 
 export const Config: Schema<Config> = Schema.object({
@@ -171,6 +189,8 @@ export const Config: Schema<Config> = Schema.object({
   taskRetention: Schema.natural().max(Number.MAX_SAFE_INTEGER).default(DEFAULTS.taskRetention),
   maxMessageChars: Schema.natural().min(1).max(Number.MAX_SAFE_INTEGER).default(DEFAULTS.maxMessageChars),
   injectRoomBrief: Schema.boolean().default(DEFAULTS.injectRoomBrief),
+  roomOpenTimeoutMs: Schema.natural().min(1).max(Number.MAX_SAFE_INTEGER).default(DEFAULTS.roomOpenTimeoutMs),
+  allowUnmarkedFacts: Schema.boolean().default(DEFAULTS.allowUnmarkedFacts),
 })
 
 /**
@@ -208,6 +228,7 @@ export function apply(ctx: Context, config: Config): void {
     taskRetention: config.taskRetention ?? DEFAULTS.taskRetention,
     maxMessageChars: config.maxMessageChars ?? DEFAULTS.maxMessageChars,
     injectRoomBrief: config.injectRoomBrief ?? DEFAULTS.injectRoomBrief,
+    roomOpenTimeoutMs: config.roomOpenTimeoutMs ?? DEFAULTS.roomOpenTimeoutMs,
   }
   if (policy.provider.trim() === '') {
     throw new Error('dsh-background-agents: `provider` must name a registered subagent provider')
@@ -229,6 +250,14 @@ export function apply(ctx: Context, config: Config): void {
 
   const lifecycle = new BackgroundAgentLifecycle()
 
+  // One host-gated appender for every log-only fact event: on hosts whose
+  // Session.append drops the ignorable marker (the rc.6 line) fact appends
+  // are skipped so session logs stay loadable everywhere (see facts.ts).
+  const facts = new FactAppender(
+    config.allowUnmarkedFacts ?? DEFAULTS.allowUnmarkedFacts,
+    message => ctx.logger('background-agents').warn(message),
+  )
+
   // Team rooms mount only where the storage domain exists (the same optional
   // seam as sessionProjections): the background-agent core never depends on
   // the durable store, so headless assemblies without storage still load the
@@ -240,7 +269,7 @@ export function apply(ctx: Context, config: Config): void {
     ctx.logger('background-agents').info('team rooms disabled: no storage domain composed (add @deepseek-ai/dsh-storage-domain to enable the /room command and the room_* tools)')
   }
   ctx.inject(['storageDomain'], (roomCtx) => {
-    const hub = new RoomHub(roomCtx, roomPolicy, roomCtx.agents, roomCtx.sessions)
+    const hub = new RoomHub(roomCtx, roomPolicy, roomCtx.agents, roomCtx.sessions, facts)
     void hub.open().catch((error: unknown) => {
       roomCtx.logger('background-agents').error(`team room store failed to open: ${String(error)}`)
     })
@@ -264,7 +293,7 @@ export function apply(ctx: Context, config: Config): void {
     lifecycle.touch(session.id, event.time)
     if (event.type !== 'turn/end') return
     try {
-      reportProgress(ctx.agents, ctx.sessions, policy, lifecycle, child, event.time)
+      reportProgress(ctx.agents, ctx.sessions, policy, lifecycle, child, event.time, facts)
     } catch (error) {
       // A report failure must never disturb the child's committed turn.
       ctx.logger('background-agents').warn(`progress report failed for ${child.childId}: ${String(error)}`)
@@ -273,7 +302,7 @@ export function apply(ctx: Context, config: Config): void {
 
   // The idle-archive sweep: owned by this fiber through a plain interval with
   // an effect disposer (no manual cleanup).
-  ctx.effect(() => startIdleSweep(ctx, ctx.agents, policy, lifecycle), 'dsh-background-agents: idle sweep')
+  ctx.effect(() => startIdleSweep(ctx, ctx.agents, policy, lifecycle, facts), 'dsh-background-agents: idle sweep')
 
   // The projection units mount only where the registry exists, so headless
   // assemblies without session projections still load the tools.
@@ -282,7 +311,7 @@ export function apply(ctx: Context, config: Config): void {
     projectionCtx.sessionProjections.register(teamRoomProjectionDefinition)
   })
 
-  registerBackgroundAgentTools(ctx, policy, lifecycle)
+  registerBackgroundAgentTools(ctx, policy, lifecycle, facts)
 
   // Cross-call guidance so the model treats the agents as a managed fleet
   // instead of polling bg_list.

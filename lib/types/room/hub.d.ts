@@ -24,6 +24,7 @@ import { Context, Service } from '@deepseek-ai/cordis';
 import type { Agent } from '@deepseek-ai/dsh-agent';
 import { SessionId, type Session } from '@deepseek-ai/dsh-session';
 import { type BusMessage, type RoomMember, type RoomRecord, type TaskRecord, type TimelineEvent } from './schema.ts';
+import type { FactAppender } from '../facts.ts';
 /** Tunables the room feature honors; every threshold is a validated Config field. */
 export interface RoomConfig {
     /** Hard cap on rooms across the profile. */
@@ -42,6 +43,13 @@ export interface RoomConfig {
     readonly maxMessageChars: number;
     /** Inject the short room brief into member sessions (join + resume). */
     readonly injectRoomBrief: boolean;
+    /**
+     * How long the `team_rooms` storage-domain open may take before every
+     * room operation fails loud (`store-unavailable`) instead of hanging
+     * forever (a stuck storage provider used to leave `/room` commands
+     * without a `command/done`).
+     */
+    readonly roomOpenTimeoutMs: number;
 }
 /** A domain-level rejection with a stable code; tools and commands render it. */
 export declare class RoomError extends Error {
@@ -74,6 +82,7 @@ export declare class RoomHub extends Service {
     private readonly config;
     private readonly agents;
     private readonly sessions;
+    private readonly facts;
     private rooms?;
     private bus?;
     private tasks?;
@@ -88,12 +97,16 @@ export declare class RoomHub extends Service {
     private readonly ready;
     private readyResolve;
     private initError;
-    constructor(ctx: Context, config: RoomConfig, agents: LiveAgents, sessions: LiveSessions);
+    constructor(ctx: Context, config: RoomConfig, agents: LiveAgents, sessions: LiveSessions, facts: FactAppender);
     /**
      * Open the `team_rooms` storage domain and load its four tables. Called
      * once by the mount site after the storage domain becomes available; every
      * hub operation gates on this resolution. A failed open fails every
-     * operation loud through {@link requireRooms} instead of hanging.
+     * operation loud through {@link requireRooms} instead of hanging — and a
+     * STUCK open (a storage provider whose open promise never settles) is cut
+     * off by the `roomOpenTimeoutMs` timer so `/room` commands still settle
+     * with a `store-unavailable` error instead of never emitting
+     * `command/done`.
      */
     open(): Promise<void>;
     /** One room record, or undefined. */
@@ -184,7 +197,13 @@ export declare class RoomHub extends Service {
     injectBrief(sessionId: SessionId, room: RoomRecord): void;
     /** Build the minimal brief paragraph for one room. */
     briefText(room: RoomRecord): string;
-    /** Queue one mutation on the single write chain; rejections are contained. */
+    /**
+     * Queue one mutation on the single write chain; rejections are contained.
+     * The previous tail is captured SYNCHRONOUSLY: reading `this.tail` after
+     * `ready` resolves would see the just-assigned tail (a promise that settles
+     * with this very result) and deadlock the whole write chain — the exact
+     * hang that left `/room create` without a `command/done`.
+     */
     private enqueue;
     /** Serialize work per room (delivery order = bus order). */
     private onRoomChain;

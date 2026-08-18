@@ -44,8 +44,12 @@ export type {
   TeamRoomsInjected, TeamRoomsSectionProps,
 } from './TeamRoomsSection.tsx'
 
-/** Required services: sessions (list + bindings), slots, locale, the wire client, and the remote (command execution). */
-export const inject = ['sessions', 'slots', 'locale', 'connection', 'remote']
+/**
+ * Required services: sessions (list + bindings), slots, locale, the wire
+ * client, and the remote command executor (declared as `remote.commands`
+ * because the team-room panel executes `/room` lines through it).
+ */
+export const inject = ['sessions', 'slots', 'locale', 'connection', 'remote', 'remote.commands']
 
 /**
  * Live team-room controller: derives the settings-panel state from the

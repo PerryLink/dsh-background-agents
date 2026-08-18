@@ -98,6 +98,8 @@ bg_stop <agentId>
 | `taskRetention` | `50` | 每个房间保留的已完成任务数 |
 | `maxMessageChars` | `4000` | 单条房间消息文本的硬上限（超限直接拒绝，绝不截断） |
 | `injectRoomBrief` | `true` | 向成员会话注入简短房间简介（加入 + 恢复时） |
+| `roomOpenTimeoutMs` | `15000` | `team_rooms` 存储域打开的最长等待时间；超时后所有房间操作以 `store-unavailable` 明确失败，而不是永久挂起 |
+| `allowUnmarkedFacts` | `false` | 强制在丢弃 `ignorable` 标记的宿主上写入事实事件（危险：未标记事件会让会话在其他宿主上无法恢复）；默认自动探测并跳过 |
 
 ## 工具与界面
 
@@ -122,7 +124,7 @@ bg_stop <agentId>
 
 该插件通过**一个结构化通道和一个模型可见通道**写入每一个事实：
 
-- **`background-agents/fact` 结构化事实事件** —— 即注册 / 消息 / 停止 / 进度 / 已归档等事实，以仅日志记录的形式追加到父日志，并带上信封的 `ignorable: true` 标记；不认识该类型的读取器会跳过这些记录，而不是拒绝读取日志。
+- **`background-agents/fact` 结构化事实事件** —— 即注册 / 消息 / 停止 / 进度 / 已归档等事实，以仅日志记录的形式追加到父日志，并带上信封的 `ignorable: true` 标记；不认识该类型的读取器会跳过这些记录，而不是拒绝读取日志。`Session.append` 早于该标记的宿主（`0.1.0-rc.6` 系列会静默丢弃标记，使未标记会话在更严格的构建上无法恢复）会在首次追加前被探测出来（peer 版本预检 + 返回信封探测），事实追加被跳过并发出一次性警告 —— 持久存储、通知与工具照常工作，投影降级为空事实折叠。
 - **`tool/result` 回放元数据** —— 在结构化通道出现之前写入日志的相同事实（仅当某行没有结构化来源时才折叠）。
 - **注入的 `user/message` 通知**（模型可见），来源为 `{ kind: 'plugin', plugin: 'dsh-background-agents' }` —— 即节流的进度行与归档通知（规范前缀 `[background-agent <id>] …`）。
 - **官方的 `subagent-settled` 通知** —— 子代理持久化的 "settled"（已结束）事实。
@@ -157,7 +159,7 @@ harness 核心自带它自己的子代理工具（`subagent`、`send_message`、
 
 - **权限**：workshop 清单声明 `session:append`、`subagent:spawn` 与 `tools:register`。
 - **数据**：团队房间位于 `team_rooms` 存储域（SQLite 或 JSONL —— 零额外服务）；后台代理事实随父会话日志。无独立数据库，无网络。
-- **会话日志**：`background-agents/fact` 与 `team-room/fact` 事件以信封的 `ignorable: true` 标记追加；模型可见的进度行与房间投递是真实的 `user/message` 记录。
+- **会话日志**：`background-agents/fact` 与 `team-room/fact` 事件在支持标记的宿主上以信封的 `ignorable: true` 标记追加（早于该标记的宿主会被探测出来，事实追加被跳过 —— 见 `allowUnmarkedFacts`）；模型可见的进度行与房间投递是真实的 `user/message` 记录。
 
 ## 安全边界
 

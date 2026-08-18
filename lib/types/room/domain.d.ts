@@ -62,7 +62,7 @@ export declare const teamRoomsDomainSpec: {
         }>;
         timeline: import("@deepseek-ai/dsh-storage-domain").DomainTableSpec<AppendKey, {
             at: number;
-            kind: "member-joined" | "member-left" | "message-posted" | "task-created" | "task-claimed" | "task-assigned" | "task-completed" | "room-created" | "message-directed";
+            kind: "room-created" | "member-joined" | "member-left" | "message-posted" | "message-directed" | "task-created" | "task-claimed" | "task-assigned" | "task-completed";
             roomId: string;
             seq: number;
             data: Record<string, unknown>;

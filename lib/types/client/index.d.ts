@@ -24,7 +24,11 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 }
 export type { BackgroundAgentsActionProps, BackgroundAgentsInjected, } from './BackgroundAgentsAction.tsx';
 export type { TeamRoomsInjected, TeamRoomsSectionProps, } from './TeamRoomsSection.tsx';
-/** Required services: sessions (list + bindings), slots, locale, the wire client, and the remote (command execution). */
+/**
+ * Required services: sessions (list + bindings), slots, locale, the wire
+ * client, and the remote command executor (declared as `remote.commands`
+ * because the team-room panel executes `/room` lines through it).
+ */
 export declare const inject: string[];
 /**
  * Register the background-agent sidebar panel and the Team Rooms settings

@@ -46,7 +46,7 @@ async function mount(root: string, adapter: MockAdapter): Promise<Context> {
   await ctx.plugin(SessionProjectionRegistry)
   await ctx.plugin(SubagentRuntime)
   await ctx.plugin(SubagentSpawn, { providerName: 'spawn' })
-  await ctx.plugin(plugin, { provider: 'spawn', autoReport: true, reportThrottleMs: 0, idleSweepIntervalMs: 60_000 })
+  await ctx.plugin(plugin, { provider: 'spawn', autoReport: true, reportThrottleMs: 0, idleSweepIntervalMs: 60_000, allowUnmarkedFacts: true })
   ctx.llm.registerAdapter(['mock'], adapter)
   return ctx
 }
@@ -195,7 +195,7 @@ describe('dsh-background-agents end-to-end', () => {
     await second.plugin(SessionProjectionRegistry)
     await second.plugin(SubagentRuntime)
     await second.plugin(SubagentSpawn, { providerName: 'spawn' })
-    await second.plugin(plugin, { provider: 'spawn', autoReport: false, idleSweepIntervalMs: 60_000 })
+    await second.plugin(plugin, { provider: 'spawn', autoReport: false, idleSweepIntervalMs: 60_000, allowUnmarkedFacts: true })
     second.llm.registerAdapter(['mock'], new MockAdapter([]))
     const resumed = (await second.agents.resume({
       resumeSessionId: SessionId('parent'),

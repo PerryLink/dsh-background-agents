@@ -98,6 +98,8 @@ Cada ajuste é um campo Schemastery `Config` validado — altere no cordis.yml, 
 | `taskRetention` | `50` | Tarefas concluídas mantidas por sala |
 | `maxMessageChars` | `4000` | Limite rígido do texto de uma mensagem de sala (rejeição acima, nunca truncado) |
 | `injectRoomBrief` | `true` | Injeta o resumo breve da sala nas sessões membro (ao entrar + ao retomar) |
+| `roomOpenTimeoutMs` | `15000` | Quanto tempo a abertura do domínio de armazenamento `team_rooms` pode demorar antes de cada operação falhar claramente (`store-unavailable`) em vez de travar |
+| `allowUnmarkedFacts` | `false` | Força eventos de fato em hosts que descartam o marcador `ignorable` (perigoso: fatos sem marcador tornam sessões irrecuperáveis em outros hosts); o padrão é detectar e pular |
 
 ## Ferramentas e superfícies
 
@@ -122,7 +124,7 @@ Tudo se apoia na costura oficial de subagentes: `startContinuable`, `followup`, 
 
 O plugin grava cada fato por meio de **um canal estruturado e um canal visível ao modelo**:
 
-- **eventos de fato estruturados `background-agents/fact`** — os fatos registrado / mensagem / parada / progresso / arquivado, anexados ao log do pai como registros somente-log com o marcador de envelope `ignorable: true`; leitores que não conhecem o tipo pulam os registros em vez de recusar o log.
+- **eventos de fato estruturados `background-agents/fact`** — os fatos registrado / mensagem / parada / progresso / arquivado, anexados ao log do pai como registros somente-log com o marcador de envelope `ignorable: true`; leitores que não conhecem o tipo pulam os registros em vez de recusar o log. Hosts cujo `Session.append` é anterior ao marcador (a linha `0.1.0-rc.6` o descarta silenciosamente, deixando sessões sem marcador irrecuperáveis em builds mais estritos) são detectados antes do primeiro append (pré-checagem da versão do peer e sondagem do envelope retornado) e os appends de fatos são pulados com um aviso único — o armazenamento durável, os avisos e as ferramentas continuam funcionando, e as projeções degradam para um fold vazio.
 - **metadados de repetição `tool/result`** — os mesmos fatos em logs gravados antes do canal estruturado (dobrados apenas enquanto uma linha não tem procedência estruturada).
 - **avisos `user/message` injetados** (visíveis ao modelo), fonte `{ kind: 'plugin', plugin: 'dsh-background-agents' }` — as linhas de progresso com limite de frequência e os avisos de arquivamento (prefixo canônico `[background-agent <id>] …`).
 - o **aviso oficial `subagent-settled`** — o fato durável "settled" do filho.
@@ -157,7 +159,7 @@ Fora de escopo: acionamento programado (a costura de agendamento existe), agente
 
 - **Permissões**: o manifesto do workshop declara `session:append`, `subagent:spawn` e `tools:register`.
 - **Dados**: as salas de equipe vivem no domínio de armazenamento `team_rooms` (SQLite ou JSONL — zero serviços extras); os fatos dos agentes de segundo plano viajam no log de sessão do pai. Sem banco de dados separado, sem rede.
-- **Log de sessão**: os eventos `background-agents/fact` e `team-room/fact` são anexados com o marcador de envelope `ignorable: true`; as linhas de progresso e entregas de sala visíveis ao modelo são registros `user/message` reais.
+- **Log de sessão**: os eventos `background-agents/fact` e `team-room/fact` são anexados com o marcador de envelope `ignorable: true` em hosts que o respeitam (hosts anteriores ao marcador são detectados e os appends são pulados — veja `allowUnmarkedFacts`); as linhas de progresso e entregas de sala visíveis ao modelo são registros `user/message` reais.
 
 ## Limites de segurança
 

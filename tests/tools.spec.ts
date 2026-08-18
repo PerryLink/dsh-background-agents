@@ -36,6 +36,9 @@ async function setup(config: Partial<plugin.Config> = {}) {
     provider: 'spawn',
     autoReport: false,
     idleSweepIntervalMs: 60_000,
+    // The rc.6 test peers drop the ignorable marker; the specs assert the
+    // durable fact chain, so mount with the documented opt-in.
+    allowUnmarkedFacts: true,
     ...config,
   })
   // No adapter registered here: tests that need model turns register their own.
@@ -207,7 +210,7 @@ describe('dsh-background-agents tools', () => {
     // instead of fabricating an empty catalog.
     await ctx.plugin(SubagentRuntime)
     await ctx.plugin(SubagentSpawn, { providerName: 'spawn' })
-    await ctx.plugin(plugin, { provider: 'spawn', autoReport: false })
+    await ctx.plugin(plugin, { provider: 'spawn', autoReport: false, allowUnmarkedFacts: true })
     ctx.llm.registerAdapter(['mock'], new MockAdapter([]))
     const parent = ctx.agentLoop.create(SessionId('parent'), { provider: 'mock', model: 'mock' })
 
@@ -456,7 +459,7 @@ describe('dsh-background-agents tools', () => {
     await ctx.plugin(SessionProjectionRegistry)
     await ctx.plugin(SubagentRuntime)
     await ctx.plugin(SubagentSpawn, { providerName: 'spawn' })
-    const fiber = await ctx.plugin(plugin, { provider: 'spawn' })
+    const fiber = await ctx.plugin(plugin, { provider: 'spawn', allowUnmarkedFacts: true })
     expect(ctx.tools.schemas().some(schema => schema.name === 'background_agent')).toBe(true)
     await fiber.dispose()
     expect(ctx.tools.schemas().some(schema => schema.name === 'background_agent')).toBe(false)

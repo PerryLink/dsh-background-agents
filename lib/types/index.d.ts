@@ -100,6 +100,21 @@ export interface Config {
     maxMessageChars?: number;
     /** Inject the short room brief into member sessions (join + resume). */
     injectRoomBrief?: boolean;
+    /**
+     * How long the `team_rooms` storage-domain open may take before every
+     * room operation fails loud (`store-unavailable`) instead of hanging.
+     */
+    roomOpenTimeoutMs?: number;
+    /**
+     * Force the log-only fact events (`background-agents/fact`,
+     * `team-room/fact`) even on hosts that drop the `ignorable` envelope
+     * marker (the `0.1.0-rc.6` line). Deliberately dangerous: unmarked fact
+     * events make sessions unresumable on stricter harness builds. Default
+     * `false` — the runtime detects such hosts and skips fact appends (the
+     * projections degrade to an empty fact fold; the durable store and the
+     * model-visible notices keep working).
+     */
+    allowUnmarkedFacts?: boolean;
 }
 /**
  * The single source of truth for every optional policy default: the schema
@@ -125,6 +140,8 @@ export declare const DEFAULTS: {
     readonly taskRetention: 50;
     readonly maxMessageChars: 4000;
     readonly injectRoomBrief: true;
+    readonly roomOpenTimeoutMs: 15000;
+    readonly allowUnmarkedFacts: false;
 };
 export declare const Config: Schema<Config>;
 /**

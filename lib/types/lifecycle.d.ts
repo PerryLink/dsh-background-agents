@@ -12,6 +12,7 @@ import type { Context } from '@deepseek-ai/cordis';
 import type { Agent } from '@deepseek-ai/dsh-agent';
 import type { Session, SessionEvent, SessionId } from '@deepseek-ai/dsh-session';
 import type { AgentRegistry } from '@deepseek-ai/dsh-agent';
+import type { FactAppender } from './facts.ts';
 /** Tunables the lifecycle honors; every threshold is a validated Config field. */
 export interface LifecycleConfig {
     readonly autoReport: boolean;
@@ -115,7 +116,7 @@ export declare function childLastText(sessions: LiveSessions, childId: SessionId
  * request through `Agent.inject`.
  * @returns true when a report was emitted.
  */
-export declare function reportProgress(agents: LiveAgents, sessions: LiveSessions, config: LifecycleConfig, lifecycle: BackgroundAgentLifecycle, child: TrackedChild, now: number): boolean;
+export declare function reportProgress(agents: LiveAgents, sessions: LiveSessions, config: LifecycleConfig, lifecycle: BackgroundAgentLifecycle, child: TrackedChild, now: number, facts: FactAppender): boolean;
 /**
  * Archive one idle child: inject the archived notice into the live parent and
  * request interruption of a resident activation. The stop request is exactly
@@ -124,14 +125,14 @@ export declare function reportProgress(agents: LiveAgents, sessions: LiveSession
  * alone (a long tool execution emits no session events and would otherwise
  * read as idle).
  */
-export declare function archiveChild(ctx: Context, agents: LiveAgents, config: LifecycleConfig, lifecycle: BackgroundAgentLifecycle, child: TrackedChild): void;
+export declare function archiveChild(ctx: Context, agents: LiveAgents, config: LifecycleConfig, lifecycle: BackgroundAgentLifecycle, child: TrackedChild, facts: FactAppender): void;
 /**
  * One sweep pass: archive quiet children past the idle window and drop cache
  * entries whose parent and child agents are both gone (the parent log keeps
  * the durable facts). Throwing archive notices are contained per child so one
  * failure never skips a sibling.
  */
-export declare function sweepIdle(ctx: Context, agents: LiveAgents, config: LifecycleConfig, lifecycle: BackgroundAgentLifecycle, now: number): void;
+export declare function sweepIdle(ctx: Context, agents: LiveAgents, config: LifecycleConfig, lifecycle: BackgroundAgentLifecycle, now: number, facts: FactAppender): void;
 /** Read the parent's projection value and return the archived agent ids, guarded. */
 export declare function archivedIdsFor(ctx: Context, parent: Agent): string[];
 /**
@@ -143,5 +144,5 @@ export declare function archivedIdsFor(ctx: Context, parent: Agent): string[];
  */
 export declare function countBackgroundAgents(ctx: Context, parent: Agent, lifecycle: BackgroundAgentLifecycle, signal: AbortSignal): Promise<number>;
 /** The idle sweep timer, owned by the caller's effect. */
-export declare function startIdleSweep(ctx: Context, agents: AgentRegistry, config: LifecycleConfig, lifecycle: BackgroundAgentLifecycle): () => void;
+export declare function startIdleSweep(ctx: Context, agents: AgentRegistry, config: LifecycleConfig, lifecycle: BackgroundAgentLifecycle, facts: FactAppender): () => void;
 //# sourceMappingURL=lifecycle.d.ts.map

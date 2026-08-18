@@ -33,6 +33,7 @@ import {
   type TimelineEvent, type TimelineKind,
 } from './schema.ts'
 import { TEAM_ROOM_FACT, type TeamRoomFact } from './events.ts'
+import type { FactAppender } from '../facts.ts'
 import { PLUGIN } from '../vocabulary.ts'
 
 /** Tunables the room feature honors; every threshold is a validated Config field. */
@@ -53,6 +54,13 @@ export interface RoomConfig {
   readonly maxMessageChars: number
   /** Inject the short room brief into member sessions (join + resume). */
   readonly injectRoomBrief: boolean
+  /**
+   * How long the `team_rooms` storage-domain open may take before every
+   * room operation fails loud (`store-unavailable`) instead of hanging
+   * forever (a stuck storage provider used to leave `/room` commands
+   * without a `command/done`).
+   */
+  readonly roomOpenTimeoutMs: number
 }
 
 /** A domain-level rejection with a stable code; tools and commands render it. */
@@ -115,6 +123,7 @@ export class RoomHub extends Service {
     private readonly config: RoomConfig,
     private readonly agents: LiveAgents,
     private readonly sessions: LiveSessions,
+    private readonly facts: FactAppender,
   ) {
     super(ctx, 'roomHub')
     this.ready = new Promise<void>(resolve => { this.readyResolve = resolve })
@@ -124,11 +133,32 @@ export class RoomHub extends Service {
    * Open the `team_rooms` storage domain and load its four tables. Called
    * once by the mount site after the storage domain becomes available; every
    * hub operation gates on this resolution. A failed open fails every
-   * operation loud through {@link requireRooms} instead of hanging.
+   * operation loud through {@link requireRooms} instead of hanging — and a
+   * STUCK open (a storage provider whose open promise never settles) is cut
+   * off by the `roomOpenTimeoutMs` timer so `/room` commands still settle
+   * with a `store-unavailable` error instead of never emitting
+   * `command/done`.
    */
   async open(): Promise<void> {
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const timeout = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => {
+        reject(new RoomError(
+          'store-unavailable',
+          `the team_rooms storage domain did not open within ${this.config.roomOpenTimeoutMs} ms `
+          + '(the storage provider may be missing or stuck) — /room and the room_* tools are disabled for this profile',
+        ))
+      }, this.config.roomOpenTimeoutMs)
+    })
+    const openPromise = this.ctx.storageDomain.open(teamRoomsDomainSpec)
+    // A late open after a timeout must still be closed (no orphaned domain).
+    void openPromise.then(domain => {
+      if (this.initError !== undefined) void domain.close()
+    }, () => {})
     try {
-      const domain = await this.ctx.storageDomain.open(teamRoomsDomainSpec)
+      const domain = await Promise.race([openPromise, timeout])
+      clearTimeout(timer)
+      if (this.initError !== undefined) return // already timed out; the late domain was closed above
       this.ctx.effect(() => () => { void domain.close() }, 'dsh-background-agents: team_rooms domain close')
       this.rooms = domain.table('rooms')
       this.bus = domain.table('bus')
@@ -138,6 +168,7 @@ export class RoomHub extends Service {
       this.initError = error
       throw error
     } finally {
+      clearTimeout(timer)
       this.readyResolve()
     }
   }
@@ -484,7 +515,7 @@ export class RoomHub extends Service {
         // Log-only timeline facts first, in store order.
         for (const event of await this.timelineOf(record.roomId, member.lastFactSeq)) {
           const fact = this.factFromTimeline(record, event)
-          if (fact !== undefined) session.append(TEAM_ROOM_FACT, fact, { ignorable: true })
+          if (fact !== undefined) this.facts.append(session, TEAM_ROOM_FACT, fact)
         }
         // Model-visible bus backlog: injected as durable user messages that
         // the member's next step claims (no wake: the user is opening the
@@ -554,9 +585,16 @@ export class RoomHub extends Service {
 
   // ── internals ───────────────────────────────────────────────────────────────
 
-  /** Queue one mutation on the single write chain; rejections are contained. */
+  /**
+   * Queue one mutation on the single write chain; rejections are contained.
+   * The previous tail is captured SYNCHRONOUSLY: reading `this.tail` after
+   * `ready` resolves would see the just-assigned tail (a promise that settles
+   * with this very result) and deadlock the whole write chain — the exact
+   * hang that left `/room create` without a `command/done`.
+   */
   private enqueue<T>(job: () => Promise<T>): Promise<T> {
-    const result = this.ready.then(() => this.tail).then(job)
+    const previous = this.tail
+    const result = this.ready.then(() => previous).then(job)
     this.tail = result.then(() => {}, () => {})
     return result
   }
@@ -659,7 +697,7 @@ export class RoomHub extends Service {
   private appendFactTo(sessionId: SessionId, fact: TeamRoomFact): void {
     const session = this.sessions.get(sessionId)
     if (session === undefined) return
-    session.append(TEAM_ROOM_FACT, fact, { ignorable: true })
+    this.facts.append(session, TEAM_ROOM_FACT, fact)
   }
 
   /** Append one fact to every LIVE member session (offline members catch up). */

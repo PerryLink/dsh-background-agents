@@ -6,9 +6,13 @@ import {
   type LifecycleConfig, type LiveAgents, type LiveSessions,
 } from '../src/lifecycle.ts'
 import { parseNotice } from '../src/vocabulary.ts'
+import { FactAppender } from '../src/facts.ts'
 
 const childId = SessionId('child-1')
 const parentId = SessionId('parent')
+
+/** Permissive appender: lifecycle specs assert the raw append call shape, not host gating. */
+const facts = new FactAppender(true, () => {})
 
 function policy(over: Partial<LifecycleConfig> = {}): LifecycleConfig {
   return {
@@ -86,8 +90,8 @@ describe('reportProgress throttle and bounds', () => {
     const sessions = makeSessions(childSessionWithAssistant('wrote line 1'))
     const child = lifecycle.get(childId)!
 
-    const first = reportProgress(agents, sessions, policy(), lifecycle, child, 10_000)
-    const second = reportProgress(agents, sessions, policy(), lifecycle, child, 20_000)
+    const first = reportProgress(agents, sessions, policy(), lifecycle, child, 10_000, facts)
+    const second = reportProgress(agents, sessions, policy(), lifecycle, child, 20_000, facts)
 
     expect(first).toBe(true)
     expect(second).toBe(false)
@@ -112,8 +116,8 @@ describe('reportProgress throttle and bounds', () => {
     const agents = makeAgents(parent)
     const sessions = makeSessions(childSessionWithAssistant('first'))
     const child = lifecycle.get(childId)!
-    reportProgress(agents, sessions, policy(), lifecycle, child, 0)
-    expect(reportProgress(agents, sessions, policy(), lifecycle, child, 20_000)).toBe(true)
+    reportProgress(agents, sessions, policy(), lifecycle, child, 0, facts)
+    expect(reportProgress(agents, sessions, policy(), lifecycle, child, 20_000, facts)).toBe(true)
     expect(inject).toHaveBeenCalledTimes(2)
   })
 
@@ -123,7 +127,7 @@ describe('reportProgress throttle and bounds', () => {
     const inject = vi.fn()
     const parent: FakeParent = { id: parentId, inject, followup: vi.fn(), session: { append: vi.fn() } }
     const child = lifecycle.get(childId)!
-    expect(reportProgress(makeAgents(parent), makeSessions(childSessionWithAssistant('x')), policy({ autoReport: false }), lifecycle, child, 10_000)).toBe(false)
+    expect(reportProgress(makeAgents(parent), makeSessions(childSessionWithAssistant('x')), policy({ autoReport: false }), lifecycle, child, 10_000, facts)).toBe(false)
     expect(inject).not.toHaveBeenCalled()
   })
 
@@ -135,7 +139,7 @@ describe('reportProgress throttle and bounds', () => {
     const parent: FakeParent = { id: parentId, inject, followup, session: { append: vi.fn() } }
     const child = lifecycle.get(childId)!
 
-    expect(reportProgress(makeAgents(parent), makeSessions(childSessionWithAssistant('wake line')), policy({ reportDelivery: 'wakeup' }), lifecycle, child, 10_000)).toBe(true)
+    expect(reportProgress(makeAgents(parent), makeSessions(childSessionWithAssistant('wake line')), policy({ reportDelivery: 'wakeup' }), lifecycle, child, 10_000, facts)).toBe(true)
     expect(followup).toHaveBeenCalledTimes(1)
     expect(inject).not.toHaveBeenCalled()
     const head = parseNotice(followup.mock.calls[0]![0].content[0].text)
@@ -152,7 +156,7 @@ describe('reportProgress throttle and bounds', () => {
     const lifecycle = new BackgroundAgentLifecycle()
     lifecycle.register(childId, parentId, 'writer', 0)
     const child = lifecycle.get(childId)!
-    expect(reportProgress(makeAgents(undefined), makeSessions(childSessionWithAssistant('x')), policy(), lifecycle, child, 10_000)).toBe(false)
+    expect(reportProgress(makeAgents(undefined), makeSessions(childSessionWithAssistant('x')), policy(), lifecycle, child, 10_000, facts)).toBe(false)
   })
 
   it('bounds the injected line by reportSummaryMaxChars with an ellipsis', () => {
@@ -161,7 +165,7 @@ describe('reportProgress throttle and bounds', () => {
     const inject = vi.fn()
     const parent: FakeParent = { id: parentId, inject, followup: vi.fn(), session: { append: vi.fn() } }
     const child = lifecycle.get(childId)!
-    reportProgress(makeAgents(parent), makeSessions(childSessionWithAssistant('a'.repeat(500))), policy({ reportSummaryMaxChars: 50 }), lifecycle, child, 0)
+    reportProgress(makeAgents(parent), makeSessions(childSessionWithAssistant('a'.repeat(500))), policy({ reportSummaryMaxChars: 50 }), lifecycle, child, 0, facts)
     const head = parseNotice(inject.mock.calls[0]![0].content[0].text)!
     expect(head.text.length).toBeLessThanOrEqual(100)
     expect(head.text.endsWith('…')).toBe(true)
@@ -187,7 +191,7 @@ describe('idle sweep', () => {
     const childAgent = { id: childId, status: 'idle' }
     const agentFace = { get: (id: SessionId) => (id === childId ? childAgent : parent) } as unknown as LiveAgents
 
-    sweepIdle(fakeCtx(interrupt), agentFace, policy({ idleTimeoutMinutes: 120 }), lifecycle, 121 * 60_000)
+    sweepIdle(fakeCtx(interrupt), agentFace, policy({ idleTimeoutMinutes: 120 }), lifecycle, 121 * 60_000, facts)
 
     expect(lifecycle.get(childId)!.archived).toBe(true)
     expect(interrupt).toHaveBeenCalledExactlyOnceWith(childId, { kind: 'ancestor', agent: parent })
@@ -210,7 +214,7 @@ describe('idle sweep', () => {
     const childAgent = { id: childId, status: 'running' }
     const agentFace = { get: (id: SessionId) => (id === childId ? childAgent : parent) } as unknown as LiveAgents
 
-    sweepIdle(fakeCtx(interrupt), agentFace, policy(), lifecycle, 121 * 60_000)
+    sweepIdle(fakeCtx(interrupt), agentFace, policy(), lifecycle, 121 * 60_000, facts)
 
     expect(lifecycle.get(childId)!.archived).toBe(false)
     expect(interrupt).not.toHaveBeenCalled()
@@ -226,7 +230,7 @@ describe('idle sweep', () => {
     const childAgent = { id: childId, status: 'idle' }
     const agentFace = { get: (id: SessionId) => (id === childId ? childAgent : parent) } as unknown as LiveAgents
 
-    sweepIdle(fakeCtx(interrupt), agentFace, policy({ autoArchive: false }), lifecycle, 121 * 60_000)
+    sweepIdle(fakeCtx(interrupt), agentFace, policy({ autoArchive: false }), lifecycle, 121 * 60_000, facts)
 
     // The quiet child survives the idle window: no archive fact, no notice,
     // no interrupt request.
@@ -236,7 +240,7 @@ describe('idle sweep', () => {
     expect(parent.session.append).not.toHaveBeenCalled()
 
     // The dead-entry reclamation branch still runs: both agents gone -> drop.
-    sweepIdle(fakeCtx(interrupt), { get: () => undefined }, policy({ autoArchive: false }), lifecycle, 1_000)
+    sweepIdle(fakeCtx(interrupt), { get: () => undefined }, policy({ autoArchive: false }), lifecycle, 1_000, facts)
     expect(lifecycle.has(childId)).toBe(false)
   })
 
@@ -244,7 +248,7 @@ describe('idle sweep', () => {
     const lifecycle = new BackgroundAgentLifecycle()
     lifecycle.register(childId, parentId, 'writer', 0)
     const interrupt = vi.fn()
-    sweepIdle(fakeCtx(interrupt), { get: () => undefined }, policy(), lifecycle, 1_000)
+    sweepIdle(fakeCtx(interrupt), { get: () => undefined }, policy(), lifecycle, 1_000, facts)
     expect(lifecycle.has(childId)).toBe(false)
   })
 
@@ -252,7 +256,7 @@ describe('idle sweep', () => {
     const lifecycle = new BackgroundAgentLifecycle()
     lifecycle.register(childId, parentId, 'writer', 0)
     lifecycle.archive(childId)
-    sweepIdle(fakeCtx(vi.fn()), { get: () => undefined }, policy(), lifecycle, 1_000)
+    sweepIdle(fakeCtx(vi.fn()), { get: () => undefined }, policy(), lifecycle, 1_000, facts)
     expect(lifecycle.has(childId)).toBe(false)
   })
 })

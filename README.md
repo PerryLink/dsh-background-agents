@@ -98,6 +98,8 @@ Every tunable is a validated Schemastery `Config` field — change it in cordis.
 | `taskRetention` | `50` | Completed tasks kept per room |
 | `maxMessageChars` | `4000` | Hard cap on one room message's text (rejected above, never truncated) |
 | `injectRoomBrief` | `true` | Inject the short room brief into member sessions (join + resume) |
+| `roomOpenTimeoutMs` | `15000` | How long the `team_rooms` storage-domain open may take before every room operation fails loud (`store-unavailable`) instead of hanging |
+| `allowUnmarkedFacts` | `false` | Force log-only fact events on hosts that drop the `ignorable` marker (dangerous: unmarked facts make sessions unresumable elsewhere); default is detect-and-skip |
 
 ## Tools & surfaces
 
@@ -122,7 +124,7 @@ Everything rides the official subagent seam: `startContinuable`, `followup`, `in
 
 The plugin writes every fact through **one structured channel and one model-visible channel**:
 
-- **`background-agents/fact` structured fact events** — the registered / message / stop / progress / archived facts, appended to the parent log as log-only records with the envelope's `ignorable: true` marker; readers that do not know the type skip the records instead of refusing the log.
+- **`background-agents/fact` structured fact events** — the registered / message / stop / progress / archived facts, appended to the parent log as log-only records with the envelope's `ignorable: true` marker; readers that do not know the type skip the records instead of refusing the log. Hosts whose `Session.append` predates the marker (the `0.1.0-rc.6` line drops it silently, making unmarked sessions unresumable on stricter builds) are detected before the first append (peer-version pre-check, then a probe of the returned envelope) and fact appends are skipped with a one-time warning — the durable store, the notices, and the tools keep working, and the projections degrade to an empty fact fold.
 - **`tool/result` replay metadata** — the same facts in logs written before the structured channel (folded only while a row has no structured provenance).
 - **injected `user/message` notices** (model-visible), source `{ kind: 'plugin', plugin: 'dsh-background-agents' }` — the throttled progress lines and archive notices (canonical `[background-agent <id>] …` prefix).
 - the **official `subagent-settled` notice** — the child's durable "settled" fact.
@@ -157,7 +159,7 @@ Not in scope: scheduled triggering (the schedule seam exists), cross-machine/rem
 
 - **Permissions**: the workshop manifest declares `session:append`, `subagent:spawn`, and `tools:register`.
 - **Data**: team rooms live in the `team_rooms` storage domain (SQLite or JSONL — zero extra services); background-agent facts ride the parent session log. No separate database, no network.
-- **Session log**: `background-agents/fact` and `team-room/fact` events are appended with the envelope's `ignorable: true` marker; the model-visible progress lines and room deliveries are real `user/message` records.
+- **Session log**: `background-agents/fact` and `team-room/fact` events are appended with the envelope's `ignorable: true` marker on hosts that honor it (pre-marker hosts are detected and fact appends are skipped — see `allowUnmarkedFacts`); the model-visible progress lines and room deliveries are real `user/message` records.
 
 ## Security boundaries
 

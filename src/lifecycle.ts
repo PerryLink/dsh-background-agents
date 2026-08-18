@@ -16,6 +16,7 @@ import type { Session, SessionEvent, SessionId } from '@deepseek-ai/dsh-session'
 import type { AgentRegistry } from '@deepseek-ai/dsh-agent'
 import { finalAssistantOutput, SubagentError } from '@deepseek-ai/dsh-subagent'
 import { FACT_EVENT } from './events.ts'
+import type { FactAppender } from './facts.ts'
 import { isBackgroundAgentsProjection } from './projection-schema.ts'
 import { noticeLine, PLUGIN } from './vocabulary.ts'
 
@@ -208,6 +209,7 @@ export function reportProgress(
   lifecycle: BackgroundAgentLifecycle,
   child: TrackedChild,
   now: number,
+  facts: FactAppender,
 ): boolean {
   if (!config.autoReport || child.archived) return false
   if (child.lastReportAt >= 0 && now - child.lastReportAt < config.reportThrottleMs) return false
@@ -233,7 +235,7 @@ export function reportProgress(
   }
   // The structured progress fact rides the parent log next to the model-
   // visible notice; the projection folds it instead of parsing the text back.
-  parent.session.append(FACT_EVENT, { kind: 'progress', agentId: child.childId, text: line }, { ignorable: true })
+  facts.append(parent.session, FACT_EVENT, { kind: 'progress', agentId: child.childId, text: line })
   lifecycle.noteReport(child.childId, now)
   return true
 }
@@ -252,6 +254,7 @@ export function archiveChild(
   config: LifecycleConfig,
   lifecycle: BackgroundAgentLifecycle,
   child: TrackedChild,
+  facts: FactAppender,
 ): void {
   const parent = agents.get(child.parentSessionId)
   const liveChild = agents.get(child.childId)
@@ -285,7 +288,7 @@ export function archiveChild(
   }
   if (parent !== undefined) {
     // The structured archived fact rides the parent log next to the notice.
-    parent.session.append(FACT_EVENT, { kind: 'archived', agentId: child.childId }, { ignorable: true })
+    facts.append(parent.session, FACT_EVENT, { kind: 'archived', agentId: child.childId })
   }
   lifecycle.archive(child.childId)
 }
@@ -302,6 +305,7 @@ export function sweepIdle(
   config: LifecycleConfig,
   lifecycle: BackgroundAgentLifecycle,
   now: number,
+  facts: FactAppender,
 ): void {
   const timeoutMs = config.idleTimeoutMinutes * 60_000
   for (const child of lifecycle.all()) {
@@ -311,7 +315,7 @@ export function sweepIdle(
     }
     if (config.autoArchive && now - child.lastActivityAt >= timeoutMs) {
       try {
-        archiveChild(ctx, agents, config, lifecycle, child)
+        archiveChild(ctx, agents, config, lifecycle, child, facts)
       } catch (error) {
         ctx.logger('background-agents').warn(`idle archive failed for ${child.childId}: ${String(error)}`)
       }
@@ -370,10 +374,11 @@ export function startIdleSweep(
   agents: AgentRegistry,
   config: LifecycleConfig,
   lifecycle: BackgroundAgentLifecycle,
+  facts: FactAppender,
 ): () => void {
   const timer = setInterval(() => {
     try {
-      sweepIdle(ctx, agents, config, lifecycle, Date.now())
+      sweepIdle(ctx, agents, config, lifecycle, Date.now(), facts)
     } catch (error) {
       ctx.logger('background-agents').warn(`idle sweep pass failed: ${String(error)}`)
     }

@@ -14,6 +14,7 @@
  */
 import type { Context } from '@deepseek-ai/cordis';
 import { type BackgroundAgentLifecycle } from './lifecycle.ts';
+import type { FactAppender } from './facts.ts';
 /** Lifecycle thresholds the tools enforce. */
 export interface ToolConfig {
     /** Name of the `ctx.subagents` provider that starts continuable children. */
@@ -99,5 +100,5 @@ export declare function validateMaxDepth(raw: number | undefined, config: ToolCo
  * @param config - provider, cap, and label bound.
  * @param lifecycle - the live tracked-children registry.
  */
-export declare function registerBackgroundAgentTools(ctx: Context, config: ToolConfig, lifecycle: BackgroundAgentLifecycle): void;
+export declare function registerBackgroundAgentTools(ctx: Context, config: ToolConfig, lifecycle: BackgroundAgentLifecycle, facts: FactAppender): void;
 //# sourceMappingURL=tools.d.ts.map
