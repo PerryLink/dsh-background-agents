@@ -9,7 +9,7 @@
  * @module dsh-background-agents/room/projection
  */
 import type { ProjectionDefinition } from '@deepseek-ai/dsh-session-projection';
-import { type RoomView, type TeamRoomView } from './schema.js';
+import { type RoomView, type TeamRoomView } from './schema.ts';
 /** Mutable fold state; plain JSON so the persisted projection cache can store it. */
 interface State {
     rooms: RoomView[];

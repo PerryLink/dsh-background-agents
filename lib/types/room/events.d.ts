@@ -19,7 +19,7 @@
  *
  * @module dsh-background-agents/room/events
  */
-import type { RoomMember, TaskRecord, TimelineEvent } from './schema.js';
+import type { RoomMember, TaskRecord, TimelineEvent } from './schema.ts';
 /** The log-only fact event type this plugin appends to member sessions. */
 export declare const TEAM_ROOM_FACT: "team-room/fact";
 /** One structured room fact, discriminated on `kind`. */

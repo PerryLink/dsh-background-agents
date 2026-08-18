@@ -81,6 +81,7 @@ export declare const roomRecordSchema: z.ZodObject<{
 }, "strict", z.ZodTypeAny, {
     createdAt: number;
     roomId: string;
+    name: string;
     members: {
         role: "owner" | "member";
         sessionId: string;
@@ -88,12 +89,12 @@ export declare const roomRecordSchema: z.ZodObject<{
         lastDeliveredSeq: number;
         lastFactSeq: number;
     }[];
-    name: string;
     busNext: number;
     timelineNext: number;
 }, {
     createdAt: number;
     roomId: string;
+    name: string;
     members: {
         role: "owner" | "member";
         sessionId: string;
@@ -101,7 +102,6 @@ export declare const roomRecordSchema: z.ZodObject<{
         lastDeliveredSeq: number;
         lastFactSeq: number;
     }[];
-    name: string;
     busNext: number;
     timelineNext: number;
 }>;
@@ -118,16 +118,16 @@ export declare const busMessageSchema: z.ZodObject<{
 }, "strict", z.ZodTypeAny, {
     createdAt: number;
     text: string;
+    senderSessionId: string;
     roomId: string;
     seq: number;
-    senderSessionId: string;
     toSessionId?: string | undefined;
 }, {
     createdAt: number;
     text: string;
+    senderSessionId: string;
     roomId: string;
     seq: number;
-    senderSessionId: string;
     toSessionId?: string | undefined;
 }>;
 /** One task-board card: todo / in-progress / done plus its assignee. */
@@ -144,22 +144,22 @@ export declare const taskRecordSchema: z.ZodObject<{
     updatedAt: z.ZodNumber;
     completedAt: z.ZodOptional<z.ZodNumber>;
 }, "strict", z.ZodTypeAny, {
-    status: "done" | "todo" | "in-progress";
+    status: "todo" | "in-progress" | "done";
     createdAt: number;
-    title: string;
     roomId: string;
     taskId: string;
+    title: string;
     description: string;
     assigneeSessionId: string | null;
     createdBy: string;
     updatedAt: number;
     completedAt?: number | undefined;
 }, {
-    status: "done" | "todo" | "in-progress";
+    status: "todo" | "in-progress" | "done";
     createdAt: number;
-    title: string;
     roomId: string;
     taskId: string;
+    title: string;
     description: string;
     assigneeSessionId: string | null;
     createdBy: string;
@@ -179,15 +179,15 @@ export declare const timelineEventSchema: z.ZodObject<{
     data: z.ZodRecord<z.ZodString, z.ZodUnknown>;
 }, "strict", z.ZodTypeAny, {
     at: number;
+    kind: "room-created" | "member-joined" | "member-left" | "message-posted" | "message-directed" | "task-created" | "task-claimed" | "task-assigned" | "task-completed";
     roomId: string;
     seq: number;
-    kind: "room-created" | "member-joined" | "member-left" | "message-posted" | "message-directed" | "task-created" | "task-claimed" | "task-assigned" | "task-completed";
     data: Record<string, unknown>;
 }, {
     at: number;
+    kind: "room-created" | "member-joined" | "member-left" | "message-posted" | "message-directed" | "task-created" | "task-claimed" | "task-assigned" | "task-completed";
     roomId: string;
     seq: number;
-    kind: "room-created" | "member-joined" | "member-left" | "message-posted" | "message-directed" | "task-created" | "task-claimed" | "task-assigned" | "task-completed";
     data: Record<string, unknown>;
 }>;
 /** One member row as the fold serves it. */
@@ -215,19 +215,19 @@ export declare const roomViewTaskSchema: z.ZodObject<{
     createdAt: z.ZodNumber;
     updatedAt: z.ZodNumber;
 }, "strict", z.ZodTypeAny, {
-    status: "done" | "todo" | "in-progress";
+    status: "todo" | "in-progress" | "done";
     createdAt: number;
-    title: string;
     taskId: string;
+    title: string;
     description: string;
     assigneeSessionId: string | null;
     createdBy: string;
     updatedAt: number;
 }, {
-    status: "done" | "todo" | "in-progress";
+    status: "todo" | "in-progress" | "done";
     createdAt: number;
-    title: string;
     taskId: string;
+    title: string;
     description: string;
     assigneeSessionId: string | null;
     createdBy: string;
@@ -261,19 +261,19 @@ export declare const roomViewSchema: z.ZodObject<{
         createdAt: z.ZodNumber;
         updatedAt: z.ZodNumber;
     }, "strict", z.ZodTypeAny, {
-        status: "done" | "todo" | "in-progress";
+        status: "todo" | "in-progress" | "done";
         createdAt: number;
-        title: string;
         taskId: string;
+        title: string;
         description: string;
         assigneeSessionId: string | null;
         createdBy: string;
         updatedAt: number;
     }, {
-        status: "done" | "todo" | "in-progress";
+        status: "todo" | "in-progress" | "done";
         createdAt: number;
-        title: string;
         taskId: string;
+        title: string;
         description: string;
         assigneeSessionId: string | null;
         createdBy: string;
@@ -289,30 +289,31 @@ export declare const roomViewSchema: z.ZodObject<{
         data: z.ZodRecord<z.ZodString, z.ZodUnknown>;
     }, "strict", z.ZodTypeAny, {
         at: number;
+        kind: "room-created" | "member-joined" | "member-left" | "message-posted" | "message-directed" | "task-created" | "task-claimed" | "task-assigned" | "task-completed";
         roomId: string;
         seq: number;
-        kind: "room-created" | "member-joined" | "member-left" | "message-posted" | "message-directed" | "task-created" | "task-claimed" | "task-assigned" | "task-completed";
         data: Record<string, unknown>;
     }, {
         at: number;
+        kind: "room-created" | "member-joined" | "member-left" | "message-posted" | "message-directed" | "task-created" | "task-claimed" | "task-assigned" | "task-completed";
         roomId: string;
         seq: number;
-        kind: "room-created" | "member-joined" | "member-left" | "message-posted" | "message-directed" | "task-created" | "task-claimed" | "task-assigned" | "task-completed";
         data: Record<string, unknown>;
     }>, "many">;
 }, "strict", z.ZodTypeAny, {
     createdAt: number;
     roomId: string;
+    name: string;
     members: {
         role: "owner" | "member";
         sessionId: string;
         joinedAt: number;
     }[];
     tasks: {
-        status: "done" | "todo" | "in-progress";
+        status: "todo" | "in-progress" | "done";
         createdAt: number;
-        title: string;
         taskId: string;
+        title: string;
         description: string;
         assigneeSessionId: string | null;
         createdBy: string;
@@ -320,25 +321,25 @@ export declare const roomViewSchema: z.ZodObject<{
     }[];
     timeline: {
         at: number;
+        kind: "room-created" | "member-joined" | "member-left" | "message-posted" | "message-directed" | "task-created" | "task-claimed" | "task-assigned" | "task-completed";
         roomId: string;
         seq: number;
-        kind: "room-created" | "member-joined" | "member-left" | "message-posted" | "message-directed" | "task-created" | "task-claimed" | "task-assigned" | "task-completed";
         data: Record<string, unknown>;
     }[];
-    name: string;
 }, {
     createdAt: number;
     roomId: string;
+    name: string;
     members: {
         role: "owner" | "member";
         sessionId: string;
         joinedAt: number;
     }[];
     tasks: {
-        status: "done" | "todo" | "in-progress";
+        status: "todo" | "in-progress" | "done";
         createdAt: number;
-        title: string;
         taskId: string;
+        title: string;
         description: string;
         assigneeSessionId: string | null;
         createdBy: string;
@@ -346,12 +347,11 @@ export declare const roomViewSchema: z.ZodObject<{
     }[];
     timeline: {
         at: number;
+        kind: "room-created" | "member-joined" | "member-left" | "message-posted" | "message-directed" | "task-created" | "task-claimed" | "task-assigned" | "task-completed";
         roomId: string;
         seq: number;
-        kind: "room-created" | "member-joined" | "member-left" | "message-posted" | "message-directed" | "task-created" | "task-claimed" | "task-assigned" | "task-completed";
         data: Record<string, unknown>;
     }[];
-    name: string;
 }>;
 /** The whole `teamRoom` projection value: every room this session belongs to. */
 export declare const teamRoomViewSchema: z.ZodObject<{
@@ -382,19 +382,19 @@ export declare const teamRoomViewSchema: z.ZodObject<{
             createdAt: z.ZodNumber;
             updatedAt: z.ZodNumber;
         }, "strict", z.ZodTypeAny, {
-            status: "done" | "todo" | "in-progress";
+            status: "todo" | "in-progress" | "done";
             createdAt: number;
-            title: string;
             taskId: string;
+            title: string;
             description: string;
             assigneeSessionId: string | null;
             createdBy: string;
             updatedAt: number;
         }, {
-            status: "done" | "todo" | "in-progress";
+            status: "todo" | "in-progress" | "done";
             createdAt: number;
-            title: string;
             taskId: string;
+            title: string;
             description: string;
             assigneeSessionId: string | null;
             createdBy: string;
@@ -410,30 +410,31 @@ export declare const teamRoomViewSchema: z.ZodObject<{
             data: z.ZodRecord<z.ZodString, z.ZodUnknown>;
         }, "strict", z.ZodTypeAny, {
             at: number;
+            kind: "room-created" | "member-joined" | "member-left" | "message-posted" | "message-directed" | "task-created" | "task-claimed" | "task-assigned" | "task-completed";
             roomId: string;
             seq: number;
-            kind: "room-created" | "member-joined" | "member-left" | "message-posted" | "message-directed" | "task-created" | "task-claimed" | "task-assigned" | "task-completed";
             data: Record<string, unknown>;
         }, {
             at: number;
+            kind: "room-created" | "member-joined" | "member-left" | "message-posted" | "message-directed" | "task-created" | "task-claimed" | "task-assigned" | "task-completed";
             roomId: string;
             seq: number;
-            kind: "room-created" | "member-joined" | "member-left" | "message-posted" | "message-directed" | "task-created" | "task-claimed" | "task-assigned" | "task-completed";
             data: Record<string, unknown>;
         }>, "many">;
     }, "strict", z.ZodTypeAny, {
         createdAt: number;
         roomId: string;
+        name: string;
         members: {
             role: "owner" | "member";
             sessionId: string;
             joinedAt: number;
         }[];
         tasks: {
-            status: "done" | "todo" | "in-progress";
+            status: "todo" | "in-progress" | "done";
             createdAt: number;
-            title: string;
             taskId: string;
+            title: string;
             description: string;
             assigneeSessionId: string | null;
             createdBy: string;
@@ -441,25 +442,25 @@ export declare const teamRoomViewSchema: z.ZodObject<{
         }[];
         timeline: {
             at: number;
+            kind: "room-created" | "member-joined" | "member-left" | "message-posted" | "message-directed" | "task-created" | "task-claimed" | "task-assigned" | "task-completed";
             roomId: string;
             seq: number;
-            kind: "room-created" | "member-joined" | "member-left" | "message-posted" | "message-directed" | "task-created" | "task-claimed" | "task-assigned" | "task-completed";
             data: Record<string, unknown>;
         }[];
-        name: string;
     }, {
         createdAt: number;
         roomId: string;
+        name: string;
         members: {
             role: "owner" | "member";
             sessionId: string;
             joinedAt: number;
         }[];
         tasks: {
-            status: "done" | "todo" | "in-progress";
+            status: "todo" | "in-progress" | "done";
             createdAt: number;
-            title: string;
             taskId: string;
+            title: string;
             description: string;
             assigneeSessionId: string | null;
             createdBy: string;
@@ -467,27 +468,27 @@ export declare const teamRoomViewSchema: z.ZodObject<{
         }[];
         timeline: {
             at: number;
+            kind: "room-created" | "member-joined" | "member-left" | "message-posted" | "message-directed" | "task-created" | "task-claimed" | "task-assigned" | "task-completed";
             roomId: string;
             seq: number;
-            kind: "room-created" | "member-joined" | "member-left" | "message-posted" | "message-directed" | "task-created" | "task-claimed" | "task-assigned" | "task-completed";
             data: Record<string, unknown>;
         }[];
-        name: string;
     }>, "many">;
 }, "strict", z.ZodTypeAny, {
     rooms: {
         createdAt: number;
         roomId: string;
+        name: string;
         members: {
             role: "owner" | "member";
             sessionId: string;
             joinedAt: number;
         }[];
         tasks: {
-            status: "done" | "todo" | "in-progress";
+            status: "todo" | "in-progress" | "done";
             createdAt: number;
-            title: string;
             taskId: string;
+            title: string;
             description: string;
             assigneeSessionId: string | null;
             createdBy: string;
@@ -495,27 +496,27 @@ export declare const teamRoomViewSchema: z.ZodObject<{
         }[];
         timeline: {
             at: number;
+            kind: "room-created" | "member-joined" | "member-left" | "message-posted" | "message-directed" | "task-created" | "task-claimed" | "task-assigned" | "task-completed";
             roomId: string;
             seq: number;
-            kind: "room-created" | "member-joined" | "member-left" | "message-posted" | "message-directed" | "task-created" | "task-claimed" | "task-assigned" | "task-completed";
             data: Record<string, unknown>;
         }[];
-        name: string;
     }[];
 }, {
     rooms: {
         createdAt: number;
         roomId: string;
+        name: string;
         members: {
             role: "owner" | "member";
             sessionId: string;
             joinedAt: number;
         }[];
         tasks: {
-            status: "done" | "todo" | "in-progress";
+            status: "todo" | "in-progress" | "done";
             createdAt: number;
-            title: string;
             taskId: string;
+            title: string;
             description: string;
             assigneeSessionId: string | null;
             createdBy: string;
@@ -523,12 +524,11 @@ export declare const teamRoomViewSchema: z.ZodObject<{
         }[];
         timeline: {
             at: number;
+            kind: "room-created" | "member-joined" | "member-left" | "message-posted" | "message-directed" | "task-created" | "task-claimed" | "task-assigned" | "task-completed";
             roomId: string;
             seq: number;
-            kind: "room-created" | "member-joined" | "member-left" | "message-posted" | "message-directed" | "task-created" | "task-claimed" | "task-assigned" | "task-completed";
             data: Record<string, unknown>;
         }[];
-        name: string;
     }[];
 }>;
 export type RoomMember = z.infer<typeof roomMemberSchema>;

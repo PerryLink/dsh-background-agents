@@ -10,7 +10,7 @@
  * @module dsh-background-agents/projection
  */
 import type { ProjectionDefinition } from '@deepseek-ai/dsh-session-projection';
-import { type BackgroundAgentEntry, type BackgroundAgentsProjection } from './projection-schema.js';
+import { type BackgroundAgentEntry, type BackgroundAgentsProjection } from './projection-schema.ts';
 /**
  * Mutable fold state; plain JSON so the persisted projection cache can store
  * it. `source` is fold-internal only (never in the wire value): `legacy`

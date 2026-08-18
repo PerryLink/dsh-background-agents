@@ -11,7 +11,7 @@
 import type { Context } from '@deepseek-ai/cordis';
 import type { Agent } from '@deepseek-ai/dsh-agent';
 import type { CallId } from '@deepseek-ai/dsh-llm';
-import { type RoomHub } from './hub.js';
+import { type RoomHub } from './hub.ts';
 /** The approval seam face the tools ask through (optional in the composition). */
 export interface ApprovalLike {
     request(req: {

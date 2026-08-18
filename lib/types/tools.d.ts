@@ -13,8 +13,8 @@
  * @module dsh-background-agents/tools
  */
 import type { Context } from '@deepseek-ai/cordis';
-import { type BackgroundAgentLifecycle } from './lifecycle.js';
-import type { FactAppender } from './facts.js';
+import { type BackgroundAgentLifecycle } from './lifecycle.ts';
+import type { FactAppender } from './facts.ts';
 /** Lifecycle thresholds the tools enforce. */
 export interface ToolConfig {
     /** Name of the `ctx.subagents` provider that starts continuable children. */
