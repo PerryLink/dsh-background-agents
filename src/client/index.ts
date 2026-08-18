@@ -123,6 +123,24 @@ class TeamRoomsController implements ObservableSnapshot<TeamRoomsState> {
 }
 
 /**
+ * The structural shape of the api-remotes `commands` Remote namespace the
+ * team-room panel needs. Declared locally because the ambient namespace
+ * merge onto the client remote is assembled from several generated
+ * modules and can resolve to a different physical copy under strict
+ * package managers — the runtime contract is what this client depends on.
+ */
+interface CommandsRemote {
+  readonly execute: (
+    agentId: SessionId,
+    line: string,
+    signal?: AbortSignal,
+  ) => Promise<
+    | { ok: false; error: { code: string; message: string } }
+    | { ok: true; value?: { result?: { kind?: string; text?: string } } }
+  >
+}
+
+/**
  * Register the background-agent sidebar panel and the Team Rooms settings
  * page.
  * @param ctx - client root context.
@@ -134,7 +152,7 @@ export function apply(ctx: Context): void {
   // shadow it in mixed programs, so the cast reads the runtime contract.
   const sessions = ctx.get('sessions') as ISessions
   const { api } = ctx.get('connection') as ConnectionHandle
-  const remote = ctx.remote
+  const remote = ctx.remote as unknown as { commands: CommandsRemote }
   ctx.slots.inject('sidebar.footer.action', () => ctx.slots.register({
     name: 'sidebar.footer.action',
     id: 'background-agents',
@@ -218,7 +236,7 @@ export function apply(ctx: Context): void {
     try {
       const result = await remote.commands.execute(sessionId as SessionId, line)
       if (!result.ok) return `${result.error.code}: ${result.error.message}`
-      if (result.value === undefined) return `unknown or malformed command: ${line}`
+      if (result.value === undefined || result.value.result === undefined) return `unknown or malformed command: ${line}`
       return result.value.result.kind === 'error' ? result.value.result.text : undefined
     } catch (error) {
       return error instanceof Error ? error.message : String(error)
