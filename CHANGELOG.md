@@ -2,6 +2,12 @@
 
 All notable changes to `dsh-background-agents` are documented here. The repo is pre-release; versions follow the DeepSeek Harness `0.1.0-rc.x` target runtime and bump on every behavior change.
 
+## [0.5.4] — 2026-08-19
+
+### Fixed
+
+- **Mid-open unload no longer leaks the room store.** A plugin fiber disposed while the `team_rooms` storage domain was still opening could no longer register the close effect (`ctx.effect` throws on an inactive fiber), so the late-arriving domain handle leaked; the hub now closes the domain directly on that path. Regression: a deferred-domain suite disposes the fiber mid-open and asserts the late domain is closed.
+
 ## [0.5.3] — 2026-08-19
 
 ### Fixed
