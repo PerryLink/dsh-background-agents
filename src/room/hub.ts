@@ -159,7 +159,15 @@ export class RoomHub extends Service {
       const domain = await Promise.race([openPromise, timeout])
       clearTimeout(timer)
       if (this.initError !== undefined) return // already timed out; the late domain was closed above
-      this.ctx.effect(() => () => { void domain.close() }, 'dsh-background-agents: team_rooms domain close')
+      try {
+        this.ctx.effect(() => () => { void domain.close() }, 'dsh-background-agents: team_rooms domain close')
+      } catch (effectError) {
+        // The owning fiber unloaded while the domain was opening, so the close
+        // effect can no longer be registered: close the domain here instead of
+        // leaking its handle.
+        void domain.close()
+        throw effectError
+      }
       this.rooms = domain.table('rooms')
       this.bus = domain.table('bus')
       this.tasks = domain.table('tasks')

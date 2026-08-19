@@ -85,3 +85,45 @@ describe('room open timeout against a stuck storage provider', () => {
     expect(names).toEqual(expect.arrayContaining(['room_list_rooms', 'room_create_task', 'room_post']))
   })
 })
+
+describe('room open racing a fiber unload', () => {
+  it('closes the late-opened domain when the plugin fiber unloads mid-open', async () => {
+    const ctx = new Context()
+    await mountAgentLoopTestDependencies(ctx)
+    const root = mkdtempSync(join(tmpdir(), 'dsh-background-agents-midopen-'))
+    roots.push(root)
+    await ctx.plugin(JsonlSessionPersistence, { root })
+    await ctx.plugin(AgentLoop, { agents: [] })
+    await ctx.plugin(SessionProjectionRegistry)
+    await ctx.plugin(SubagentRuntime)
+    await ctx.plugin(SubagentSpawn, { providerName: 'spawn' })
+    await ctx.plugin(Storage)
+    await ctx.plugin(StorageJson, { root: join(root, 'storages') })
+    // A deferred domain: open() settles only when this test resolves it.
+    let resolveOpen: ((domain: { table: () => never; close: () => Promise<void> }) => void) | undefined
+    const closed: string[] = []
+    ctx.provide('storageDomain', {
+      open: () => new Promise((resolve) => { resolveOpen = resolve }),
+    } as never)
+    await ctx.plugin(CommandRuntime)
+    const pluginFiber = await ctx.plugin(plugin, {
+      provider: 'spawn',
+      autoReport: false,
+      idleSweepIntervalMs: 60_000,
+      allowUnmarkedFacts: true,
+      roomOpenTimeoutMs: 60_000,
+    })
+
+    // The room half is parked on the domain open; unload the plugin now.
+    await pluginFiber.dispose()
+
+    // The late-arriving domain cannot take the close effect anymore (the
+    // fiber is gone), so the hub must close it directly — never leak it.
+    resolveOpen?.({
+      table: () => { throw new Error('domain tables must not be read after unload') },
+      close: async () => { closed.push('close') },
+    })
+    for (let i = 0; i < 50 && closed.length === 0; i++) await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(closed).toEqual(['close'])
+  })
+})
