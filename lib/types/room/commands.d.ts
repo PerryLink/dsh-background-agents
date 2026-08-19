@@ -10,7 +10,7 @@
  * @module dsh-background-agents/room/commands
  */
 import type { Context } from '@deepseek-ai/cordis';
-import { type RoomHub } from './hub.ts';
+import { type RoomHub } from './hub.js';
 /**
  * Register the `/room` command when the harness composes the command
  * registry. The handler runs outside any model turn, so it performs the

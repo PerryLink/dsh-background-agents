@@ -2,6 +2,16 @@
 
 All notable changes to `dsh-background-agents` are documented here. The repo is pre-release; versions follow the DeepSeek Harness `0.1.0-rc.x` target runtime and bump on every behavior change.
 
+## [0.5.3] — 2026-08-19
+
+### Fixed
+
+- **Room write-chain self-deadlock (second site).** `createTask` and `mutateTask` (claim/assign/complete) ran their fact broadcast, cursor advance, and assign delivery INSIDE their own write-chain job; those side effects enqueue new links and captured the still-pending `this.tail`, so `room_create_task`/`room_claim_task`/`room_complete_task`/`room_transfer_task` hung forever. They now run after the job settles (the `createRoom`/`postMessage` pattern). Regression: an eight-way concurrent task-creation suite and a full claim/complete walk.
+
+### Added
+
+- Room tool three-interface suites, real-Loader composition, self-contained/artifacts gates, coverage/lint/README CI, and the declaration-specifier rewrite for NodeNext consumers.
+
 ## [0.5.2] — 2026-08-17
 
 ### Fixed

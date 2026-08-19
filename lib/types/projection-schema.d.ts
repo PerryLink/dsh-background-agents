@@ -34,7 +34,7 @@ export declare const backgroundAgentEntrySchema: z.ZodObject<{
 }, "strict", z.ZodTypeAny, {
     agentId: string;
     label: string;
-    activity: "archived" | "running" | "inactive";
+    activity: "running" | "inactive" | "archived";
     messageCount: number;
     createdAt: number;
     lastActiveAt: number;
@@ -44,7 +44,7 @@ export declare const backgroundAgentEntrySchema: z.ZodObject<{
 }, {
     agentId: string;
     label: string;
-    activity: "archived" | "running" | "inactive";
+    activity: "running" | "inactive" | "archived";
     messageCount: number;
     createdAt: number;
     lastActiveAt: number;
@@ -80,7 +80,7 @@ export declare const backgroundAgentsSchema: z.ZodObject<{
     }, "strict", z.ZodTypeAny, {
         agentId: string;
         label: string;
-        activity: "archived" | "running" | "inactive";
+        activity: "running" | "inactive" | "archived";
         messageCount: number;
         createdAt: number;
         lastActiveAt: number;
@@ -90,7 +90,7 @@ export declare const backgroundAgentsSchema: z.ZodObject<{
     }, {
         agentId: string;
         label: string;
-        activity: "archived" | "running" | "inactive";
+        activity: "running" | "inactive" | "archived";
         messageCount: number;
         createdAt: number;
         lastActiveAt: number;
@@ -102,7 +102,7 @@ export declare const backgroundAgentsSchema: z.ZodObject<{
     agents: {
         agentId: string;
         label: string;
-        activity: "archived" | "running" | "inactive";
+        activity: "running" | "inactive" | "archived";
         messageCount: number;
         createdAt: number;
         lastActiveAt: number;
@@ -114,7 +114,7 @@ export declare const backgroundAgentsSchema: z.ZodObject<{
     agents: {
         agentId: string;
         label: string;
-        activity: "archived" | "running" | "inactive";
+        activity: "running" | "inactive" | "archived";
         messageCount: number;
         createdAt: number;
         lastActiveAt: number;
