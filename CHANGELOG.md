@@ -2,6 +2,17 @@
 
 All notable changes to `dsh-background-agents` are documented here. The repo is pre-release; versions follow the DeepSeek Harness `0.1.0-rc.x` target runtime and bump on every behavior change.
 
+## [0.5.5] — 2026-08-21
+
+### Changed
+
+- **Upgrade to the `0.1.0-rc.8` harness line.** The eight `@deepseek-ai/dsh-*` peer ranges move to `>=0.1.0-rc.8 <0.2.0`, `HARNESS_COMMIT` repins to the rc.8 release commit, the compat profile installs the rc.8 CLI / `dsh-base` / `dsh-headless` lines, `dshWorkshop.dshVersions` lists `0.1.0-rc.8`, and the compatibility table (all five README languages) reports the rc.8 line.
+- **`commands.execute` now receives the rc.8 `images` argument.** The rc.8 command service (and its client wire Remote) gained a leading base64 image-attachment array; this plugin's host test calls and the client's pinned `CommandsRemote` shape pass the new empty `images` array for every plain `/room` line.
+
+### Fixed
+
+- **The rc.8 host is treated as marker-unaware BEFORE the first fact append.** The released `0.1.0-rc.8` still drops the `ignorable` envelope marker on log-only appends (the stamping fix exists on harness master only), so the `FactAppender` version pre-check bound extends to rc.8: fact appends are skipped pre-emptively with a one-time warning instead of probing with a first append that would land unmarked and make the session unresumable on rc.8 readers (`SessionFormatUnsupportedError`). The legacy `tool/result` replay meta and the official `subagent-settled` account keep the dashboard projection and `bg_list`/`bg_result` reconstructing on rc.8; the reopen regression now proves the default gate keeps logs loadable end to end, and the fact pipeline stays covered by the unit appender suite plus the in-memory opt-in specs.
+
 ## [0.5.4] — 2026-08-19
 
 ### Fixed
