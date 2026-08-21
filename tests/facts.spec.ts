@@ -1,6 +1,6 @@
 /**
  * Fact-appender gating and the room-store open-timeout tests: on hosts
- * whose `Session.append` drops the `ignorable` marker (the rc.1–rc.6
+ * whose `Session.append` drops the `ignorable` marker (the rc.1–rc.8
  * lines), fact events must NEVER land unmarked, and a stuck storage
  * provider must fail `/room` operations loud instead of hanging.
  * @module dsh-background-agents/tests/facts.spec
@@ -15,7 +15,7 @@ import type { RoomConfig } from '../src/room/hub.ts'
 
 vi.mock('../src/audit.ts', async importOriginal => {
   const original = await importOriginal() as typeof import('../src/audit.ts')
-  return { ...original, peerSessionVersion: vi.fn(() => '0.1.0-rc.6') }
+  return { ...original, peerSessionVersion: vi.fn(() => '0.1.0-rc.8') }
 })
 
 function fakeSession() {
@@ -38,7 +38,7 @@ function roomConfig(over: Partial<RoomConfig> = {}): RoomConfig {
 }
 
 describe('FactAppender host gating', () => {
-  it('skips appends on the known-unmarked rc.6 host with a one-time warning', () => {
+  it('skips appends on the known-unmarked rc.8 host with a one-time warning', () => {
     const warn = vi.fn()
     const facts = new FactAppender(false, warn)
     const session = fakeSession()

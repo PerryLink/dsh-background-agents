@@ -4,7 +4,7 @@
  * timeline facts).
  *
  * Hosts whose `Session.append` predates the `ignorable` envelope marker
- * (the rc.1–rc.6 lines) silently drop the options bag, so a fact event
+ * (the rc.1–rc.8 lines) silently drop the options bag, so a fact event
  * lands UNMARKED and stricter harness builds refuse to resume the session.
  * The appender detects such hosts BEFORE the first append (installed-peer
  * version pre-check, then a probe of the first appended envelope's return

@@ -36,8 +36,11 @@ async function setup(config: Partial<plugin.Config> = {}) {
     provider: 'spawn',
     autoReport: false,
     idleSweepIntervalMs: 60_000,
-    // The rc.6 test peers drop the ignorable marker; the specs assert the
-    // durable fact chain, so mount with the documented opt-in.
+    // The rc.8 peer drops the ignorable marker, so direct tool execution has
+    // no stamped fact channel; the specs assert the durable fact chain (the
+    // registration record of direct execution IS the fact), so mount with
+    // the documented opt-in — these sessions never reopen, so the unmarked
+    // events stay harmless here.
     allowUnmarkedFacts: true,
     ...config,
   })
@@ -94,11 +97,12 @@ describe('dsh-background-agents tools', () => {
     const child = ctx.agents.get(SessionId(started.agentId))
     expect(child).toBeDefined()
     // The structured registered fact rides the parent log next to the replay
-    // meta, stamped ignorable for readers that do not know the type.
+    // meta. The rc.8 host drops the envelope marker (the stamping fix exists
+    // on harness master only), so with the documented opt-in the fact lands
+    // unmarked — this in-memory session never reopens, so it stays harmless.
     const fact = parent.session.events.find(event => event.type === 'background-agents/fact')
     expect(fact).toMatchObject({
       type: 'background-agents/fact',
-      ignorable: true,
       data: { kind: 'registered', agentId: started.agentId, label: 'write one line' },
     })
   })
@@ -234,9 +238,10 @@ describe('dsh-background-agents tools', () => {
     const value = valueOf<{ kind: string; agents: Array<Record<string, unknown>> }>(listing)
     expect(value.kind).toBe('listing')
     expect(value.agents).toHaveLength(1)
-    // The structured registered fact lands even for direct tool execution;
-    // the child then settles (no adapter), so the row reads the settled state
-    // with the initial message counted.
+    // The structured registered fact lands even for direct tool execution
+    // (unmarked on the rc.8 host, per the documented opt-in); the child then
+    // settles (no adapter), so the row reads the settled state with the
+    // initial message counted.
     expect(value.agents[0]).toMatchObject({
       agentId: startedValue.agentId,
       label: 'writer',
@@ -310,7 +315,7 @@ describe('dsh-background-agents tools', () => {
     // The structured registered fact lands even for direct tool execution and
     // the official settled account folds over it, so the activity reads the
     // durable settled state instead of the live-catalog fallback. The label
-    // rides the same fact.
+    // rides the same fact (unmarked on the rc.8 host, per the opt-in).
     expect(valueOf<{ agentId: string; label: string; activity: string; text?: string }>(result)).toEqual({
       agentId: childId,
       label: 'answer one thing',

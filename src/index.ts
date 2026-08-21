@@ -121,11 +121,11 @@ export interface Config {
   /**
    * Force the log-only fact events (`background-agents/fact`,
    * `team-room/fact`) even on hosts that drop the `ignorable` envelope
-   * marker (the `0.1.0-rc.6` line). Deliberately dangerous: unmarked fact
-   * events make sessions unresumable on stricter harness builds. Default
-   * `false` — the runtime detects such hosts and skips fact appends (the
-   * projections degrade to an empty fact fold; the durable store and the
-   * model-visible notices keep working).
+   * marker (every released rc line through `0.1.0-rc.8`). Deliberately
+   * dangerous: unmarked fact events make sessions unresumable on stricter
+   * harness builds. Default `false` — the runtime detects such hosts and
+   * skips fact appends (the projections degrade to an empty fact fold; the
+   * durable store and the model-visible notices keep working).
    */
   allowUnmarkedFacts?: boolean
 }
@@ -251,7 +251,7 @@ export function apply(ctx: Context, config: Config): void {
   const lifecycle = new BackgroundAgentLifecycle()
 
   // One host-gated appender for every log-only fact event: on hosts whose
-  // Session.append drops the ignorable marker (the rc.6 line) fact appends
+  // Session.append drops the ignorable marker (the rc.8 line) fact appends
   // are skipped so session logs stay loadable everywhere (see facts.ts).
   const facts = new FactAppender(
     config.allowUnmarkedFacts ?? DEFAULTS.allowUnmarkedFacts,

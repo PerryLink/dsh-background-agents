@@ -108,11 +108,11 @@ export interface Config {
     /**
      * Force the log-only fact events (`background-agents/fact`,
      * `team-room/fact`) even on hosts that drop the `ignorable` envelope
-     * marker (the `0.1.0-rc.6` line). Deliberately dangerous: unmarked fact
-     * events make sessions unresumable on stricter harness builds. Default
-     * `false` — the runtime detects such hosts and skips fact appends (the
-     * projections degrade to an empty fact fold; the durable store and the
-     * model-visible notices keep working).
+     * marker (every released rc line through `0.1.0-rc.8`). Deliberately
+     * dangerous: unmarked fact events make sessions unresumable on stricter
+     * harness builds. Default `false` — the runtime detects such hosts and
+     * skips fact appends (the projections degrade to an empty fact fold; the
+     * durable store and the model-visible notices keep working).
      */
     allowUnmarkedFacts?: boolean;
 }
