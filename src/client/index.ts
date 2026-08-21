@@ -133,6 +133,7 @@ interface CommandsRemote {
   readonly execute: (
     agentId: SessionId,
     line: string,
+    images: readonly { mediaType: string; data: string; name?: string }[],
     signal?: AbortSignal,
   ) => Promise<
     | { ok: false; error: { code: string; message: string } }
@@ -234,7 +235,7 @@ export function apply(ctx: Context): void {
     const sessionId = controller.currentSessionId()
     if (sessionId === undefined) return 'no active session'
     try {
-      const result = await remote.commands.execute(sessionId as SessionId, line)
+      const result = await remote.commands.execute(sessionId as SessionId, line, [])
       if (!result.ok) return `${result.error.code}: ${result.error.message}`
       if (result.value === undefined || result.value.result === undefined) return `unknown or malformed command: ${line}`
       return result.value.result.kind === 'error' ? result.value.result.text : undefined

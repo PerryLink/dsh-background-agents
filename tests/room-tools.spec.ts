@@ -63,7 +63,7 @@ function callTool(ctx: Context, name: string, args: unknown, agent: unknown) {
 
 /** Create one room through the real `/room create` command and return its id. */
 async function createRoom(ctx: Context, agent: unknown, name: string): Promise<string> {
-  const execution = await ctx.commands.execute(agent as never, `/room create ${name}`, new AbortController().signal)
+  const execution = await ctx.commands.execute(agent as never, `/room create ${name}`, [], new AbortController().signal)
   const text = execution?.result.kind === 'success' ? execution.result.text : undefined
   if (text === undefined) throw new Error(`/room create failed: ${JSON.stringify(execution?.result)}`)
   const roomId = text.match(/Room created: (\S+)/u)?.[1]

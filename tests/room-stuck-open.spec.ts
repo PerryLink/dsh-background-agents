@@ -59,7 +59,7 @@ async function setupWithStuckDomain() {
 describe('room open timeout against a stuck storage provider', () => {
   it('settles /room create with store-unavailable instead of hanging', async () => {
     const { ctx, parent } = await setupWithStuckDomain()
-    const execution = await ctx.commands.execute(parent as never, '/room create stuck-room', new AbortController().signal)
+    const execution = await ctx.commands.execute(parent as never, '/room create stuck-room', [], new AbortController().signal)
     expect(execution?.result.kind).toBe('error')
     const text = String((execution?.result as { text?: string } | undefined)?.text ?? '')
     expect(text).toContain('store-unavailable')
