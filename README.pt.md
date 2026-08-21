@@ -24,7 +24,7 @@
 
 | Superfície | Status |
 |---|---|
-| Harness | DeepSeek Harness `0.1.0-rc.6` (peers `>=0.1.0-rc.5 <0.2.0`) |
+| Harness | DeepSeek Harness `0.1.0-rc.8` (peers `>=0.1.0-rc.8 <0.2.0`) |
 | Node | `^22.19.0 \|\| >=24.0.0` |
 | Plataformas | Todas (ferramentas de host; painel lateral web e salas de equipe opcionais via capacidade de domínio de armazenamento) |
 | Modelo | Qualquer (os filhos herdam a rota do pai; `childProvider`/`childModel` sobrescrevem) |
@@ -124,7 +124,7 @@ Tudo se apoia na costura oficial de subagentes: `startContinuable`, `followup`, 
 
 O plugin grava cada fato por meio de **um canal estruturado e um canal visível ao modelo**:
 
-- **eventos de fato estruturados `background-agents/fact`** — os fatos registrado / mensagem / parada / progresso / arquivado, anexados ao log do pai como registros somente-log com o marcador de envelope `ignorable: true`; leitores que não conhecem o tipo pulam os registros em vez de recusar o log. Hosts cujo `Session.append` é anterior ao marcador (todas as linhas rc publicadas até `0.1.0-rc.7` o descartam silenciosamente — a correção do marcador só existe no master — deixando sessões sem marcador irrecuperáveis em builds mais estritos) são detectados antes do primeiro append (pré-checagem da versão do peer e sondagem do envelope retornado) e os appends de fatos são pulados com um aviso único — o armazenamento durável, os avisos e as ferramentas continuam funcionando, e as projeções degradam para um fold vazio.
+- **eventos de fato estruturados `background-agents/fact`** — os fatos registrado / mensagem / parada / progresso / arquivado, anexados ao log do pai como registros somente-log com o marcador de envelope `ignorable: true`; leitores que não conhecem o tipo pulam os registros em vez de recusar o log. Hosts cujo `Session.append` é anterior ao marcador (todas as linhas rc publicadas até `0.1.0-rc.8` o descartam silenciosamente — a correção do marcador só existe no master — deixando sessões sem marcador irrecuperáveis em builds mais estritos) são detectados antes do primeiro append (pré-checagem da versão do peer e sondagem do envelope retornado) e os appends de fatos são pulados com um aviso único — o armazenamento durável, os avisos e as ferramentas continuam funcionando, e as projeções degradam para um fold vazio.
 - **metadados de repetição `tool/result`** — os mesmos fatos em logs gravados antes do canal estruturado (dobrados apenas enquanto uma linha não tem procedência estruturada).
 - **avisos `user/message` injetados** (visíveis ao modelo), fonte `{ kind: 'plugin', plugin: 'dsh-background-agents' }` — as linhas de progresso com limite de frequência e os avisos de arquivamento (prefixo canônico `[background-agent <id>] …`).
 - o **aviso oficial `subagent-settled`** — o fato durável "settled" do filho.
