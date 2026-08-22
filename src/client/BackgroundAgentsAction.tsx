@@ -9,7 +9,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { PropsLocale, PropsRuntime, TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
-import { Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
+import { IconBranchOutline16, Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import { buildAgentRows, relativeTime, type AgentRow, type RowStatus, type SessionListLike } from './presenter.ts'
 import { NS } from './locales.ts'
@@ -162,6 +162,7 @@ export function BackgroundAgentsAction({
   const [draft, setDraft] = useState('')
   const [result, setResult] = useState<ResultState | undefined>(undefined)
   const [now, setNow] = useState(() => Date.now())
+  const [anchor, setAnchor] = useState<{ left: number; bottom: number }>()
   const wrapRef = useRef<HTMLDivElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
@@ -180,6 +181,21 @@ export function BackgroundAgentsAction({
     if (!open) return
     const timer = window.setInterval(() => { setNow(Date.now()) }, 30_000)
     return () => { window.clearInterval(timer) }
+  }, [open])
+
+  // Panel placement: anchor the floating panel to the trigger's left edge,
+  // opening upward from the footer (the sidebar-footer convention), and
+  // re-anchor on window resize while it is open.
+  useEffect(() => {
+    if (!open) return
+    const place = (): void => {
+      const rect = wrapRef.current?.getBoundingClientRect()
+      if (rect === undefined) return
+      setAnchor({ left: rect.left, bottom: window.innerHeight - rect.top + 8 })
+    }
+    place()
+    window.addEventListener('resize', place)
+    return () => { window.removeEventListener('resize', place) }
   }, [open])
 
   // Dialog focus: move into the panel on open, hand back to the trigger on
@@ -260,13 +276,13 @@ export function BackgroundAgentsAction({
             setError(undefined)
           }}
         >
-          <span className={css.triggerIcon} aria-hidden>◉</span>
+          <span className={css.triggerIcon} aria-hidden><IconBranchOutline16 size={16} /></span>
           {wide && <span className={css.triggerLabel}>{t('trigger.label')}</span>}
           {runningCount > 0 && <span className={css.count}>{runningCount}</span>}
         </button>
       </Tooltip>
       {open && createPortal(
-        <div className={css.panel} role="dialog" aria-label={t('panel.title')} ref={panelRef} tabIndex={-1}>
+        <div className={css.panel} style={anchor} role="dialog" aria-label={t('panel.title')} ref={panelRef} tabIndex={-1}>
           <div className={css.panelTitle}>{t('panel.title')}</div>
           {error !== undefined && <div className={css.error}>{error}</div>}
           {rows.length === 0

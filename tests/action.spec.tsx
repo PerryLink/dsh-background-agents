@@ -5,10 +5,12 @@ import type { ComponentProps, ReactNode } from 'react'
 import { BackgroundAgentsAction } from '../src/client/BackgroundAgentsAction.tsx'
 import type { SessionListLike } from '../src/client/presenter.ts'
 
-// The panel binds primitives' Tooltip only as a hover affordance; the mock
-// keeps this test hermetic (one React copy, no primitives runtime).
+// The panel binds primitives' Tooltip only as a hover affordance and the
+// branch icon as the trigger glyph; the mock keeps this test hermetic (one
+// React copy, no primitives runtime).
 vi.mock('@deepseek-ai/dsh-client-ui-primitives', () => ({
   Tooltip: ({ children }: { readonly children?: ReactNode }) => <>{children}</>,
+  IconBranchOutline16: () => <svg />,
 }))
 
 /** One snapshot: a parent whose projection carries one tracked child. */
@@ -99,6 +101,24 @@ function setInputValue(input: HTMLInputElement, text: string): void {
 }
 
 describe('BackgroundAgentsAction', () => {
+  it('renders an SVG icon in the trigger instead of a text glyph', async () => {
+    const { container } = mount(list(false))
+    await vi.waitFor(() => { expect(container.querySelector('button')).not.toBeNull() })
+    const trigger = container.querySelector('button')!
+    expect(trigger.querySelector('svg')).not.toBeNull()
+    expect(trigger.textContent).not.toContain('◉')
+  })
+
+  it('anchors the open panel to the trigger with inline left/bottom placement', async () => {
+    const { container } = mount(list(false))
+    await vi.waitFor(() => { expect(container.querySelector('button')).not.toBeNull() })
+    container.querySelector('button')!.click()
+    await vi.waitFor(() => { expect(document.body.querySelector('[role="dialog"]')).not.toBeNull() })
+    const panel = document.body.querySelector('[role="dialog"]') as HTMLDivElement
+    expect(panel.style.left).toBe('0px')
+    expect(panel.style.bottom).toMatch(/px$/)
+  })
+
   it('opens the panel from the trigger and closes on Escape', async () => {
     const { container } = mount(list(false))
     await vi.waitFor(() => { expect(container.querySelector('button')).not.toBeNull() })
