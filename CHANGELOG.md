@@ -1,6 +1,17 @@
 # Changelog
 
-All notable changes to `dsh-background-agents` are documented here. The repo is pre-release; versions follow the DeepSeek Harness `0.1.0-rc.x` target runtime and bump on every behavior change.
+All notable changes to `dsh-background-agents` are documented here. The repo is pre-release; versions follow the DeepSeek Harness `0.1.x-rc.x` target runtime and bump on every behavior change.
+
+## [0.5.6] — 2026-08-22
+
+### Changed
+
+- **Upgrade to the `0.1.1-rc.2` harness line.** `HARNESS_COMMIT` repins to the rc.2 release commit, the compat profile installs the rc.2 CLI / `dsh-base` / `dsh-headless` lines, `dshWorkshop.dshVersions` lists `0.1.1-rc.2`, and the compatibility table (all five README languages) reports the rc.2 line.
+- **Projection units migrate to the rc.2 session-projection contract.** `backgroundAgents` and `teamRoom` now declare `stateSchema` and a `wire: { viewSchema, view }` client view (the rc.2 `ProjectionDefinition` field split), and merge their host fold state into `SessionProjectionStateMap` alongside the client-visible `SessionProjectionMap` key. `stateVersion` values are unchanged, so existing projection checkpoints keep replaying and only refold on a genuine semantic change.
+
+### Fixed
+
+- **Sidebar footer action aligned with the DSH design system (issue #4).** The trigger now renders the official `IconBranchOutline16` SVG instead of the `◉` text glyph, follows the footer-action pill style with the `--dsw-alias-label-tertiary`/`--dsw-alias-label-secondary` tokens, and the floating panel no longer sits at a fixed screen corner — it anchors to the trigger's left edge and opens upward from the sidebar footer (re-anchoring on window resize, the sidebar-footer convention). Panel chrome switches to the `--dsw-alias-border-l2` / `--dsw-specific-menu` / `--dsw-shadow-lv3` tokens with the previous values kept as fallbacks. Regression: the action spec pins the SVG trigger and the panel's inline left/bottom placement.
 
 ## [0.5.5] — 2026-08-21
 

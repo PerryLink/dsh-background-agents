@@ -9,7 +9,8 @@
  *
  * @module dsh-background-agents/projection
  */
-import type { ProjectionDefinition } from '@deepseek-ai/dsh-session-projection';
+import { z } from 'zod';
+import type { SessionEvent } from '@deepseek-ai/dsh-session';
 import { type BackgroundAgentEntry, type BackgroundAgentsProjection } from './projection-schema.js';
 /**
  * Mutable fold state; plain JSON so the persisted projection cache can store
@@ -32,8 +33,78 @@ interface StateEntry extends BackgroundAgentEntry {
  * semantics or the serialized state fields change, so persisted checkpoint
  * rows from an older unit refold instead of replaying into garbage.
  */
-export declare const backgroundAgentsProjectionDefinition: ProjectionDefinition<'backgroundAgents', State>;
+export declare const backgroundAgentsProjectionDefinition: {
+    key: "backgroundAgents";
+    stateSchema: z.ZodType<State, z.ZodTypeDef, State>;
+    init: () => State;
+    apply(state: State, event: SessionEvent): State;
+    wire: {
+        viewSchema: z.ZodObject<{
+            agents: z.ZodArray<z.ZodObject<{
+                agentId: z.ZodString;
+                label: z.ZodString;
+                activity: z.ZodEnum<["running", "inactive", "archived"]>;
+                messageCount: z.ZodNumber;
+                lastMessage: z.ZodOptional<z.ZodString>;
+                createdAt: z.ZodNumber;
+                lastActiveAt: z.ZodNumber;
+                archivedAt: z.ZodOptional<z.ZodNumber>;
+                stopRequestedAt: z.ZodOptional<z.ZodNumber>;
+            }, "strict", z.ZodTypeAny, {
+                agentId: string;
+                label: string;
+                activity: "archived" | "running" | "inactive";
+                messageCount: number;
+                createdAt: number;
+                lastActiveAt: number;
+                lastMessage?: string | undefined;
+                archivedAt?: number | undefined;
+                stopRequestedAt?: number | undefined;
+            }, {
+                agentId: string;
+                label: string;
+                activity: "archived" | "running" | "inactive";
+                messageCount: number;
+                createdAt: number;
+                lastActiveAt: number;
+                lastMessage?: string | undefined;
+                archivedAt?: number | undefined;
+                stopRequestedAt?: number | undefined;
+            }>, "many">;
+        }, "strict", z.ZodTypeAny, {
+            agents: {
+                agentId: string;
+                label: string;
+                activity: "archived" | "running" | "inactive";
+                messageCount: number;
+                createdAt: number;
+                lastActiveAt: number;
+                lastMessage?: string | undefined;
+                archivedAt?: number | undefined;
+                stopRequestedAt?: number | undefined;
+            }[];
+        }, {
+            agents: {
+                agentId: string;
+                label: string;
+                activity: "archived" | "running" | "inactive";
+                messageCount: number;
+                createdAt: number;
+                lastActiveAt: number;
+                lastMessage?: string | undefined;
+                archivedAt?: number | undefined;
+                stopRequestedAt?: number | undefined;
+            }[];
+        }>;
+        view: (state: NoInfer<State>) => BackgroundAgentsProjection;
+    };
+    stateVersion: number;
+};
 declare module '@deepseek-ai/dsh-session-projection/types' {
+    interface SessionProjectionStateMap {
+        /** Host fold state for the background-agent dashboard rows. */
+        backgroundAgents: State;
+    }
     interface SessionProjectionMap {
         /** Background-agent dashboard rows folded from the parent session log. */
         backgroundAgents: BackgroundAgentsProjection;

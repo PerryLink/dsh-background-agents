@@ -9,7 +9,6 @@
  * @module dsh-background-agents/room/projection
  */
 
-import { z } from 'zod'
 import type { ProjectionDefinition } from '@deepseek-ai/dsh-session-projection'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import {
@@ -237,23 +236,30 @@ function capDoneTasks(room: RoomView): RoomView {
 }
 
 /** The registered projection unit. */
-export const teamRoomProjectionDefinition: ProjectionDefinition<'teamRoom', State> = {
+export const teamRoomProjectionDefinition = {
   key: 'teamRoom',
-  // The cast mirrors the subagent package's projection units: the zod object's
-  // inferred input type is narrower than the wire `unknown` the registry parses.
-  schema: teamRoomViewSchema as unknown as z.ZodType<TeamRoomView>,
-  init: () => ({ rooms: [] }),
-  apply(state, event: SessionEvent) {
+  // The fold state and the wire value share one shape (`{ rooms: RoomView[] }`);
+  // only the done-task backlog differs (the state keeps every row, the view caps it).
+  stateSchema: teamRoomViewSchema,
+  init: (): State => ({ rooms: [] }),
+  apply(state: State, event: SessionEvent): State {
     if (event.type !== TEAM_ROOM_FACT) return state
     return applyFact(state, event as SessionEvent<typeof TEAM_ROOM_FACT>)
   },
-  view: (state): TeamRoomView => ({
-    rooms: state.rooms.map(capDoneTasks),
-  }),
+  wire: {
+    viewSchema: teamRoomViewSchema,
+    view: (state): TeamRoomView => ({
+      rooms: state.rooms.map(capDoneTasks),
+    }),
+  },
   stateVersion: 1,
-}
+} satisfies ProjectionDefinition<'teamRoom', State>
 
 declare module '@deepseek-ai/dsh-session-projection/types' {
+  interface SessionProjectionStateMap {
+    /** Host fold state for the team-room views. */
+    teamRoom: State
+  }
   interface SessionProjectionMap {
     /** Team-room views folded from one member session's room facts. */
     teamRoom: TeamRoomView

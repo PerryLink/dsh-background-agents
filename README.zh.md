@@ -24,7 +24,7 @@
 
 | 方面 | 状态 |
 |---|---|
-| Harness | DeepSeek Harness `0.1.0-rc.8`（peer 依赖 `>=0.1.0-rc.8 <0.2.0`） |
+| Harness | DeepSeek Harness `0.1.1-rc.2`（peer 依赖 `>=0.1.0-rc.8 <0.2.0`） |
 | Node | `^22.19.0 \|\| >=24.0.0` |
 | 平台 | 全部（宿主工具；可选 Web 侧栏面板与团队房间，依赖存储域能力） |
 | 模型 | 任意（子代理继承父代理的路由；`childProvider`/`childModel` 可覆盖） |

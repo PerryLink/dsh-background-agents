@@ -32,7 +32,7 @@ function userMessageEvent(source: UserMessage['source'], text: string, time?: nu
 }
 
 function fold(events: SessionEvent[]): BackgroundAgentEntry[] {
-  return unit.view(events.reduce((state, next) => unit.apply(state, next), unit.init())).agents
+  return unit.wire.view(events.reduce((state, next) => unit.apply(state, next), unit.init())).agents
 }
 
 describe('backgroundAgents projection', () => {
@@ -160,10 +160,10 @@ describe('backgroundAgents projection', () => {
   it('validates its view against the wire schema', () => {
     const state = [toolResultEvent({ plugin: PLUGIN, action: 'registered', agentId: 'child-1', label: 'writer' })]
       .reduce((folded, next) => unit.apply(folded, next), unit.init())
-    const rows = unit.view(state).agents
-    const parsed = unit.schema.safeParse(unit.view(state))
+    const rows = unit.wire.view(state).agents
+    const parsed = unit.wire.viewSchema.safeParse(unit.wire.view(state))
     expect(parsed.success).toBe(true)
-    expect(unit.schema.parse(unit.view(state)).agents).toEqual(rows)
+    expect(unit.wire.viewSchema.parse(unit.wire.view(state)).agents).toEqual(rows)
   })
 
   it('does not count stop facts as deliveries or change activity', () => {

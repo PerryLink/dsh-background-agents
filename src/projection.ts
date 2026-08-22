@@ -15,7 +15,7 @@ import type { ProjectionDefinition } from '@deepseek-ai/dsh-session-projection'
 import type { SessionEvent, UserMessage } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-subagent'
 import {
-  backgroundAgentsSchema, type BackgroundAgentEntry, type BackgroundAgentsProjection,
+  backgroundAgentEntrySchema, backgroundAgentsSchema, type BackgroundAgentEntry, type BackgroundAgentsProjection,
 } from './projection-schema.ts'
 import { FACT_EVENT } from './events.ts'
 import { isBackgroundAgentsMeta, parseNotice, PLUGIN } from './vocabulary.ts'
@@ -96,18 +96,26 @@ function factBase(at: number): Omit<StateEntry, 'agentId'> {
 }
 
 /**
+ * Zod schema validating the persisted fold state: the wire row plus the
+ * `source` provenance column (fold-internal, never in the wire value). Plain
+ * JSON by construction, so the persisted projection cache stores it losslessly.
+ */
+const backgroundAgentsStateSchema: z.ZodType<State> = z.object({
+  entries: z.array(
+    backgroundAgentEntrySchema.extend({ source: z.enum(['legacy', 'event']) }).strict(),
+  ),
+}).strict()
+
+/**
  * The registered projection unit. `stateVersion` bumps whenever the fold
  * semantics or the serialized state fields change, so persisted checkpoint
  * rows from an older unit refold instead of replaying into garbage.
  */
-export const backgroundAgentsProjectionDefinition:
-ProjectionDefinition<'backgroundAgents', State> = {
+export const backgroundAgentsProjectionDefinition = {
   key: 'backgroundAgents',
-  // The cast mirrors the subagent package's projection units: the zod object's
-  // inferred input type is narrower than the wire `unknown` the registry parses.
-  schema: backgroundAgentsSchema as unknown as z.ZodType<BackgroundAgentsProjection>,
-  init: () => ({ entries: [] }),
-  apply(state, event: SessionEvent) {
+  stateSchema: backgroundAgentsStateSchema,
+  init: (): State => ({ entries: [] }),
+  apply(state: State, event: SessionEvent): State {
     switch (event.type) {
       case FACT_EVENT: {
         // The structured channel: every fact is folded from its event, and
@@ -256,19 +264,28 @@ ProjectionDefinition<'backgroundAgents', State> = {
         return state
     }
   },
-  view: (state): BackgroundAgentsProjection => ({
-    agents: state.entries
-      .map((entry): BackgroundAgentEntry => {
-        const { source: _source, ...wire } = entry
-        return wire
-      })
-      .sort((a, b) =>
-        a.createdAt !== b.createdAt ? a.createdAt - b.createdAt : (a.agentId < b.agentId ? -1 : 1)),
-  }),
+  wire: {
+    // The wire schema validates the client-visible whole value; the fold state
+    // (with its per-row `source` provenance) never leaves the host.
+    viewSchema: backgroundAgentsSchema,
+    view: (state): BackgroundAgentsProjection => ({
+      agents: state.entries
+        .map((entry): BackgroundAgentEntry => {
+          const { source: _source, ...wire } = entry
+          return wire
+        })
+        .sort((a, b) =>
+          a.createdAt !== b.createdAt ? a.createdAt - b.createdAt : (a.agentId < b.agentId ? -1 : 1)),
+    }),
+  },
   stateVersion: 2,
-}
+} satisfies ProjectionDefinition<'backgroundAgents', State>
 
 declare module '@deepseek-ai/dsh-session-projection/types' {
+  interface SessionProjectionStateMap {
+    /** Host fold state for the background-agent dashboard rows. */
+    backgroundAgents: State
+  }
   interface SessionProjectionMap {
     /** Background-agent dashboard rows folded from the parent session log. */
     backgroundAgents: BackgroundAgentsProjection
