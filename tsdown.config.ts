@@ -144,6 +144,11 @@ export default defineConfig([
     },
     outputOptions: {
       entryFileNames: 'client.js',
+      // Absolute source paths (Windows `D:\…` vs CI `/home/runner/…`) would
+      // make the emitted map platform-dependent and fail the committed-lib
+      // drift gate; normalize every source to its plugin-root-relative posix
+      // form (node_modules sources stay relative from lib/).
+      sourcemapPathTransform: (source: string) => stablePath(resolvePath(CONFIG_DIR, source)),
       banner: `window.__ModuleLoader__.load({ id: ${JSON.stringify(PLUGIN_ID)}, factory: (require) => {`,
       footer: 'return module.exports; } });',
       intro: 'var module = { exports: {} }; var exports = module.exports;',
