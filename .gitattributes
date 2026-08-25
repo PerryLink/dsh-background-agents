@@ -1,0 +1,4 @@
+# Force LF in the working tree on every platform: source text is embedded
+# verbatim in the client sourcemap's sourcesContent, so a CRLF checkout makes
+# the committed map differ from the Linux CI build and fails the drift gate.
+* text=auto eol=lf
