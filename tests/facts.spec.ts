@@ -10,6 +10,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { FactAppender } from '../src/facts.ts'
 import type { FactAppender as FactAppenderType } from '../src/facts.ts'
+import { isUnmarkedHostVersion } from '../src/audit.ts'
 import { RoomHub, RoomError } from '../src/room/hub.ts'
 import type { RoomConfig } from '../src/room/hub.ts'
 
@@ -36,6 +37,13 @@ function roomConfig(over: Partial<RoomConfig> = {}): RoomConfig {
     ...over,
   }
 }
+
+describe('isUnmarkedHostVersion', () => {
+  it('flags the 0.1.0/0.1.1 rc.1–rc.8 lines and nothing else', () => {
+    for (const version of ['0.1.0-rc.1', '0.1.0-rc.8', '0.1.1-rc.1', '0.1.1-rc.2', '0.1.1-rc.8']) expect(isUnmarkedHostVersion(version)).toBe(true)
+    for (const version of ['0.1.0-rc.9', '0.1.1-rc.9', '0.1.0', '0.2.0', '0.1.0-rc.6-pre', 'garbage']) expect(isUnmarkedHostVersion(version)).toBe(false)
+  })
+})
 
 describe('FactAppender host gating', () => {
   it('skips appends on the known-unmarked rc.8 host with a one-time warning', () => {

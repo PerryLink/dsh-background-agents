@@ -31,13 +31,16 @@ export declare function isMarkedAuditEvent(result: unknown): boolean;
  * `ignorable` envelope-marker surface: every released rc line through
  * `0.1.0-rc.8` silently drops the marker from `Session.append` options
  * (the stamping fix exists on harness master only — no release carries it
- * yet), so fact events written by those builds land unmarked and break
- * resume on stricter hosts. Extend the bound when a new rc line ships that
- * still drops the marker. Non-matching (later rc, stable, or unresolvable)
- * versions are treated as possibly-marker-aware and verified by the
- * append probe.
+ * yet), and the `0.1.1-rc` line regressed the same way (verified on
+ * `0.1.1-rc.2`), so fact events written by those builds land unmarked and
+ * break resume on stricter hosts. The gate therefore treats
+ * `0.1.1-rc.1`–`rc.8` as known-unmarked too; over-refusal is harmless
+ * because `allowUnmarkedFacts: true` opts back in. Extend the bound when a
+ * new rc line ships that still drops the marker. Non-matching (later rc,
+ * stable, or unresolvable) versions are treated as possibly-marker-aware
+ * and verified by the append probe.
  * @param version - the installed peer version string.
- * @returns true for the known-unmarked rc.1–rc.8 lines.
+ * @returns true for the known-unmarked rc.1–rc.8 lines of `0.1.0` and `0.1.1`.
  */
 export declare function isUnmarkedHostVersion(version: string): boolean;
 /**

@@ -2,6 +2,12 @@
 
 All notable changes to `dsh-background-agents` are documented here. The repo is pre-release; versions follow the DeepSeek Harness `0.1.x-rc.x` target runtime and bump on every behavior change.
 
+## [Unreleased]
+
+### Fixed
+
+- `isUnmarkedHostVersion` only matched the `0.1.0-rc` line, so hosts on the `0.1.1-rc` line passed the pre-check and wrote the first `background-agents/fact` event unmarked — that polluted event makes the session unresumable on stricter harness builds. The gate now covers `0.1.1-rc.1`–`rc.8` as known-unmarked (verified on `0.1.1-rc.2`, where the harness still drops the `ignorable` marker); over-refusal is opt-out via `allowUnmarkedFacts: true`. Reported by [@Nicholas023](https://github.com/PerryLink/dsh-background-agents/issues/5).
+
 ## [0.5.6] — 2026-08-22
 
 ### Changed
