@@ -2,6 +2,17 @@
 
 All notable changes to `dsh-background-agents` are documented here. The repo is pre-release; versions follow the DeepSeek Harness `0.1.x-rc.x` target runtime and bump on every behavior change.
 
+## [0.6.0] — 2026-08-26
+
+### Added
+
+- **Cross-ecosystem stdio JSON-RPC inbound bridge** (`inbound.enabled`, `inbound.command`). `InboundCoordinator` is a reversible seam (`registerInboundAdapter` returns a disposer) and `StdioJsonRpcInbound` maps OpenAI Agents SDK / CrewAI notifications (`agent_started` / `agent_message` / `agent_finished`) onto the team room's task board and message bus over newline-delimited JSON-RPC 2.0. Invalid messages fail closed with a JSON-RPC error; start/stop ride the fiber disposer, and an unspawnable command degrades to a logged warning (default off).
+- **Per-agent cost/status observability projection.** The dashboard projection now records per-agent cost/status metrics and the client presenter surfaces them, making each background agent's progress, steering, and cost observable per agent.
+
+### Fixed
+
+- The committed client sourcemap is rebuilt from LF-normalized sources and `lib/` matches `tsc` 5.9 declaration-emit ordering again, keeping the build-drift gate clean.
+
 ## [0.5.7] — 2026-08-25
 
 ### Fixed
