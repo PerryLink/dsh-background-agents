@@ -180,15 +180,15 @@ export declare const timelineEventSchema: z.ZodObject<{
 }, "strict", z.ZodTypeAny, {
     at: number;
     roomId: string;
+    data: Record<string, unknown>;
     seq: number;
     kind: "room-created" | "member-joined" | "member-left" | "message-posted" | "message-directed" | "task-created" | "task-claimed" | "task-assigned" | "task-completed";
-    data: Record<string, unknown>;
 }, {
     at: number;
     roomId: string;
+    data: Record<string, unknown>;
     seq: number;
     kind: "room-created" | "member-joined" | "member-left" | "message-posted" | "message-directed" | "task-created" | "task-claimed" | "task-assigned" | "task-completed";
-    data: Record<string, unknown>;
 }>;
 /** One member row as the fold serves it. */
 export declare const roomViewMemberSchema: z.ZodObject<{
@@ -290,15 +290,15 @@ export declare const roomViewSchema: z.ZodObject<{
     }, "strict", z.ZodTypeAny, {
         at: number;
         roomId: string;
+        data: Record<string, unknown>;
         seq: number;
         kind: "room-created" | "member-joined" | "member-left" | "message-posted" | "message-directed" | "task-created" | "task-claimed" | "task-assigned" | "task-completed";
-        data: Record<string, unknown>;
     }, {
         at: number;
         roomId: string;
+        data: Record<string, unknown>;
         seq: number;
         kind: "room-created" | "member-joined" | "member-left" | "message-posted" | "message-directed" | "task-created" | "task-claimed" | "task-assigned" | "task-completed";
-        data: Record<string, unknown>;
     }>, "many">;
 }, "strict", z.ZodTypeAny, {
     createdAt: number;
@@ -321,9 +321,9 @@ export declare const roomViewSchema: z.ZodObject<{
     timeline: {
         at: number;
         roomId: string;
+        data: Record<string, unknown>;
         seq: number;
         kind: "room-created" | "member-joined" | "member-left" | "message-posted" | "message-directed" | "task-created" | "task-claimed" | "task-assigned" | "task-completed";
-        data: Record<string, unknown>;
     }[];
     name: string;
 }, {
@@ -347,9 +347,9 @@ export declare const roomViewSchema: z.ZodObject<{
     timeline: {
         at: number;
         roomId: string;
+        data: Record<string, unknown>;
         seq: number;
         kind: "room-created" | "member-joined" | "member-left" | "message-posted" | "message-directed" | "task-created" | "task-claimed" | "task-assigned" | "task-completed";
-        data: Record<string, unknown>;
     }[];
     name: string;
 }>;
@@ -411,15 +411,15 @@ export declare const teamRoomViewSchema: z.ZodObject<{
         }, "strict", z.ZodTypeAny, {
             at: number;
             roomId: string;
+            data: Record<string, unknown>;
             seq: number;
             kind: "room-created" | "member-joined" | "member-left" | "message-posted" | "message-directed" | "task-created" | "task-claimed" | "task-assigned" | "task-completed";
-            data: Record<string, unknown>;
         }, {
             at: number;
             roomId: string;
+            data: Record<string, unknown>;
             seq: number;
             kind: "room-created" | "member-joined" | "member-left" | "message-posted" | "message-directed" | "task-created" | "task-claimed" | "task-assigned" | "task-completed";
-            data: Record<string, unknown>;
         }>, "many">;
     }, "strict", z.ZodTypeAny, {
         createdAt: number;
@@ -442,9 +442,9 @@ export declare const teamRoomViewSchema: z.ZodObject<{
         timeline: {
             at: number;
             roomId: string;
+            data: Record<string, unknown>;
             seq: number;
             kind: "room-created" | "member-joined" | "member-left" | "message-posted" | "message-directed" | "task-created" | "task-claimed" | "task-assigned" | "task-completed";
-            data: Record<string, unknown>;
         }[];
         name: string;
     }, {
@@ -468,9 +468,9 @@ export declare const teamRoomViewSchema: z.ZodObject<{
         timeline: {
             at: number;
             roomId: string;
+            data: Record<string, unknown>;
             seq: number;
             kind: "room-created" | "member-joined" | "member-left" | "message-posted" | "message-directed" | "task-created" | "task-claimed" | "task-assigned" | "task-completed";
-            data: Record<string, unknown>;
         }[];
         name: string;
     }>, "many">;
@@ -496,9 +496,9 @@ export declare const teamRoomViewSchema: z.ZodObject<{
         timeline: {
             at: number;
             roomId: string;
+            data: Record<string, unknown>;
             seq: number;
             kind: "room-created" | "member-joined" | "member-left" | "message-posted" | "message-directed" | "task-created" | "task-claimed" | "task-assigned" | "task-completed";
-            data: Record<string, unknown>;
         }[];
         name: string;
     }[];
@@ -524,9 +524,9 @@ export declare const teamRoomViewSchema: z.ZodObject<{
         timeline: {
             at: number;
             roomId: string;
+            data: Record<string, unknown>;
             seq: number;
             kind: "room-created" | "member-joined" | "member-left" | "message-posted" | "message-directed" | "task-created" | "task-claimed" | "task-assigned" | "task-completed";
-            data: Record<string, unknown>;
         }[];
         name: string;
     }[];

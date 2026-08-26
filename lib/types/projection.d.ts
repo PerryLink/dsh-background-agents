@@ -59,16 +59,16 @@ export declare const backgroundAgentsProjectionDefinition: {
                     outputTokens: z.ZodNullable<z.ZodNumber>;
                     errorCount: z.ZodNumber;
                 }, "strict", z.ZodTypeAny, {
-                    turnCount: number;
-                    totalDurationMs: number;
                     inputTokens: number | null;
                     outputTokens: number | null;
+                    turnCount: number;
+                    totalDurationMs: number;
                     errorCount: number;
                 }, {
-                    turnCount: number;
-                    totalDurationMs: number;
                     inputTokens: number | null;
                     outputTokens: number | null;
+                    turnCount: number;
+                    totalDurationMs: number;
                     errorCount: number;
                 }>>;
             }, "strict", z.ZodTypeAny, {
@@ -79,10 +79,10 @@ export declare const backgroundAgentsProjectionDefinition: {
                 createdAt: number;
                 lastActiveAt: number;
                 metrics?: {
-                    turnCount: number;
-                    totalDurationMs: number;
                     inputTokens: number | null;
                     outputTokens: number | null;
+                    turnCount: number;
+                    totalDurationMs: number;
                     errorCount: number;
                 } | undefined;
                 lastMessage?: string | undefined;
@@ -96,10 +96,10 @@ export declare const backgroundAgentsProjectionDefinition: {
                 createdAt: number;
                 lastActiveAt: number;
                 metrics?: {
-                    turnCount: number;
-                    totalDurationMs: number;
                     inputTokens: number | null;
                     outputTokens: number | null;
+                    turnCount: number;
+                    totalDurationMs: number;
                     errorCount: number;
                 } | undefined;
                 lastMessage?: string | undefined;
@@ -115,10 +115,10 @@ export declare const backgroundAgentsProjectionDefinition: {
                 createdAt: number;
                 lastActiveAt: number;
                 metrics?: {
-                    turnCount: number;
-                    totalDurationMs: number;
                     inputTokens: number | null;
                     outputTokens: number | null;
+                    turnCount: number;
+                    totalDurationMs: number;
                     errorCount: number;
                 } | undefined;
                 lastMessage?: string | undefined;
@@ -134,10 +134,10 @@ export declare const backgroundAgentsProjectionDefinition: {
                 createdAt: number;
                 lastActiveAt: number;
                 metrics?: {
-                    turnCount: number;
-                    totalDurationMs: number;
                     inputTokens: number | null;
                     outputTokens: number | null;
+                    turnCount: number;
+                    totalDurationMs: number;
                     errorCount: number;
                 } | undefined;
                 lastMessage?: string | undefined;

@@ -27,9 +27,9 @@ export declare const teamRoomsDomainSpec: {
     version: number;
     tables: {
         rooms: import("@deepseek-ai/dsh-storage-domain").DomainTableSpec<RoomKey, {
+            name: string;
             createdAt: number;
             roomId: string;
-            name: string;
             members: {
                 role: "owner" | "member";
                 sessionId: string;
@@ -41,8 +41,8 @@ export declare const teamRoomsDomainSpec: {
             timelineNext: number;
         }>;
         bus: import("@deepseek-ai/dsh-storage-domain").DomainTableSpec<AppendKey, {
-            createdAt: number;
             text: string;
+            createdAt: number;
             senderSessionId: string;
             roomId: string;
             seq: number;
@@ -50,10 +50,10 @@ export declare const teamRoomsDomainSpec: {
         }>;
         tasks: import("@deepseek-ai/dsh-storage-domain").DomainTableSpec<AppendKey, {
             status: "todo" | "in-progress" | "done";
+            title: string;
             createdAt: number;
             roomId: string;
             taskId: string;
-            title: string;
             description: string;
             assigneeSessionId: string | null;
             createdBy: string;
@@ -62,10 +62,10 @@ export declare const teamRoomsDomainSpec: {
         }>;
         timeline: import("@deepseek-ai/dsh-storage-domain").DomainTableSpec<AppendKey, {
             at: number;
+            data: Record<string, unknown>;
             kind: "room-created" | "member-joined" | "member-left" | "message-posted" | "message-directed" | "task-created" | "task-claimed" | "task-assigned" | "task-completed";
             roomId: string;
             seq: number;
-            data: Record<string, unknown>;
         }>;
     };
 };

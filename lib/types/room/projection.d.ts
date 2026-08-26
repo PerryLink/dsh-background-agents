@@ -46,18 +46,18 @@ export declare const teamRoomProjectionDefinition: {
                 updatedAt: import("zod").ZodNumber;
             }, "strict", import("zod").ZodTypeAny, {
                 status: "todo" | "in-progress" | "done";
+                title: string;
                 createdAt: number;
                 taskId: string;
-                title: string;
                 description: string;
                 assigneeSessionId: string | null;
                 createdBy: string;
                 updatedAt: number;
             }, {
                 status: "todo" | "in-progress" | "done";
+                title: string;
                 createdAt: number;
                 taskId: string;
-                title: string;
                 description: string;
                 assigneeSessionId: string | null;
                 createdBy: string;
@@ -71,21 +71,21 @@ export declare const teamRoomProjectionDefinition: {
                 data: import("zod").ZodRecord<import("zod").ZodString, import("zod").ZodUnknown>;
             }, "strict", import("zod").ZodTypeAny, {
                 at: number;
+                data: Record<string, unknown>;
                 kind: "room-created" | "member-joined" | "member-left" | "message-posted" | "message-directed" | "task-created" | "task-claimed" | "task-assigned" | "task-completed";
                 roomId: string;
                 seq: number;
-                data: Record<string, unknown>;
             }, {
                 at: number;
+                data: Record<string, unknown>;
                 kind: "room-created" | "member-joined" | "member-left" | "message-posted" | "message-directed" | "task-created" | "task-claimed" | "task-assigned" | "task-completed";
                 roomId: string;
                 seq: number;
-                data: Record<string, unknown>;
             }>, "many">;
         }, "strict", import("zod").ZodTypeAny, {
+            name: string;
             createdAt: number;
             roomId: string;
-            name: string;
             members: {
                 role: "owner" | "member";
                 sessionId: string;
@@ -93,9 +93,9 @@ export declare const teamRoomProjectionDefinition: {
             }[];
             tasks: {
                 status: "todo" | "in-progress" | "done";
+                title: string;
                 createdAt: number;
                 taskId: string;
-                title: string;
                 description: string;
                 assigneeSessionId: string | null;
                 createdBy: string;
@@ -103,15 +103,15 @@ export declare const teamRoomProjectionDefinition: {
             }[];
             timeline: {
                 at: number;
+                data: Record<string, unknown>;
                 kind: "room-created" | "member-joined" | "member-left" | "message-posted" | "message-directed" | "task-created" | "task-claimed" | "task-assigned" | "task-completed";
                 roomId: string;
                 seq: number;
-                data: Record<string, unknown>;
             }[];
         }, {
+            name: string;
             createdAt: number;
             roomId: string;
-            name: string;
             members: {
                 role: "owner" | "member";
                 sessionId: string;
@@ -119,9 +119,9 @@ export declare const teamRoomProjectionDefinition: {
             }[];
             tasks: {
                 status: "todo" | "in-progress" | "done";
+                title: string;
                 createdAt: number;
                 taskId: string;
-                title: string;
                 description: string;
                 assigneeSessionId: string | null;
                 createdBy: string;
@@ -129,17 +129,17 @@ export declare const teamRoomProjectionDefinition: {
             }[];
             timeline: {
                 at: number;
+                data: Record<string, unknown>;
                 kind: "room-created" | "member-joined" | "member-left" | "message-posted" | "message-directed" | "task-created" | "task-claimed" | "task-assigned" | "task-completed";
                 roomId: string;
                 seq: number;
-                data: Record<string, unknown>;
             }[];
         }>, "many">;
     }, "strict", import("zod").ZodTypeAny, {
         rooms: {
+            name: string;
             createdAt: number;
             roomId: string;
-            name: string;
             members: {
                 role: "owner" | "member";
                 sessionId: string;
@@ -147,9 +147,9 @@ export declare const teamRoomProjectionDefinition: {
             }[];
             tasks: {
                 status: "todo" | "in-progress" | "done";
+                title: string;
                 createdAt: number;
                 taskId: string;
-                title: string;
                 description: string;
                 assigneeSessionId: string | null;
                 createdBy: string;
@@ -157,17 +157,17 @@ export declare const teamRoomProjectionDefinition: {
             }[];
             timeline: {
                 at: number;
+                data: Record<string, unknown>;
                 kind: "room-created" | "member-joined" | "member-left" | "message-posted" | "message-directed" | "task-created" | "task-claimed" | "task-assigned" | "task-completed";
                 roomId: string;
                 seq: number;
-                data: Record<string, unknown>;
             }[];
         }[];
     }, {
         rooms: {
+            name: string;
             createdAt: number;
             roomId: string;
-            name: string;
             members: {
                 role: "owner" | "member";
                 sessionId: string;
@@ -175,9 +175,9 @@ export declare const teamRoomProjectionDefinition: {
             }[];
             tasks: {
                 status: "todo" | "in-progress" | "done";
+                title: string;
                 createdAt: number;
                 taskId: string;
-                title: string;
                 description: string;
                 assigneeSessionId: string | null;
                 createdBy: string;
@@ -185,10 +185,10 @@ export declare const teamRoomProjectionDefinition: {
             }[];
             timeline: {
                 at: number;
+                data: Record<string, unknown>;
                 kind: "room-created" | "member-joined" | "member-left" | "message-posted" | "message-directed" | "task-created" | "task-claimed" | "task-assigned" | "task-completed";
                 roomId: string;
                 seq: number;
-                data: Record<string, unknown>;
             }[];
         }[];
     }>;
@@ -224,18 +224,18 @@ export declare const teamRoomProjectionDefinition: {
                     updatedAt: import("zod").ZodNumber;
                 }, "strict", import("zod").ZodTypeAny, {
                     status: "todo" | "in-progress" | "done";
+                    title: string;
                     createdAt: number;
                     taskId: string;
-                    title: string;
                     description: string;
                     assigneeSessionId: string | null;
                     createdBy: string;
                     updatedAt: number;
                 }, {
                     status: "todo" | "in-progress" | "done";
+                    title: string;
                     createdAt: number;
                     taskId: string;
-                    title: string;
                     description: string;
                     assigneeSessionId: string | null;
                     createdBy: string;
@@ -249,21 +249,21 @@ export declare const teamRoomProjectionDefinition: {
                     data: import("zod").ZodRecord<import("zod").ZodString, import("zod").ZodUnknown>;
                 }, "strict", import("zod").ZodTypeAny, {
                     at: number;
+                    data: Record<string, unknown>;
                     kind: "room-created" | "member-joined" | "member-left" | "message-posted" | "message-directed" | "task-created" | "task-claimed" | "task-assigned" | "task-completed";
                     roomId: string;
                     seq: number;
-                    data: Record<string, unknown>;
                 }, {
                     at: number;
+                    data: Record<string, unknown>;
                     kind: "room-created" | "member-joined" | "member-left" | "message-posted" | "message-directed" | "task-created" | "task-claimed" | "task-assigned" | "task-completed";
                     roomId: string;
                     seq: number;
-                    data: Record<string, unknown>;
                 }>, "many">;
             }, "strict", import("zod").ZodTypeAny, {
+                name: string;
                 createdAt: number;
                 roomId: string;
-                name: string;
                 members: {
                     role: "owner" | "member";
                     sessionId: string;
@@ -271,9 +271,9 @@ export declare const teamRoomProjectionDefinition: {
                 }[];
                 tasks: {
                     status: "todo" | "in-progress" | "done";
+                    title: string;
                     createdAt: number;
                     taskId: string;
-                    title: string;
                     description: string;
                     assigneeSessionId: string | null;
                     createdBy: string;
@@ -281,15 +281,15 @@ export declare const teamRoomProjectionDefinition: {
                 }[];
                 timeline: {
                     at: number;
+                    data: Record<string, unknown>;
                     kind: "room-created" | "member-joined" | "member-left" | "message-posted" | "message-directed" | "task-created" | "task-claimed" | "task-assigned" | "task-completed";
                     roomId: string;
                     seq: number;
-                    data: Record<string, unknown>;
                 }[];
             }, {
+                name: string;
                 createdAt: number;
                 roomId: string;
-                name: string;
                 members: {
                     role: "owner" | "member";
                     sessionId: string;
@@ -297,9 +297,9 @@ export declare const teamRoomProjectionDefinition: {
                 }[];
                 tasks: {
                     status: "todo" | "in-progress" | "done";
+                    title: string;
                     createdAt: number;
                     taskId: string;
-                    title: string;
                     description: string;
                     assigneeSessionId: string | null;
                     createdBy: string;
@@ -307,17 +307,17 @@ export declare const teamRoomProjectionDefinition: {
                 }[];
                 timeline: {
                     at: number;
+                    data: Record<string, unknown>;
                     kind: "room-created" | "member-joined" | "member-left" | "message-posted" | "message-directed" | "task-created" | "task-claimed" | "task-assigned" | "task-completed";
                     roomId: string;
                     seq: number;
-                    data: Record<string, unknown>;
                 }[];
             }>, "many">;
         }, "strict", import("zod").ZodTypeAny, {
             rooms: {
+                name: string;
                 createdAt: number;
                 roomId: string;
-                name: string;
                 members: {
                     role: "owner" | "member";
                     sessionId: string;
@@ -325,9 +325,9 @@ export declare const teamRoomProjectionDefinition: {
                 }[];
                 tasks: {
                     status: "todo" | "in-progress" | "done";
+                    title: string;
                     createdAt: number;
                     taskId: string;
-                    title: string;
                     description: string;
                     assigneeSessionId: string | null;
                     createdBy: string;
@@ -335,17 +335,17 @@ export declare const teamRoomProjectionDefinition: {
                 }[];
                 timeline: {
                     at: number;
+                    data: Record<string, unknown>;
                     kind: "room-created" | "member-joined" | "member-left" | "message-posted" | "message-directed" | "task-created" | "task-claimed" | "task-assigned" | "task-completed";
                     roomId: string;
                     seq: number;
-                    data: Record<string, unknown>;
                 }[];
             }[];
         }, {
             rooms: {
+                name: string;
                 createdAt: number;
                 roomId: string;
-                name: string;
                 members: {
                     role: "owner" | "member";
                     sessionId: string;
@@ -353,9 +353,9 @@ export declare const teamRoomProjectionDefinition: {
                 }[];
                 tasks: {
                     status: "todo" | "in-progress" | "done";
+                    title: string;
                     createdAt: number;
                     taskId: string;
-                    title: string;
                     description: string;
                     assigneeSessionId: string | null;
                     createdBy: string;
@@ -363,10 +363,10 @@ export declare const teamRoomProjectionDefinition: {
                 }[];
                 timeline: {
                     at: number;
+                    data: Record<string, unknown>;
                     kind: "room-created" | "member-joined" | "member-left" | "message-posted" | "message-directed" | "task-created" | "task-claimed" | "task-assigned" | "task-completed";
                     roomId: string;
                     seq: number;
-                    data: Record<string, unknown>;
                 }[];
             }[];
         }>;
