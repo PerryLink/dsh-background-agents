@@ -101,6 +101,8 @@ Cada ajuste é um campo Schemastery `Config` validado — altere no cordis.yml, 
 | `roomOpenTimeoutMs` | `15000` | Quanto tempo a abertura do domínio de armazenamento `team_rooms` pode demorar antes de cada operação falhar claramente (`store-unavailable`) em vez de travar |
 | `allowUnmarkedFacts` | `false` | Força eventos de fato em hosts que descartam o marcador `ignorable` (perigoso: fatos sem marcador tornam sessões irrecuperáveis em outros hosts); o padrão é detectar e pular |
 | `observability` | `true` | Interruptor de observabilidade de custo/estado por agente: captura um fato `metrics` por turno filho (tokens, tempo de parede do turno, sinalizador de erro) e os agrega nos totais `metrics` de cada linha para o painel de custo; `false` desativa a captura (o painel mostra as métricas como indisponíveis) |
+| `inbound.enabled` | `false` | Habilita a ponte de entrada JSON-RPC 2.0 sobre stdio para runtimes externos (OpenAI Agents SDK / CrewAI); desabilitado por padrão (fail-closed) |
+| `inbound.command` | *(nenhum)* | Comando de lançamento do runtime externo; quando habilitado e presente, o plugin o gera e escuta notificações JSON-RPC delimitadas por quebras de linha. Ausente/não gerável = a ponte permanece inativa (registrado) |
 
 ## Ferramentas e superfícies
 
@@ -169,6 +171,10 @@ Fora de escopo: acionamento programado (a costura de agendamento existe), agente
 - **Transferências com aprovação.** `room_transfer_task` passa pela costura oficial de aprovação e fecha em falha quando nenhum answerer a concede.
 - **Visível ao modelo ⟺ registrado.** Cada mensagem de sala entregue é um `user/message` durável no log do próprio membro; a linha do tempo compartilhada se espelha como eventos `team-room/fact` somente-log.
 - **Sem agendamento, sem agentes entre máquinas.** Os filhos são sessões continuáveis locais ao processo do deployment.
+
+## Entrada entre ecossistemas (P2)
+
+Runtimes de agentes externos — OpenAI Agents SDK, CrewAI e similares — podem publicar em uma sala de equipe por uma **ponte JSON-RPC 2.0 delimitada por quebras de linha sobre stdio** (conjunto mínimo de conexão direta; a compatibilidade total com o protocolo ACP aguarda a costura upstream). Ative com `inbound.enabled` e `inbound.command`; o runtime emite uma notificação JSON por linha onde `method` é o evento (`agent_started` abre um cartão no quadro, `agent_message` publica no barramento, `agent_finished` conclui o cartão). Mensagens inválidas são descartadas e um erro JSON-RPC é respondido; início e parada passam por um disposer.
 
 ## Limitações conhecidas
 

@@ -125,6 +125,24 @@ export interface Config {
      * the lifecycle dashboard and all tools keep working unchanged.
      */
     observability?: boolean;
+    /** Cross-ecosystem inbound bridge (P2) policy; absent = disabled. */
+    inbound?: InboundConfig;
+}
+/** Cross-ecosystem inbound bridge (P2) policy. */
+export interface InboundConfig {
+    /**
+     * Enable the newline-delimited JSON-RPC 2.0 stdio inbound bridge that lets
+     * external agent runtimes (OpenAI Agents SDK / CrewAI) publish into team
+     * rooms. Default `false` (fail-closed — the bridge never spawns unless
+     * explicitly enabled).
+     */
+    enabled?: boolean;
+    /**
+     * External runtime launch command. When `enabled` and present, the plugin
+     * spawns it and listens for notifications on its stdout. Absent or
+     * unspawnable = the bridge stays dormant with a logged warning.
+     */
+    command?: string;
 }
 /**
  * The single source of truth for every optional policy default: the schema
@@ -153,6 +171,9 @@ export declare const DEFAULTS: {
     readonly roomOpenTimeoutMs: 15000;
     readonly allowUnmarkedFacts: false;
     readonly observability: true;
+    readonly inbound: {
+        readonly enabled: false;
+    };
 };
 export declare const Config: Schema<Config>;
 /**

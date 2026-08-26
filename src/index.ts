@@ -35,12 +35,15 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import Schema from '@deepseek-ai/schemastery'
+import { SessionId } from '@deepseek-ai/dsh-session'
 import { BackgroundAgentLifecycle, reportProgress, startIdleSweep } from './lifecycle.ts'
 import { backgroundAgentsProjectionDefinition } from './projection.ts'
 import { registerBackgroundAgentTools } from './tools.ts'
 import { FactAppender } from './facts.ts'
 import { foldTurnMetrics } from './metrics.ts'
 import { FACT_EVENT } from './events.ts'
+import { deliveriesFor, InboundCoordinator, StdioJsonRpcInbound } from './inbound.ts'
+import type { InboundLogger, InboundSink } from './inbound.ts'
 import { RoomHub } from './room/hub.ts'
 import type { RoomConfig } from './room/hub.ts'
 import { registerRoomCommand } from './room/commands.ts'
@@ -140,6 +143,25 @@ export interface Config {
    * the lifecycle dashboard and all tools keep working unchanged.
    */
   observability?: boolean
+  /** Cross-ecosystem inbound bridge (P2) policy; absent = disabled. */
+  inbound?: InboundConfig
+}
+
+/** Cross-ecosystem inbound bridge (P2) policy. */
+export interface InboundConfig {
+  /**
+   * Enable the newline-delimited JSON-RPC 2.0 stdio inbound bridge that lets
+   * external agent runtimes (OpenAI Agents SDK / CrewAI) publish into team
+   * rooms. Default `false` (fail-closed — the bridge never spawns unless
+   * explicitly enabled).
+   */
+  enabled?: boolean
+  /**
+   * External runtime launch command. When `enabled` and present, the plugin
+   * spawns it and listens for notifications on its stdout. Absent or
+   * unspawnable = the bridge stays dormant with a logged warning.
+   */
+  command?: string
 }
 
 /**
@@ -169,6 +191,7 @@ export const DEFAULTS = {
   roomOpenTimeoutMs: 15_000,
   allowUnmarkedFacts: false,
   observability: true,
+  inbound: { enabled: false },
 } as const
 
 export const Config: Schema<Config> = Schema.object({
@@ -205,6 +228,10 @@ export const Config: Schema<Config> = Schema.object({
   roomOpenTimeoutMs: Schema.natural().min(1).max(Number.MAX_SAFE_INTEGER).default(DEFAULTS.roomOpenTimeoutMs),
   allowUnmarkedFacts: Schema.boolean().default(DEFAULTS.allowUnmarkedFacts),
   observability: Schema.boolean().default(DEFAULTS.observability),
+  inbound: Schema.object({
+    enabled: Schema.boolean().default(DEFAULTS.inbound.enabled),
+    command: Schema.string(),
+  }),
 })
 
 /**
@@ -282,6 +309,9 @@ export function apply(ctx: Context, config: Config): void {
   // first call.
   if (ctx.get('storageDomain') === undefined) {
     ctx.logger('background-agents').info('team rooms disabled: no storage domain composed (add @deepseek-ai/dsh-storage-domain to enable the /room command and the room_* tools)')
+    if (config.inbound?.enabled) {
+      ctx.logger('background-agents').warn('cross-ecosystem inbound disabled: enabled but no storage domain composed (team rooms are required)')
+    }
   }
   ctx.inject(['storageDomain'], (roomCtx) => {
     const hub = new RoomHub(roomCtx, roomPolicy, roomCtx.agents, roomCtx.sessions, facts)
@@ -298,6 +328,23 @@ export function apply(ctx: Context, config: Config): void {
         roomCtx.logger('background-agents').warn(`room catch-up failed for ${agent.id}: ${String(error)}`)
       })
     })
+
+    // Cross-ecosystem inbound (P2): spawn the external runtime and map its
+    // notifications onto the room's bus/board. Gated by inbound.enabled and
+    // mounted only where the room hub exists; start/stop ride the disposer.
+    if (config.inbound?.enabled) {
+      const command = config.inbound.command?.trim()
+      if (command === undefined || command === '') {
+        roomCtx.logger('background-agents').warn('inbound.enabled is true but inbound.command is empty; the stdio bridge stays dormant')
+      } else {
+        const coordinator = new InboundCoordinator()
+        const logger = roomCtx.logger('background-agents')
+        roomCtx.effect(() => coordinator.registerInboundAdapter(
+          new StdioJsonRpcInbound(command, logger),
+          inboundRoomSink(hub, logger),
+        ), 'dsh-background-agents: stdio JSON-RPC inbound bridge')
+      }
+    }
   })
 
   // Per-turn progress: observe tracked children's session events. A turn end
@@ -367,4 +414,56 @@ export function apply(ctx: Context, config: Config): void {
         + 'handing a task to another member.',
     })
   })
+}
+
+/**
+ * The room half of the inbound bridge: execute {@link deliveriesFor} against
+ * the team room's task board and message bus. External runtimes are not DSH
+ * sessions, so the room owner's member session stands in as the sender; a
+ * room with no owner member drops the event (fail-closed). The `traceId →
+ * taskId` map lets `agent_finished` close the card `agent_started` opened.
+ * @param hub - the room service owning the durable state.
+ * @param logger - where bridge rejection lines are logged.
+ * @returns the sink the stdio adapter emits normalized events into.
+ */
+function inboundRoomSink(hub: RoomHub, logger: InboundLogger): InboundSink {
+  const openTasks = new Map<string, string>()
+  return async (event) => {
+    const sender = await ownerSessionOf(hub, event.roomId)
+    if (sender === undefined) {
+      logger.warn(`inbound: room ${event.roomId} has no owner member; dropped ${event.method} (fail-closed)`)
+      return
+    }
+    try {
+      for (const delivery of deliveriesFor(event)) {
+        switch (delivery.kind) {
+          case 'task-open': {
+            const task = await hub.createTask({ roomId: delivery.roomId, bySessionId: sender, title: delivery.title })
+            openTasks.set(delivery.traceId, task.taskId)
+            break
+          }
+          case 'bus-post':
+            await hub.postMessage({ roomId: delivery.roomId, senderSessionId: sender, text: delivery.text })
+            break
+          case 'task-close': {
+            const taskId = openTasks.get(delivery.traceId)
+            if (taskId !== undefined) {
+              await hub.completeTask({ roomId: delivery.roomId, bySessionId: sender, taskId })
+              openTasks.delete(delivery.traceId)
+            }
+            break
+          }
+        }
+      }
+    } catch (error) {
+      logger.warn(`inbound: delivery for ${event.method} failed: ${String(error)}`)
+    }
+  }
+}
+
+/** Resolve the room's owner member session id (the bridge sender), or undefined. */
+async function ownerSessionOf(hub: RoomHub, roomId: string): Promise<SessionId | undefined> {
+  const room = await hub.room(roomId)
+  const owner = room?.members.find(member => member.role === 'owner')
+  return owner === undefined ? undefined : SessionId(owner.sessionId)
 }

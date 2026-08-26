@@ -101,6 +101,8 @@ bg_stop <agentId>
 | `roomOpenTimeoutMs` | `15000` | `team_rooms` 存储域打开的最长等待时间；超时后所有房间操作以 `store-unavailable` 明确失败，而不是永久挂起 |
 | `allowUnmarkedFacts` | `false` | 强制在丢弃 `ignorable` 标记的宿主上写入事实事件（危险：未标记事件会让会话在其他宿主上无法恢复）；默认自动探测并跳过 |
 | `observability` | `true` | 每个 agent 的成本/状态可观测开关：每个子回合采集一条 `metrics` 事实（token、回合耗时、错误标志），聚合进每行的 `metrics` 汇总供成本面板使用；设为 `false` 关闭采集（面板将指标显示为不可用） |
+| `inbound.enabled` | `false` | 开启面向外部代理运行时（OpenAI Agents SDK / CrewAI）的 stdio JSON-RPC 入站桥接；默认关闭（fail-closed） |
+| `inbound.command` | *(无)* | 外部运行时启动命令；开启且存在时插件会 spawn 它并监听换行分隔的 JSON-RPC 通知；缺失/无法 spawn = 桥接保持休眠（记日志） |
 
 ## 工具与界面
 
@@ -169,6 +171,29 @@ harness 核心自带它自己的子代理工具（`subagent`、`send_message`、
 - **审批门控的交接。** `room_transfer_task` 通过官方审批接缝路由，当没有 answerer 授权时以失败关闭。
 - **模型可见 ⟺ 已落盘。** 每一条投递的房间消息都是成员自身日志中持久化的 `user/message`；共享时间线以仅日志的 `team-room/fact` 事件镜像。
 - **无调度，无跨机器代理。** 子代理是该部署的进程内可续聊会话。
+
+## 跨生态入站（P2）
+
+外部代理运行时 —— OpenAI Agents SDK、CrewAI 等 —— 可通过一个极简的 **stdio 上换行分隔的 JSON-RPC 2.0 桥接** 发布到团队房间。这是 JSON-RPC 直连最小集，不是官方 ACP wire 协议：完整的 ACP 兼容需等待上游 seam。
+
+用两个 Config 字段开启，并把 `inbound.command` 指向一个在 stdout 上每行输出一条 JSON 通知的启动器：
+
+```yaml
+# cordis.yml（插件行）
+inbound:
+  enabled: true
+  command: "python external_runtime.py --room <room-id>"
+```
+
+运行时发出三种通知；`method` 是事件名，`params.name` 是外部代理的显示名：
+
+```json
+{"jsonrpc":"2.0","method":"agent_started","params":{"name":"researcher","room":"<room-id>","traceId":"t-1"}}
+{"jsonrpc":"2.0","method":"agent_message","params":{"name":"researcher","room":"<room-id>","traceId":"t-1","message":"found the failing test"}}
+{"jsonrpc":"2.0","method":"agent_finished","params":{"name":"researcher","room":"<room-id>","traceId":"t-1","status":"ok","usage":{"inputTokens":100,"outputTokens":40}}}
+```
+
+三者分别映射到房间既有界面：`agent_started` 在任务板开一张卡，`agent_message` 发到消息总线，`agent_finished` 完成该卡并发布结果。无效消息 fail-closed —— 丢弃并回写一条 JSON-RPC error。外部运行时不是 DSH 会话，因此由房间 owner 成员会话代发；无 owner 成员的房间会丢弃事件。启动/停止都由插件 fiber 通过 disposer 持有；无法 spawn 的 `inbound.command` 降级为一条日志警告（桥接保持休眠，其余不受影响）。
 
 ## 已知限制
 

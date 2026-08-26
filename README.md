@@ -102,6 +102,8 @@ Every tunable is a validated Schemastery `Config` field — change it in cordis.
 | `roomOpenTimeoutMs` | `15000` | How long the `team_rooms` storage-domain open may take before every room operation fails loud (`store-unavailable`) instead of hanging |
 | `allowUnmarkedFacts` | `false` | Force log-only fact events on hosts that drop the `ignorable` marker (dangerous: unmarked facts make sessions unresumable elsewhere); default is detect-and-skip |
 | `observability` | `true` | Per-agent cost/status observability toggle: capture one `metrics` fact per child turn (tokens, turn wall time, error flag) and aggregate them into each row's `metrics` totals for the cost panel; `false` disables the capture (the panel renders metrics as unavailable) |
+| `inbound.enabled` | `false` | Enable the stdio JSON-RPC inbound bridge for external agent runtimes (OpenAI Agents SDK / CrewAI). Disabled by default (fail-closed). |
+| `inbound.command` | *(none)* | External runtime launch command; when enabled and present, the plugin spawns it and listens for newline-delimited JSON-RPC notifications. Absent/unspawnable = the bridge stays dormant (logged). |
 
 ## Tools & surfaces
 
@@ -170,6 +172,29 @@ Not in scope: scheduled triggering (the schedule seam exists), cross-machine/rem
 - **Approval-gated handoffs.** `room_transfer_task` routes through the official approval seam and fails closed when no answerer grants it.
 - **Model-visible ⟺ logged.** Every delivered room message is a durable `user/message` in the member's own log; the shared timeline mirrors as log-only `team-room/fact` events.
 - **No scheduling, no cross-machine agents.** Children are process-local continuable sessions of the deployment.
+
+## Cross-ecosystem inbound (P2)
+
+External agent runtimes — OpenAI Agents SDK, CrewAI, and similar — can publish into a team room through a minimal **newline-delimited JSON-RPC 2.0 bridge over stdio**. This is a JSON-RPC direct-connect minimal set, not the official ACP wire protocol: full ACP compatibility waits for the upstream seam.
+
+Enable it with two Config fields and point `inbound.command` at a launcher that emits one JSON notification per line on stdout:
+
+```yaml
+# cordis.yml (plugin row)
+inbound:
+  enabled: true
+  command: "python external_runtime.py --room <room-id>"
+```
+
+The runtime emits three notification kinds; `method` is the event name and `params.name` is the external agent's display name:
+
+```json
+{"jsonrpc":"2.0","method":"agent_started","params":{"name":"researcher","room":"<room-id>","traceId":"t-1"}}
+{"jsonrpc":"2.0","method":"agent_message","params":{"name":"researcher","room":"<room-id>","traceId":"t-1","message":"found the failing test"}}
+{"jsonrpc":"2.0","method":"agent_finished","params":{"name":"researcher","room":"<room-id>","traceId":"t-1","status":"ok","usage":{"inputTokens":100,"outputTokens":40}}}
+```
+
+Each maps onto the room's existing surfaces: `agent_started` opens a task-board card, `agent_message` posts to the message bus, and `agent_finished` completes the card and posts the outcome. Invalid messages fail closed — they are dropped and a JSON-RPC error is written back. External runtimes are not DSH sessions, so the room owner's member session stands in as the sender; a room with no owner member drops the event. Start and stop are owned by the plugin fiber through a disposer; an unspawnable `inbound.command` degrades to a logged warning (the bridge stays dormant, nothing else is affected).
 
 ## Known limitations
 

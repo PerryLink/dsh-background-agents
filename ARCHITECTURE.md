@@ -61,6 +61,15 @@ log, and `bg_list` recovers through the official catalog.
 
 The client half registers into the `sidebar.footer.action` slot (the one list hole the sidebar shell declares): a trigger with a live running-count badge opens a floating panel. All rows derive from the `backgroundAgents` projection values riding the session-list snapshot — zero RPC for the rows themselves. Jump, message, stop, and the result peek go through the official client APIs: `sessions.refreshSubagents` + `sessions.openSubagent` (jump), `api.subagents.prompt` with `mode: 'continuable'` (message — a queued delivery whose answer is the child's next turn), `api.subagents.interrupt` with the durable parent/child address (stop), and the read-only `api.subagents.history` tail page (result — the last assistant text, extracted by a pure presenter function, never activating the child Agent). Rows carry the parent session title for disambiguation when several parents project agents; panel open/close moves focus into the dialog and back to the trigger. The presenter (`src/client/presenter.ts`) is a pure function of the snapshot — testable without a DOM.
 
+## Cross-ecosystem inbound (P2)
+
+`src/inbound.ts` adds a minimal newline-delimited JSON-RPC 2.0 bridge over stdio so external agent runtimes (OpenAI Agents SDK, CrewAI) can publish into a team room. This is a direct-connect minimal set — full ACP wire compatibility waits for the upstream seam.
+
+- **Wire**: one JSON notification per line on the child's stdout. `method` is the event name (`agent_started` | `agent_message` | `agent_finished`); `params` carries `name` (agent display name), `room`, `traceId`, optional `status` (`ok`/`error`), `message`, and optional `usage` token accounting. The zod `inboundParamsSchema` is `.strict()` — unknown fields fail closed.
+- **Seam**: `InboundCoordinator.registerInboundAdapter(adapter, sink)` returns a disposer; `StdioJsonRpcInbound` spawns `inbound.command`, parses lines, maps them to normalized `InboundEvent`s, and emits into the sink. Invalid lines are dropped and answered with a JSON-RPC error on the child's stdin.
+- **Mapping**: `deliveriesFor` translates each event onto the room's existing surfaces — `agent_started` → task-board card, `agent_message` → bus post, `agent_finished` → card close + outcome post. The `apply()` bridge (`inboundRoomSink`) executes those deliveries against the `RoomHub`; external runtimes are not DSH sessions, so the room owner's member session is the sender and a room with no owner drops the event.
+- **Lifecycle & config**: `inbound.enabled` (default `false`, fail-closed) and `inbound.command` gate the bridge, which mounts only where the storage domain (and thus the room hub) exists. Start/stop ride the fiber's effect disposer; an unspawnable command degrades to a logged warning with the bridge dormant.
+
 ## Boundaries
 
 - No scheduling: the schedule seam owns "when"; this plugin owns "steering a live conversation".
