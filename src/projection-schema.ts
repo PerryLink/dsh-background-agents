@@ -33,6 +33,23 @@ export const backgroundAgentEntrySchema = z.object({
   archivedAt: z.number().int().nonnegative().optional(),
   /** Epoch ms of the latest interrupt request, when one was recorded. */
   stopRequestedAt: z.number().int().nonnegative().optional(),
+  /**
+   * Aggregated per-agent cost/status totals, present once at least one
+   * `metrics` fact has folded. Absent = no turn has been observed yet (or the
+   * observability capture is disabled), so consumers render it as "unknown".
+   */
+  metrics: z.object({
+    /** Completed child turns that reported a metric sample. */
+    turnCount: z.number().int().nonnegative(),
+    /** Summed turn wall time over reported turns, ms. */
+    totalDurationMs: z.number().nonnegative(),
+    /** Summed uncached input tokens; null until a turn reports token accounting. */
+    inputTokens: z.number().int().nonnegative().nullable(),
+    /** Summed output tokens; null until a turn reports token accounting. */
+    outputTokens: z.number().int().nonnegative().nullable(),
+    /** Failed turns (`turn/end` with `reason.kind === 'error'`). */
+    errorCount: z.number().int().nonnegative(),
+  }).strict().optional(),
 }).strict()
 
 /** The whole wire value of the `backgroundAgents` projection unit. */
@@ -42,6 +59,9 @@ export const backgroundAgentsSchema = z.object({
 
 /** One background-agent row of the projection. */
 export type BackgroundAgentEntry = z.infer<typeof backgroundAgentEntrySchema>
+
+/** Per-agent aggregated cost/status totals carried on a projection row. */
+export type BackgroundAgentMetrics = NonNullable<BackgroundAgentEntry['metrics']>
 
 /** The whole `backgroundAgents` projection value. */
 export type BackgroundAgentsProjection = z.infer<typeof backgroundAgentsSchema>

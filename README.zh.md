@@ -100,6 +100,7 @@ bg_stop <agentId>
 | `injectRoomBrief` | `true` | 向成员会话注入简短房间简介（加入 + 恢复时） |
 | `roomOpenTimeoutMs` | `15000` | `team_rooms` 存储域打开的最长等待时间；超时后所有房间操作以 `store-unavailable` 明确失败，而不是永久挂起 |
 | `allowUnmarkedFacts` | `false` | 强制在丢弃 `ignorable` 标记的宿主上写入事实事件（危险：未标记事件会让会话在其他宿主上无法恢复）；默认自动探测并跳过 |
+| `observability` | `true` | 每个 agent 的成本/状态可观测开关：每个子回合采集一条 `metrics` 事实（token、回合耗时、错误标志），聚合进每行的 `metrics` 汇总供成本面板使用；设为 `false` 关闭采集（面板将指标显示为不可用） |
 
 ## 工具与界面
 

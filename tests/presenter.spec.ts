@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildAgentRows, extractResultText, relativeTime, rowStatus } from '../src/client/presenter.ts'
+import { buildAgentRows, buildCostReport, extractResultText, relativeTime, rowStatus } from '../src/client/presenter.ts'
 import type { BackgroundAgentEntry } from '../src/projection-schema.ts'
 import { noticeLine, parseNotice, PLUGIN, isBackgroundAgentsMeta } from '../src/vocabulary.ts'
 
@@ -106,6 +106,35 @@ describe('client presenter', () => {
     expect(extractResultText([reasoningOnly])).toBe('')
     expect(extractResultText([])).toBe('')
     expect(extractResultText([{ event: { type: 'tool/result', data: {} } }])).toBe('')
+  })
+
+  it('carries aggregated metrics onto the row when the entry reports them', () => {
+    const rows = buildAgentRows(list({
+      agents: [entry({
+        metrics: { turnCount: 2, totalDurationMs: 1500, inputTokens: 30, outputTokens: 20, errorCount: 1 },
+      })],
+    }))
+    expect(rows[0]!.metrics).toEqual({ turnCount: 2, totalDurationMs: 1500, inputTokens: 30, outputTokens: 20, errorCount: 1 })
+    // A row without metrics leaves the field absent (unknown, not zero).
+    expect(buildAgentRows(list({ agents: [entry()] }))[0]!.metrics).toBeUndefined()
+  })
+
+  it('builds a JSON cost report with error rate and null-preserving unknowns', () => {
+    const rows = buildAgentRows(list({
+      agents: [
+        entry({
+          metrics: { turnCount: 4, totalDurationMs: 4000, inputTokens: 100, outputTokens: 40, errorCount: 1 },
+        }),
+        entry({ agentId: 'child-2', metrics: { turnCount: 2, totalDurationMs: 0, inputTokens: null, outputTokens: null, errorCount: 0 } }),
+        entry({ agentId: 'child-3' }),
+      ],
+    }))
+    const report = buildCostReport(rows, 999)
+    expect(report.generatedAt).toBe(999)
+    const byId = new Map(report.agents.map(agent => [agent.agentId, agent]))
+    expect(byId.get('child-1')).toMatchObject({ turnCount: 4, inputTokens: 100, outputTokens: 40, errorCount: 1, errorRate: 0.25 })
+    expect(byId.get('child-2')).toMatchObject({ turnCount: 2, durationMs: 0, inputTokens: null, outputTokens: null, errorRate: 0 })
+    expect(byId.get('child-3')).toMatchObject({ turnCount: 0, durationMs: null, inputTokens: null, outputTokens: null, errorCount: 0, errorRate: null })
   })
 })
 

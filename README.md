@@ -101,6 +101,7 @@ Every tunable is a validated Schemastery `Config` field — change it in cordis.
 | `injectRoomBrief` | `true` | Inject the short room brief into member sessions (join + resume) |
 | `roomOpenTimeoutMs` | `15000` | How long the `team_rooms` storage-domain open may take before every room operation fails loud (`store-unavailable`) instead of hanging |
 | `allowUnmarkedFacts` | `false` | Force log-only fact events on hosts that drop the `ignorable` marker (dangerous: unmarked facts make sessions unresumable elsewhere); default is detect-and-skip |
+| `observability` | `true` | Per-agent cost/status observability toggle: capture one `metrics` fact per child turn (tokens, turn wall time, error flag) and aggregate them into each row's `metrics` totals for the cost panel; `false` disables the capture (the panel renders metrics as unavailable) |
 
 ## Tools & surfaces
 
@@ -115,9 +116,9 @@ Every tunable is a validated Schemastery `Config` field — change it in cordis.
 | `room_list_rooms` / `room_post` / `room_read` | tools | Message bus: roster, post (broadcast/directed), read history |
 | `room_list_tasks` / `room_create_task` / `room_claim_task` | tools | Shared task board |
 | `room_transfer_task` / `room_complete_task` | tools | Handoff (approval-gated) and completion |
-| `backgroundAgents` projection | session projection | Dashboard rows folded from the parent log |
+| `backgroundAgents` projection | session projection | Dashboard rows folded from the parent log, including per-agent `metrics` totals (tokens, turn wall time, error count) |
 | `teamRoom` projection | session projection | Shared timeline folded from `team-room/fact` events |
-| Web sidebar panel | client | Live status, jump, message, stop, result peek |
+| Web sidebar panel | client | Live status, jump, message, stop, result peek, per-agent cost/status totals, JSON export/copy |
 
 ## How it works — and why it survives restarts
 
@@ -125,7 +126,7 @@ Everything rides the official subagent seam: `startContinuable`, `followup`, `in
 
 The plugin writes every fact through **one structured channel and one model-visible channel**:
 
-- **`background-agents/fact` structured fact events** — the registered / message / stop / progress / archived facts, appended to the parent log as log-only records with the envelope's `ignorable: true` marker; readers that do not know the type skip the records instead of refusing the log. Hosts whose `Session.append` predates the marker (every released rc line through `0.1.0-rc.8` and `0.1.1-rc.2` drops it silently — the stamping fix exists on harness master only — making unmarked sessions unresumable on stricter builds) are detected before the first append (peer-version pre-check, then a probe of the returned envelope) and fact appends are skipped with a one-time warning — the durable store, the notices, and the tools keep working, and the projections degrade to an empty fact fold.
+- **`background-agents/fact` structured fact events** — the registered / message / stop / progress / archived facts plus the per-turn `metrics` samples (tokens, turn wall time, error flag), appended to the parent log as log-only records with the envelope's `ignorable: true` marker; readers that do not know the type skip the records instead of refusing the log. Hosts whose `Session.append` predates the marker (every released rc line through `0.1.0-rc.8` and `0.1.1-rc.2` drops it silently — the stamping fix exists on harness master only — making unmarked sessions unresumable on stricter builds) are detected before the first append (peer-version pre-check, then a probe of the returned envelope) and fact appends are skipped with a one-time warning — the durable store, the notices, and the tools keep working, and the projections degrade to an empty fact fold.
 - **`tool/result` replay metadata** — the same facts in logs written before the structured channel (folded only while a row has no structured provenance).
 - **injected `user/message` notices** (model-visible), source `{ kind: 'plugin', plugin: 'dsh-background-agents' }` — the throttled progress lines and archive notices (canonical `[background-agent <id>] …` prefix).
 - the **official `subagent-settled` notice** — the child's durable "settled" fact.
@@ -177,6 +178,7 @@ Not in scope: scheduled triggering (the schedule seam exists), cross-machine/rem
 - `maxBackgroundAgents` is a shared budget across **every** continuable direct child of the session, including ones the built-in `subagent` tool started.
 - One-shot children are never listed or messaged — `bg_list` keeps continuable rows only.
 - Children are process-local: the schedule seam owns "when", this plugin owns steering a live conversation.
+- Cost metrics are raw token/duration totals, not currency: the harness exposes no per-model pricing table to the plugin or the browser, so the cost panel and export never convert tokens to money (they show `—` when the adapter reports no token accounting).
 
 ## Development
 

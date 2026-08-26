@@ -5,7 +5,9 @@
  * `tool/result` replay metadata (registration / message / stop facts written
  * by this plugin's tools) and `user/message` (this plugin's injected notices
  * plus the official `subagent-settled` account) — so the value reconstructs
- * from the durable log on every reopen without any custom session event.
+ * from the durable log on every reopen without any custom session event. The
+ * `metrics` fact kind aggregates per-agent cost/status totals (tokens, turn
+ * wall time, error count) into each row's optional `metrics` field.
  *
  * @module dsh-background-agents/projection
  */
@@ -15,7 +17,7 @@ import type { ProjectionDefinition } from '@deepseek-ai/dsh-session-projection'
 import type { SessionEvent, UserMessage } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-subagent'
 import {
-  backgroundAgentEntrySchema, backgroundAgentsSchema, type BackgroundAgentEntry, type BackgroundAgentsProjection,
+  backgroundAgentEntrySchema, backgroundAgentsSchema, type BackgroundAgentEntry, type BackgroundAgentMetrics, type BackgroundAgentsProjection,
 } from './projection-schema.ts'
 import { FACT_EVENT } from './events.ts'
 import { isBackgroundAgentsMeta, parseNotice, PLUGIN } from './vocabulary.ts'
@@ -68,6 +70,36 @@ function merge(agentId: string, entry: StateEntry, delta: EntryDelta): StateEntr
     ...(delta.stopRequestedAt !== undefined || entry.stopRequestedAt !== undefined
       ? { stopRequestedAt: delta.stopRequestedAt ?? entry.stopRequestedAt }
       : {}),
+    ...(delta.metrics !== undefined || entry.metrics !== undefined
+      ? { metrics: delta.metrics ?? entry.metrics }
+      : {}),
+  }
+}
+
+/**
+ * Fold one `metrics` fact into the row's aggregated totals. Token totals stay
+ * `null` until a turn reports them (a `null` sample contributes nothing), so a
+ * partially-reporting adapter never fabricates a count.
+ */
+function foldMetrics(
+  current: BackgroundAgentMetrics | undefined,
+  fact: {
+    readonly durationMs: number | null
+    readonly inputTokens: number | null
+    readonly outputTokens: number | null
+    readonly error: boolean
+  },
+): BackgroundAgentMetrics {
+  return {
+    turnCount: (current?.turnCount ?? 0) + 1,
+    totalDurationMs: (current?.totalDurationMs ?? 0) + (fact.durationMs ?? 0),
+    inputTokens: fact.inputTokens === null
+      ? (current?.inputTokens ?? null)
+      : (current?.inputTokens ?? 0) + fact.inputTokens,
+    outputTokens: fact.outputTokens === null
+      ? (current?.outputTokens ?? null)
+      : (current?.outputTokens ?? 0) + fact.outputTokens,
+    errorCount: (current?.errorCount ?? 0) + (fact.error ? 1 : 0),
   }
 }
 
@@ -161,6 +193,14 @@ export const backgroundAgentsProjectionDefinition = {
               activity: 'archived',
               archivedAt: event.time,
               lastActiveAt: event.time,
+              source: 'event',
+            }, factBase(event.time))
+          case 'metrics':
+            // A metric sample changes only the cost/status totals — never the
+            // lifecycle display facts (activity, lastMessage, lastActiveAt).
+            if (existing === undefined) return state
+            return upsert(state, fact.agentId, {
+              metrics: foldMetrics(existing.metrics, fact),
               source: 'event',
             }, factBase(event.time))
           /* v8 ignore next 2 -- the closed union is total by construction. */
@@ -278,7 +318,7 @@ export const backgroundAgentsProjectionDefinition = {
           a.createdAt !== b.createdAt ? a.createdAt - b.createdAt : (a.agentId < b.agentId ? -1 : 1)),
     }),
   },
-  stateVersion: 2,
+  stateVersion: 3,
 } satisfies ProjectionDefinition<'backgroundAgents', State>
 
 declare module '@deepseek-ai/dsh-session-projection/types' {

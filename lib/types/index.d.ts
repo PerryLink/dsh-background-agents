@@ -115,6 +115,16 @@ export interface Config {
      * durable store and the model-visible notices keep working).
      */
     allowUnmarkedFacts?: boolean;
+    /**
+     * Per-agent cost/status observability toggle. When `true` (default), the
+     * turn observer captures one `metrics` fact per child `turn/end` (tokens,
+     * turn wall time, error flag) and the `backgroundAgents` projection
+     * aggregates them into each row's `metrics` totals for the cost panel.
+     * When `false`, no metric facts are written, so the per-agent aggregation
+     * stays empty and the client cost panel renders metrics as unavailable —
+     * the lifecycle dashboard and all tools keep working unchanged.
+     */
+    observability?: boolean;
 }
 /**
  * The single source of truth for every optional policy default: the schema
@@ -142,6 +152,7 @@ export declare const DEFAULTS: {
     readonly injectRoomBrief: true;
     readonly roomOpenTimeoutMs: 15000;
     readonly allowUnmarkedFacts: false;
+    readonly observability: true;
 };
 export declare const Config: Schema<Config>;
 /**

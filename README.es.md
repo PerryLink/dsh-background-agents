@@ -100,6 +100,7 @@ Cada opción es un campo Schemastery `Config` validado — cámbialo en cordis.y
 | `injectRoomBrief` | `true` | Inyecta el resumen breve de la sala en las sesiones miembro (al unirse + al reanudar) |
 | `roomOpenTimeoutMs` | `15000` | Cuánto puede tardar la apertura del dominio de almacenamiento `team_rooms` antes de que cada operación falle claramente (`store-unavailable`) en lugar de colgarse |
 | `allowUnmarkedFacts` | `false` | Fuerza los eventos de hecho en hosts que descartan el marcador `ignorable` (peligroso: los hechos sin marcar hacen las sesiones irrecuperables en otros hosts); por defecto se detecta y se omite |
+| `observability` | `true` | Conmutador de observabilidad de coste/estado por agente: captura un hecho `metrics` por turno hijo (tokens, tiempo de pared del turno, marca de error) y los agrega en los totales `metrics` de cada fila para el panel de coste; `false` desactiva la captura (el panel muestra las métricas como no disponibles) |
 
 ## Herramientas y superficies
 

@@ -241,3 +241,22 @@
   color: inherit;
   font-size: 11px;
 }
+
+.exportRow {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin-top: 4px;
+  font-size: 10px;
+  opacity: 0.75;
+}
+
+.metrics span {
+  white-space: nowrap;
+}

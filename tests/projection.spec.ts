@@ -180,7 +180,7 @@ describe('backgroundAgents projection', () => {
   })
 
   it('folds structured fact events into rows with the stateVersion bumped for the new semantics', () => {
-    expect(unit.stateVersion).toBe(2)
+    expect(unit.stateVersion).toBe(3)
     const rows = fold([
       event('background-agents/fact', { kind: 'registered', agentId: 'child-1', label: 'writer' }, 10),
     ])
@@ -264,5 +264,64 @@ describe('backgroundAgents projection', () => {
       toolResultEvent({ plugin: PLUGIN, action: 'message', agentId: 'child-1', messageId: 'm1' }, 21),
     ])
     expect(rows[0]).toMatchObject({ messageCount: 2, lastActiveAt: 20 })
+  })
+
+  it('aggregates metrics facts into per-agent cost/status totals', () => {
+    const rows = fold([
+      event('background-agents/fact', { kind: 'registered', agentId: 'child-1', label: 'writer' }, 10),
+      event('background-agents/fact', {
+        kind: 'metrics', agentId: 'child-1', turn: 1, durationMs: 1200, inputTokens: 100, outputTokens: 40, error: false,
+      }, 20),
+      event('background-agents/fact', {
+        kind: 'metrics', agentId: 'child-1', turn: 2, durationMs: 800, inputTokens: 60, outputTokens: 30, error: true,
+      }, 30),
+    ])
+    expect(rows[0]!.metrics).toEqual({
+      turnCount: 2,
+      totalDurationMs: 2000,
+      inputTokens: 160,
+      outputTokens: 70,
+      errorCount: 1,
+    })
+  })
+
+  it('keeps token totals unknown (null) while any turn reports no token accounting', () => {
+    const rows = fold([
+      event('background-agents/fact', { kind: 'registered', agentId: 'child-1', label: 'writer' }, 10),
+      event('background-agents/fact', {
+        kind: 'metrics', agentId: 'child-1', turn: 1, durationMs: null, inputTokens: null, outputTokens: null, error: false,
+      }, 20),
+    ])
+    expect(rows[0]!.metrics).toEqual({
+      turnCount: 1,
+      totalDurationMs: 0,
+      inputTokens: null,
+      outputTokens: null,
+      errorCount: 0,
+    })
+  })
+
+  it('a later token report starts the total from zero instead of fabricating one', () => {
+    const rows = fold([
+      event('background-agents/fact', { kind: 'registered', agentId: 'child-1', label: 'writer' }, 10),
+      event('background-agents/fact', {
+        kind: 'metrics', agentId: 'child-1', turn: 1, durationMs: 100, inputTokens: null, outputTokens: null, error: false,
+      }, 20),
+      event('background-agents/fact', {
+        kind: 'metrics', agentId: 'child-1', turn: 2, durationMs: 200, inputTokens: 10, outputTokens: 5, error: false,
+      }, 30),
+    ])
+    expect(rows[0]!.metrics).toMatchObject({ turnCount: 2, inputTokens: 10, outputTokens: 5 })
+  })
+
+  it('ignores metrics facts for unknown children and leaves lifecycle facts untouched', () => {
+    const rows = fold([
+      event('background-agents/fact', { kind: 'registered', agentId: 'child-1', label: 'writer' }, 10),
+      event('background-agents/fact', {
+        kind: 'metrics', agentId: 'ghost', turn: 1, durationMs: 100, inputTokens: 1, outputTokens: 1, error: false,
+      }, 20),
+    ])
+    expect(rows).toHaveLength(1)
+    expect(rows[0]).not.toHaveProperty('metrics')
   })
 })

@@ -28,6 +28,12 @@ export declare const zh: {
     readonly 'time.days': "{n} 天前";
     readonly 'time.months': "{n} 个月前";
     readonly 'time.years': "{n} 年前";
+    readonly 'metrics.turns': "{n} 回合";
+    readonly 'metrics.duration': "耗时 {n}";
+    readonly 'metrics.tokens': "{input} 入 / {output} 出";
+    readonly 'metrics.errors': "{n} 错误";
+    readonly 'export.download': "导出成本 JSON";
+    readonly 'export.copy': "复制";
 };
 /** English dictionary, key-identical to the Chinese source of truth. */
 export declare const en: Record<BackgroundAgentsKey, string>;

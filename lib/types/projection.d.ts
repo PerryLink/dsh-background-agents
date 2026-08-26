@@ -5,7 +5,9 @@
  * `tool/result` replay metadata (registration / message / stop facts written
  * by this plugin's tools) and `user/message` (this plugin's injected notices
  * plus the official `subagent-settled` account) — so the value reconstructs
- * from the durable log on every reopen without any custom session event.
+ * from the durable log on every reopen without any custom session event. The
+ * `metrics` fact kind aggregates per-agent cost/status totals (tokens, turn
+ * wall time, error count) into each row's optional `metrics` field.
  *
  * @module dsh-background-agents/projection
  */
@@ -50,6 +52,25 @@ export declare const backgroundAgentsProjectionDefinition: {
                 lastActiveAt: z.ZodNumber;
                 archivedAt: z.ZodOptional<z.ZodNumber>;
                 stopRequestedAt: z.ZodOptional<z.ZodNumber>;
+                metrics: z.ZodOptional<z.ZodObject<{
+                    turnCount: z.ZodNumber;
+                    totalDurationMs: z.ZodNumber;
+                    inputTokens: z.ZodNullable<z.ZodNumber>;
+                    outputTokens: z.ZodNullable<z.ZodNumber>;
+                    errorCount: z.ZodNumber;
+                }, "strict", z.ZodTypeAny, {
+                    turnCount: number;
+                    totalDurationMs: number;
+                    inputTokens: number | null;
+                    outputTokens: number | null;
+                    errorCount: number;
+                }, {
+                    turnCount: number;
+                    totalDurationMs: number;
+                    inputTokens: number | null;
+                    outputTokens: number | null;
+                    errorCount: number;
+                }>>;
             }, "strict", z.ZodTypeAny, {
                 agentId: string;
                 label: string;
@@ -57,6 +78,13 @@ export declare const backgroundAgentsProjectionDefinition: {
                 messageCount: number;
                 createdAt: number;
                 lastActiveAt: number;
+                metrics?: {
+                    turnCount: number;
+                    totalDurationMs: number;
+                    inputTokens: number | null;
+                    outputTokens: number | null;
+                    errorCount: number;
+                } | undefined;
                 lastMessage?: string | undefined;
                 archivedAt?: number | undefined;
                 stopRequestedAt?: number | undefined;
@@ -67,6 +95,13 @@ export declare const backgroundAgentsProjectionDefinition: {
                 messageCount: number;
                 createdAt: number;
                 lastActiveAt: number;
+                metrics?: {
+                    turnCount: number;
+                    totalDurationMs: number;
+                    inputTokens: number | null;
+                    outputTokens: number | null;
+                    errorCount: number;
+                } | undefined;
                 lastMessage?: string | undefined;
                 archivedAt?: number | undefined;
                 stopRequestedAt?: number | undefined;
@@ -79,6 +114,13 @@ export declare const backgroundAgentsProjectionDefinition: {
                 messageCount: number;
                 createdAt: number;
                 lastActiveAt: number;
+                metrics?: {
+                    turnCount: number;
+                    totalDurationMs: number;
+                    inputTokens: number | null;
+                    outputTokens: number | null;
+                    errorCount: number;
+                } | undefined;
                 lastMessage?: string | undefined;
                 archivedAt?: number | undefined;
                 stopRequestedAt?: number | undefined;
@@ -91,6 +133,13 @@ export declare const backgroundAgentsProjectionDefinition: {
                 messageCount: number;
                 createdAt: number;
                 lastActiveAt: number;
+                metrics?: {
+                    turnCount: number;
+                    totalDurationMs: number;
+                    inputTokens: number | null;
+                    outputTokens: number | null;
+                    errorCount: number;
+                } | undefined;
                 lastMessage?: string | undefined;
                 archivedAt?: number | undefined;
                 stopRequestedAt?: number | undefined;

@@ -39,6 +39,8 @@ import { BackgroundAgentLifecycle, reportProgress, startIdleSweep } from './life
 import { backgroundAgentsProjectionDefinition } from './projection.ts'
 import { registerBackgroundAgentTools } from './tools.ts'
 import { FactAppender } from './facts.ts'
+import { foldTurnMetrics } from './metrics.ts'
+import { FACT_EVENT } from './events.ts'
 import { RoomHub } from './room/hub.ts'
 import type { RoomConfig } from './room/hub.ts'
 import { registerRoomCommand } from './room/commands.ts'
@@ -128,6 +130,16 @@ export interface Config {
    * durable store and the model-visible notices keep working).
    */
   allowUnmarkedFacts?: boolean
+  /**
+   * Per-agent cost/status observability toggle. When `true` (default), the
+   * turn observer captures one `metrics` fact per child `turn/end` (tokens,
+   * turn wall time, error flag) and the `backgroundAgents` projection
+   * aggregates them into each row's `metrics` totals for the cost panel.
+   * When `false`, no metric facts are written, so the per-agent aggregation
+   * stays empty and the client cost panel renders metrics as unavailable —
+   * the lifecycle dashboard and all tools keep working unchanged.
+   */
+  observability?: boolean
 }
 
 /**
@@ -156,6 +168,7 @@ export const DEFAULTS = {
   injectRoomBrief: true,
   roomOpenTimeoutMs: 15_000,
   allowUnmarkedFacts: false,
+  observability: true,
 } as const
 
 export const Config: Schema<Config> = Schema.object({
@@ -191,6 +204,7 @@ export const Config: Schema<Config> = Schema.object({
   injectRoomBrief: Schema.boolean().default(DEFAULTS.injectRoomBrief),
   roomOpenTimeoutMs: Schema.natural().min(1).max(Number.MAX_SAFE_INTEGER).default(DEFAULTS.roomOpenTimeoutMs),
   allowUnmarkedFacts: Schema.boolean().default(DEFAULTS.allowUnmarkedFacts),
+  observability: Schema.boolean().default(DEFAULTS.observability),
 })
 
 /**
@@ -218,6 +232,7 @@ export function apply(ctx: Context, config: Config): void {
     childModel: config.childModel,
     maxChildDepth: config.maxChildDepth,
     allowedChildTools: config.allowedChildTools,
+    observability: config.observability ?? DEFAULTS.observability,
   }
   const roomPolicy: RoomConfig = {
     maxRooms: config.maxRooms ?? DEFAULTS.maxRooms,
@@ -291,6 +306,23 @@ export function apply(ctx: Context, config: Config): void {
     const child = lifecycle.get(session.id)
     if (child === undefined) return
     lifecycle.touch(session.id, event.time)
+    // Per-turn cost/status capture: fold the child event into the in-flight
+    // accumulator, and at `turn/end` flush one `metrics` fact to the parent
+    // log (the projection aggregates it). Gated by the observability toggle.
+    if (policy.observability) {
+      const folded = foldTurnMetrics(child.turnMetrics, event)
+      child.turnMetrics = folded.state
+      if (folded.observation !== undefined) {
+        const parent = ctx.agents.get(child.parentSessionId)
+        if (parent !== undefined) {
+          facts.append(parent.session, FACT_EVENT, {
+            kind: 'metrics',
+            agentId: child.childId,
+            ...folded.observation,
+          })
+        }
+      }
+    }
     if (event.type !== 'turn/end') return
     try {
       reportProgress(ctx.agents, ctx.sessions, policy, lifecycle, child, event.time, facts)

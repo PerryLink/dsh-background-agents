@@ -17,6 +17,7 @@ import type { AgentRegistry } from '@deepseek-ai/dsh-agent'
 import { finalAssistantOutput, SubagentError } from '@deepseek-ai/dsh-subagent'
 import { FACT_EVENT } from './events.ts'
 import type { FactAppender } from './facts.ts'
+import { emptyTurnMetricState, type TurnMetricState } from './metrics.ts'
 import { isBackgroundAgentsProjection } from './projection-schema.ts'
 import { noticeLine, PLUGIN } from './vocabulary.ts'
 
@@ -59,6 +60,12 @@ export interface TrackedChild {
   lastReportAt: number
   /** Set by the sweep; archived children stop being observed. */
   archived: boolean
+  /**
+   * In-flight turn-metric accumulator (cache, never durable): the observer
+   * folds child events into it and flushes a `metrics` fact at `turn/end`.
+   * Losing it (crash/reload) only costs the metrics of the in-flight turn.
+   */
+  turnMetrics: TurnMetricState
 }
 
 /** Read face of the live agent registry the lifecycle needs. */
@@ -92,6 +99,9 @@ export class BackgroundAgentLifecycle {
       // never the first one (a child's first turn may end right after start).
       lastReportAt: existing?.lastReportAt ?? -1,
       archived: false,
+      // A cold resume (bg_message) re-registers while a turn may be in flight;
+      // keep the accumulator so the in-flight turn's metrics still fold.
+      turnMetrics: existing?.turnMetrics ?? emptyTurnMetricState,
     })
   }
 

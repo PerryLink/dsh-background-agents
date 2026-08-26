@@ -30,6 +30,12 @@ export const zh = {
   'time.days': '{n} 天前',
   'time.months': '{n} 个月前',
   'time.years': '{n} 年前',
+  'metrics.turns': '{n} 回合',
+  'metrics.duration': '耗时 {n}',
+  'metrics.tokens': '{input} 入 / {output} 出',
+  'metrics.errors': '{n} 错误',
+  'export.download': '导出成本 JSON',
+  'export.copy': '复制',
 } as const
 
 /** English dictionary, key-identical to the Chinese source of truth. */
@@ -59,6 +65,12 @@ export const en: Record<BackgroundAgentsKey, string> = {
   'time.days': '{n}d ago',
   'time.months': '{n}mo ago',
   'time.years': '{n}y ago',
+  'metrics.turns': '{n} turns',
+  'metrics.duration': '{n}',
+  'metrics.tokens': '{input} in / {output} out',
+  'metrics.errors': '{n} errors',
+  'export.download': 'Export cost JSON',
+  'export.copy': 'Copy',
 }
 
 // NOTE: no es/pt/hi dictionaries here by seam constraint — the harness

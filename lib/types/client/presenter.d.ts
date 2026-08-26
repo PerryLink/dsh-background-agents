@@ -7,7 +7,7 @@
  *
  * @module dsh-background-agents/presenter
  */
-import { type BackgroundAgentEntry } from '../projection-schema.js';
+import { type BackgroundAgentEntry, type BackgroundAgentMetrics } from '../projection-schema.js';
 /** Display status of one row: the durable fact overlaid with the live running bit. */
 export type RowStatus = 'running' | 'idle' | 'settled' | 'archived';
 /** One rendered dashboard row. */
@@ -29,6 +29,8 @@ export interface AgentRow {
     readonly createdAt: number;
     /** Epoch ms of the last folded fact. */
     readonly lastActiveAt: number;
+    /** Aggregated cost/status totals, when at least one metric fact folded. */
+    readonly metrics?: BackgroundAgentMetrics;
 }
 /** The session-list face the presenter reads (host-sampled `running` per session). */
 export interface SessionListLike {
@@ -86,4 +88,32 @@ export interface HistoryEntryLike {
  * @returns the joined text of the last assistant text message.
  */
 export declare function extractResultText(entries: readonly HistoryEntryLike[]): string;
+/** One exported cost row (plain JSON: no host references, lossless over the wire). */
+export interface CostReportRow {
+    readonly agentId: string;
+    readonly label: string;
+    readonly status: RowStatus;
+    readonly turnCount: number;
+    readonly durationMs: number | null;
+    readonly inputTokens: number | null;
+    readonly outputTokens: number | null;
+    readonly errorCount: number;
+    /** Failed turns over observed turns; null when no turn was observed. */
+    readonly errorRate: number | null;
+}
+/** The whole export value (raw observability JSON; currency pricing is not applied). */
+export interface CostReport {
+    readonly generatedAt: number;
+    readonly agents: CostReportRow[];
+}
+/**
+ * Build the plain-JSON cost report from the rendered rows. Token totals and
+ * duration stay `null` for rows without a folded metric sample (absent = the
+ * adapter reported none or the observability capture is disabled), so the
+ * export never fabricates a zero. Error rate is `errorCount / turnCount`.
+ * @param rows - the rendered dashboard rows.
+ * @param now - epoch ms now (injected for purity).
+ * @returns the JSON-serializable report.
+ */
+export declare function buildCostReport(rows: AgentRow[], now: number): CostReport;
 //# sourceMappingURL=presenter.d.ts.map

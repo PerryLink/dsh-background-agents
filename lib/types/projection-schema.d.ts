@@ -31,6 +31,35 @@ export declare const backgroundAgentEntrySchema: z.ZodObject<{
     archivedAt: z.ZodOptional<z.ZodNumber>;
     /** Epoch ms of the latest interrupt request, when one was recorded. */
     stopRequestedAt: z.ZodOptional<z.ZodNumber>;
+    /**
+     * Aggregated per-agent cost/status totals, present once at least one
+     * `metrics` fact has folded. Absent = no turn has been observed yet (or the
+     * observability capture is disabled), so consumers render it as "unknown".
+     */
+    metrics: z.ZodOptional<z.ZodObject<{
+        /** Completed child turns that reported a metric sample. */
+        turnCount: z.ZodNumber;
+        /** Summed turn wall time over reported turns, ms. */
+        totalDurationMs: z.ZodNumber;
+        /** Summed uncached input tokens; null until a turn reports token accounting. */
+        inputTokens: z.ZodNullable<z.ZodNumber>;
+        /** Summed output tokens; null until a turn reports token accounting. */
+        outputTokens: z.ZodNullable<z.ZodNumber>;
+        /** Failed turns (`turn/end` with `reason.kind === 'error'`). */
+        errorCount: z.ZodNumber;
+    }, "strict", z.ZodTypeAny, {
+        turnCount: number;
+        totalDurationMs: number;
+        inputTokens: number | null;
+        outputTokens: number | null;
+        errorCount: number;
+    }, {
+        turnCount: number;
+        totalDurationMs: number;
+        inputTokens: number | null;
+        outputTokens: number | null;
+        errorCount: number;
+    }>>;
 }, "strict", z.ZodTypeAny, {
     agentId: string;
     label: string;
@@ -41,6 +70,13 @@ export declare const backgroundAgentEntrySchema: z.ZodObject<{
     lastMessage?: string | undefined;
     archivedAt?: number | undefined;
     stopRequestedAt?: number | undefined;
+    metrics?: {
+        turnCount: number;
+        totalDurationMs: number;
+        inputTokens: number | null;
+        outputTokens: number | null;
+        errorCount: number;
+    } | undefined;
 }, {
     agentId: string;
     label: string;
@@ -51,6 +87,13 @@ export declare const backgroundAgentEntrySchema: z.ZodObject<{
     lastMessage?: string | undefined;
     archivedAt?: number | undefined;
     stopRequestedAt?: number | undefined;
+    metrics?: {
+        turnCount: number;
+        totalDurationMs: number;
+        inputTokens: number | null;
+        outputTokens: number | null;
+        errorCount: number;
+    } | undefined;
 }>;
 /** The whole wire value of the `backgroundAgents` projection unit. */
 export declare const backgroundAgentsSchema: z.ZodObject<{
@@ -77,6 +120,35 @@ export declare const backgroundAgentsSchema: z.ZodObject<{
         archivedAt: z.ZodOptional<z.ZodNumber>;
         /** Epoch ms of the latest interrupt request, when one was recorded. */
         stopRequestedAt: z.ZodOptional<z.ZodNumber>;
+        /**
+         * Aggregated per-agent cost/status totals, present once at least one
+         * `metrics` fact has folded. Absent = no turn has been observed yet (or the
+         * observability capture is disabled), so consumers render it as "unknown".
+         */
+        metrics: z.ZodOptional<z.ZodObject<{
+            /** Completed child turns that reported a metric sample. */
+            turnCount: z.ZodNumber;
+            /** Summed turn wall time over reported turns, ms. */
+            totalDurationMs: z.ZodNumber;
+            /** Summed uncached input tokens; null until a turn reports token accounting. */
+            inputTokens: z.ZodNullable<z.ZodNumber>;
+            /** Summed output tokens; null until a turn reports token accounting. */
+            outputTokens: z.ZodNullable<z.ZodNumber>;
+            /** Failed turns (`turn/end` with `reason.kind === 'error'`). */
+            errorCount: z.ZodNumber;
+        }, "strict", z.ZodTypeAny, {
+            turnCount: number;
+            totalDurationMs: number;
+            inputTokens: number | null;
+            outputTokens: number | null;
+            errorCount: number;
+        }, {
+            turnCount: number;
+            totalDurationMs: number;
+            inputTokens: number | null;
+            outputTokens: number | null;
+            errorCount: number;
+        }>>;
     }, "strict", z.ZodTypeAny, {
         agentId: string;
         label: string;
@@ -87,6 +159,13 @@ export declare const backgroundAgentsSchema: z.ZodObject<{
         lastMessage?: string | undefined;
         archivedAt?: number | undefined;
         stopRequestedAt?: number | undefined;
+        metrics?: {
+            turnCount: number;
+            totalDurationMs: number;
+            inputTokens: number | null;
+            outputTokens: number | null;
+            errorCount: number;
+        } | undefined;
     }, {
         agentId: string;
         label: string;
@@ -97,6 +176,13 @@ export declare const backgroundAgentsSchema: z.ZodObject<{
         lastMessage?: string | undefined;
         archivedAt?: number | undefined;
         stopRequestedAt?: number | undefined;
+        metrics?: {
+            turnCount: number;
+            totalDurationMs: number;
+            inputTokens: number | null;
+            outputTokens: number | null;
+            errorCount: number;
+        } | undefined;
     }>, "many">;
 }, "strict", z.ZodTypeAny, {
     agents: {
@@ -109,6 +195,13 @@ export declare const backgroundAgentsSchema: z.ZodObject<{
         lastMessage?: string | undefined;
         archivedAt?: number | undefined;
         stopRequestedAt?: number | undefined;
+        metrics?: {
+            turnCount: number;
+            totalDurationMs: number;
+            inputTokens: number | null;
+            outputTokens: number | null;
+            errorCount: number;
+        } | undefined;
     }[];
 }, {
     agents: {
@@ -121,10 +214,19 @@ export declare const backgroundAgentsSchema: z.ZodObject<{
         lastMessage?: string | undefined;
         archivedAt?: number | undefined;
         stopRequestedAt?: number | undefined;
+        metrics?: {
+            turnCount: number;
+            totalDurationMs: number;
+            inputTokens: number | null;
+            outputTokens: number | null;
+            errorCount: number;
+        } | undefined;
     }[];
 }>;
 /** One background-agent row of the projection. */
 export type BackgroundAgentEntry = z.infer<typeof backgroundAgentEntrySchema>;
+/** Per-agent aggregated cost/status totals carried on a projection row. */
+export type BackgroundAgentMetrics = NonNullable<BackgroundAgentEntry['metrics']>;
 /** The whole `backgroundAgents` projection value. */
 export type BackgroundAgentsProjection = z.infer<typeof backgroundAgentsSchema>;
 /**

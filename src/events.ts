@@ -55,6 +55,27 @@ export type BackgroundAgentsFact =
     readonly kind: 'archived'
     readonly agentId: string
   }
+  | {
+    /**
+     * One child turn's observability sample, captured at `turn/end` by the
+     * lifecycle observer and folded into the row's aggregated cost/status
+     * totals. Token fields are `null` when the adapter reported none for the
+     * whole turn (graceful degradation, never an error); `error` records a
+     * failed turn (`reason.kind === 'error'`) for the error-rate total.
+     */
+    readonly kind: 'metrics'
+    readonly agentId: string
+    /** The child turn this sample belongs to (provenance only). */
+    readonly turn: number
+    /** Turn wall time ms (`turn/start` → `turn/end`), null when the start was not observed. */
+    readonly durationMs: number | null
+    /** Turn uncached input tokens, null when the adapter reported none. */
+    readonly inputTokens: number | null
+    /** Turn output tokens, null when the adapter reported none. */
+    readonly outputTokens: number | null
+    /** Whether the turn ended with `reason.kind === 'error'`. */
+    readonly error: boolean
+  }
 
 declare module '@deepseek-ai/dsh-session/types' {
   interface SessionEventMap {

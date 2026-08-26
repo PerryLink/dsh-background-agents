@@ -13,6 +13,7 @@ import type { Agent } from '@deepseek-ai/dsh-agent';
 import type { Session, SessionEvent, SessionId } from '@deepseek-ai/dsh-session';
 import type { AgentRegistry } from '@deepseek-ai/dsh-agent';
 import type { FactAppender } from './facts.js';
+import { type TurnMetricState } from './metrics.js';
 /** Tunables the lifecycle honors; every threshold is a validated Config field. */
 export interface LifecycleConfig {
     readonly autoReport: boolean;
@@ -51,6 +52,12 @@ export interface TrackedChild {
     lastReportAt: number;
     /** Set by the sweep; archived children stop being observed. */
     archived: boolean;
+    /**
+     * In-flight turn-metric accumulator (cache, never durable): the observer
+     * folds child events into it and flushes a `metrics` fact at `turn/end`.
+     * Losing it (crash/reload) only costs the metrics of the in-flight turn.
+     */
+    turnMetrics: TurnMetricState;
 }
 /** Read face of the live agent registry the lifecycle needs. */
 export interface LiveAgents {

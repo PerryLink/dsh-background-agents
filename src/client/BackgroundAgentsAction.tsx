@@ -11,7 +11,7 @@ import { createPortal } from 'react-dom'
 import type { PropsLocale, PropsRuntime, TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import { IconBranchOutline16, Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
-import { buildAgentRows, relativeTime, type AgentRow, type RowStatus, type SessionListLike } from './presenter.ts'
+import { buildAgentRows, buildCostReport, relativeTime, type AgentRow, type RowStatus, type SessionListLike } from './presenter.ts'
 import { NS } from './locales.ts'
 import css from './BackgroundAgentsAction.module.css'
 
@@ -70,6 +70,22 @@ function statusLabel(status: RowStatus, t: TranslateNS<typeof NS>): string {
   }
 }
 
+/** One token count for display: `—` when the adapter never reported one. */
+function fmtTokens(n: number | null): string {
+  return n === null ? '—' : String(n)
+}
+
+/** Compact duration for a row's summed turn wall time. */
+function fmtDuration(ms: number): string {
+  if (ms < 1000) return `${ms}ms`
+  const seconds = ms / 1000
+  if (seconds < 60) return `${seconds.toFixed(1)}s`
+  const minutes = Math.floor(seconds / 60)
+  if (minutes < 60) return `${minutes}m ${Math.round(seconds % 60)}s`
+  const hours = Math.floor(minutes / 60)
+  return `${hours}h ${minutes % 60}m`
+}
+
 /** One open result peek: the row it belongs to plus its load state. */
 interface ResultState {
   readonly id: string
@@ -107,6 +123,14 @@ function Row({ row, t, now, busy, showParent, composing, draft, result, onResult
       </div>
       {showParent && row.parentTitle !== undefined && <div className={css.parentTitle}>{row.parentTitle}</div>}
       {row.lastMessage !== undefined && <div className={css.lastMessage}>{row.lastMessage}</div>}
+      {row.metrics !== undefined && (
+        <div className={css.metrics}>
+          <span>{t('metrics.turns', { n: row.metrics.turnCount })}</span>
+          <span>{t('metrics.duration', { n: fmtDuration(row.metrics.totalDurationMs) })}</span>
+          <span>{t('metrics.tokens', { input: fmtTokens(row.metrics.inputTokens), output: fmtTokens(row.metrics.outputTokens) })}</span>
+          <span>{t('metrics.errors', { n: row.metrics.errorCount })}</span>
+        </div>
+      )}
       <div className={css.actions}>
         <button type="button" className={css.action} disabled={busy} onClick={onOpen}>{t('row.open')}</button>
         <button
@@ -262,6 +286,32 @@ export function BackgroundAgentsAction({
     }
   }
 
+  // Cost export: raw token/duration JSON. The browser cannot verify or convert
+  // currency cost — no per-model pricing table crosses the client boundary —
+  // so the export is the observability totals verbatim and the host (or the
+  // consuming tooling) owns any pricing. Both paths are defensive: download
+  // degrades to nothing when Blob/URL is unavailable, copy surfaces the error.
+  const downloadCost = (): void => {
+    const report = buildCostReport(rows, Date.now())
+    const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = 'background-agents-cost.json'
+    document.body.appendChild(anchor)
+    anchor.click()
+    anchor.remove()
+    URL.revokeObjectURL(url)
+  }
+
+  const copyCost = async (): Promise<void> => {
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(buildCostReport(rows, Date.now()), null, 2))
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : String(failure))
+    }
+  }
+
   return (
     <div className={css.triggerWrap} ref={wrapRef}>
       <Tooltip label={t('trigger.aria')} delayMs={500}>
@@ -284,6 +334,12 @@ export function BackgroundAgentsAction({
       {open && createPortal(
         <div className={css.panel} style={anchor} role="dialog" aria-label={t('panel.title')} ref={panelRef} tabIndex={-1}>
           <div className={css.panelTitle}>{t('panel.title')}</div>
+          {rows.length > 0 && (
+            <div className={css.exportRow}>
+              <button type="button" className={css.action} onClick={downloadCost}>{t('export.download')}</button>
+              <button type="button" className={css.action} onClick={() => { void copyCost() }}>{t('export.copy')}</button>
+            </div>
+          )}
           {error !== undefined && <div className={css.error}>{error}</div>}
           {rows.length === 0
             ? <div className={css.empty}>{t('panel.empty')}</div>
