@@ -1,6 +1,7 @@
 <div align="center">
 
 # 👥 dsh-background-agents
+- **Canal 1024 store**: `npm i -g dsh1024` uma vez, depois `dsh1024 plugin --profile web add dsh-background-agents` (conta para o ranking de instalações do [deepseek1024.com](https://deepseek1024.com)).
 
 **Agentes de segundo plano interativos de sessão longa mais salas de equipe multiagente persistentes para o DeepSeek Harness — inicie um agente filho durável que continua trabalhando enquanto você continua conversando.**
 

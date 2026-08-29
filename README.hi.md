@@ -1,6 +1,7 @@
 <div align="center">
 
 # 👥 dsh-background-agents
+- **1024 स्टोर चैनल**: एक बार `npm i -g dsh1024`, फिर `dsh1024 plugin --profile web add dsh-background-agents` ([deepseek1024.com](https://deepseek1024.com) इंस्टॉल रैंकिंग में गिना जाता है)।
 
 **DeepSeek Harness के लिए इंटरैक्टिव लंबी-सत्र वाले बैकग्राउंड एजेंट और लगातार बने रहने वाले मल्टी-एजेंट टीम रूम — एक टिकाऊ चाइल्ड एजेंट शुरू करें जो काम करता रहे जबकि आप बातचीत जारी रखें।**
 

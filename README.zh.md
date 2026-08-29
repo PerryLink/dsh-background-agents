@@ -1,6 +1,7 @@
 <div align="center">
 
 # 👥 dsh-background-agents
+- **1024 商店渠道**：先 `npm i -g dsh1024`，再 `dsh1024 plugin --profile web add dsh-background-agents`（计入 [deepseek1024.com](https://deepseek1024.com) 安装排行）。
 
 **为 DeepSeek Harness 提供可交互的长会话后台代理，以及持久化的多代理团队房间 —— 启动一个持久的子代理，它一边持续工作，你一边继续对话。**
 
