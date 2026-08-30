@@ -49,4 +49,22 @@ export declare function isUnmarkedHostVersion(version: string): boolean;
  * @returns the version string, or null when the peer cannot be resolved.
  */
 export declare function peerSessionVersion(): string | null;
+/**
+ * Host policy for log-only fact events.
+ * `append` = the rc lines through `0.1.1-rc.2`: fact events may be
+ * appended when the `ignorable` marker is honored; `forbidden` = hosts at
+ * `0.1.2-alpha.1` and later, which fail closed on the session event
+ * vocabulary (`background-agents/fact` and `team-room/fact` are not in
+ * KNOWN_SESSION_EVENT_TYPES, so a written fact makes the session
+ * unreadable there) — never append fact events on those hosts.
+ */
+export type FactEventPolicy = 'append' | 'forbidden' | 'unknown';
+/**
+ * Classify an installed `@deepseek-ai/dsh-session` version for log-only
+ * fact events: `forbidden` at `0.1.2-alpha.1` and later, `append` on the
+ * earlier rc lines, `unknown` for unresolvable versions.
+ * @param version - the installed peer version string.
+ * @returns the fact-event policy for that host line.
+ */
+export declare function factEventPolicyForVersion(version: string): FactEventPolicy;
 //# sourceMappingURL=audit.d.ts.map

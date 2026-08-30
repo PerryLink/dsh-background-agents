@@ -9,8 +9,10 @@
  * @module dsh-background-agents/room/tools
  */
 import type { Context } from '@deepseek-ai/cordis';
+import { type ToolExecution } from '@deepseek-ai/dsh-tools';
 import type { Agent } from '@deepseek-ai/dsh-agent';
-import type { CallId } from '@deepseek-ai/dsh-llm';
+/** Local derived brand: the host renamed CallId to ToolCallId on master; deriving from the tools contract keeps both typecheck rulers green. */
+type CallId = ToolExecution['callId'];
 import { type RoomHub } from './hub.js';
 /** The approval seam face the tools ask through (optional in the composition). */
 export interface ApprovalLike {
@@ -28,4 +30,5 @@ export interface ApprovalLike {
  * @param hub - the room service owning the durable state.
  */
 export declare function registerRoomTools(ctx: Context, hub: RoomHub): void;
+export {};
 //# sourceMappingURL=tools.d.ts.map
