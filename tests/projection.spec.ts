@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
-import { ToolCallId } from '@deepseek-ai/dsh-llm'
-const CallId = ToolCallId
+import { CallId } from './call-id.ts'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import type { JsonValue, SessionEvent, SessionEventMap, SessionEventType, UserMessage } from '@deepseek-ai/dsh-session'
 import { backgroundAgentsProjectionDefinition as unit } from '../src/projection.ts'

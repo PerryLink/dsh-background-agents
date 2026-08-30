@@ -10,11 +10,10 @@
  */
 
 import type { Context } from '@deepseek-ai/cordis'
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool, type ToolExecution } from '@deepseek-ai/dsh-tools'
 import type { Agent } from '@deepseek-ai/dsh-agent'
-import type { ToolCallId } from '@deepseek-ai/dsh-llm'
-/** Local derived brand: the host renamed CallId to ToolCallId. */
-type CallId = ToolCallId
+/** Local derived brand: the host renamed CallId to ToolCallId on master; deriving from the tools contract keeps both typecheck rulers green. */
+type CallId = ToolExecution['callId']
 import { SessionId } from '@deepseek-ai/dsh-session'
 import { RoomError, type RoomHub } from './hub.ts'
 import { PLUGIN } from '../vocabulary.ts'

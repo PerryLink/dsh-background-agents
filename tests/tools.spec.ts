@@ -3,9 +3,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
-import { ToolCallId } from '@deepseek-ai/dsh-llm'
-
-const CallId = ToolCallId
+import { CallId } from './call-id.ts'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
@@ -370,9 +368,10 @@ describe('dsh-background-agents tools', () => {
     await ctx.plugin(AgentLoop, { agents: [] })
     await ctx.plugin(SessionProjectionRegistry)
     await ctx.plugin(SubagentRuntime)
+    const capabilities = { outputSchema: false, depthLimit: false, toolFilter: false, persona: false, agentOptions: false } as Parameters<typeof ctx.subagents.registerProvider>[0]['capabilities']
     ctx.subagents.registerProvider({
       name: 'one-shot-only',
-      capabilities: { outputSchema: false, depthLimit: false, toolFilter: false, persona: false, agentOptions: false },
+      capabilities,
       inheritsParentContext: false,
       start: async () => { throw new Error('unused') },
     })
