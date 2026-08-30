@@ -2,6 +2,16 @@
 
 All notable changes to `dsh-background-agents` are documented here. The repo is pre-release; versions follow the DeepSeek Harness `0.1.x-rc.x` target runtime and bump on every behavior change.
 
+## [Unreleased]
+
+### Fixed
+
+- Stop writing log-only fact events on hosts at 0.1.2-alpha.1+ (fail-closed session event vocabulary); route each record to the fallback sink instead of the session log. Older rc lines keep the ignorable-marker behavior.
+- Migrate the client half to the current client packages after `dsh-client-runtime` and `dsh-client-web-react` were removed from the host.
+- Update the subagent panel RPCs: `interruptByParent` with positional address arguments, `prompt` with a client-minted `requestId`, and a projection-based result peek replacing the removed `history` RPC.
+- Align the `/room` command remote with the current `execute(agent, line, images, signal)` contract.
+- Switch `CallId` to the renamed `ToolCallId` via the derived-brand pattern in sources and tests.
+
 ## [0.6.0] — 2026-08-26
 
 ### Added
