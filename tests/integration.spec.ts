@@ -13,6 +13,7 @@ import JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import SubagentRuntime from '@deepseek-ai/dsh-subagent'
 import * as SubagentSpawn from '@deepseek-ai/dsh-subagent-spawn-in-process'
+import { TestSessionQuery } from './test-session-query.ts'
 import { isBackgroundAgentsProjection } from '../src/projection-schema.ts'
 import { parseNotice, PLUGIN } from '../src/vocabulary.ts'
 import * as plugin from '../src/index.ts'
@@ -45,6 +46,7 @@ async function mount(root: string, adapter: MockAdapter, config: Partial<plugin.
   await ctx.plugin(JsonlSessionPersistence, { root })
   await ctx.plugin(AgentLoop, { agents: [] })
   await ctx.plugin(SessionProjectionRegistry)
+  await ctx.plugin(TestSessionQuery)
   await ctx.plugin(SubagentRuntime)
   await ctx.plugin(SubagentSpawn, { providerName: 'spawn' })
   await ctx.plugin(plugin, {
@@ -206,6 +208,7 @@ describe('dsh-background-agents end-to-end', () => {
     await second.plugin(JsonlSessionPersistence, { root })
     await second.plugin(AgentLoop, { agents: [] })
     await second.plugin(SessionProjectionRegistry)
+    await second.plugin(TestSessionQuery)
     await second.plugin(SubagentRuntime)
     await second.plugin(SubagentSpawn, { providerName: 'spawn' })
     await second.plugin(plugin, { provider: 'spawn', autoReport: false, idleSweepIntervalMs: 60_000 })
@@ -221,7 +224,7 @@ describe('dsh-background-agents end-to-end', () => {
       kind: string
       agents: Array<Record<string, unknown>>
     }
-    expect(value.kind).toBe('listing')
+    expect(value).toMatchObject({ kind: 'listing' })
     expect(value.agents).toEqual([
       expect.objectContaining({
         agentId: childId,

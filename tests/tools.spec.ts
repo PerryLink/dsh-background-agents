@@ -14,6 +14,7 @@ import JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import SubagentRuntime from '@deepseek-ai/dsh-subagent'
 import * as SubagentSpawn from '@deepseek-ai/dsh-subagent-spawn-in-process'
+import { TestSessionQuery } from './test-session-query.ts'
 import * as plugin from '../src/index.ts'
 import { MockAdapter, reasoningResponse, textResponse } from './mock-adapter.ts'
 
@@ -32,6 +33,7 @@ async function setup(config: Partial<plugin.Config> = {}) {
   await ctx.plugin(JsonlSessionPersistence, { root })
   await ctx.plugin(AgentLoop, { agents: [] })
   await ctx.plugin(SessionProjectionRegistry)
+  await ctx.plugin(TestSessionQuery)
   await ctx.plugin(SubagentRuntime)
   await ctx.plugin(SubagentSpawn, { providerName: 'spawn' })
   await ctx.plugin(plugin, {
