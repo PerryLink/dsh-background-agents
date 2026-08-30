@@ -63,7 +63,10 @@ function mount(snapshot: SessionListLike): Harness {
   const props = {
     wide: true,
     t: ((key: string) => key) as never,
-    useSessions: ((selector: (value: SessionListLike) => unknown) => selector(snapshot)) as never,
+    sessions: {
+      getSnapshot: () => snapshot,
+      subscribe: () => () => {},
+    } as never,
     openChild: vi.fn().mockResolvedValue(undefined),
     stopChild,
     sendMessage,

@@ -5,7 +5,8 @@
  */
 
 import type { GenerateOptions, LlmResolvedModelInfo, StreamChunk } from '@deepseek-ai/dsh-llm'
-import { CallId, LlmAdapter } from '@deepseek-ai/dsh-llm'
+import { ToolCallId, LlmAdapter } from '@deepseek-ai/dsh-llm'
+const CallId = ToolCallId
 
 /** One plain-text assistant answer. */
 export function textResponse(text: string): StreamChunk[] {
