@@ -23,6 +23,8 @@
 
 ## 兼容性
 
+宿主 `0.1.2-alpha.1` 及以后对会话事件词汇表采取失败即拒读策略，本插件在这些宿主上不再写入其仅日志事实事件（`background-agents/fact`、`team-room/fact`）：事实改走 logger/面板通道，投影退化为空折叠。更早的 rc 线（截至 `0.1.1-rc.2`）保留 ignorable 标记机制。客户端半面现已使用现行客户端包（`dsh-api-session-controller`、`dsh-client-web`）与现行 subagent 远端（`interruptByParent`、带客户端铸造 `requestId` 的 `prompt`；旧 `history` RPC 已删除——结果窥视改读子会话的 `conversation` 投影）。
+
 | 方面 | 状态 |
 |---|---|
 | Harness | DeepSeek Harness `0.1.1-rc.2`（peer 依赖 `>=0.1.0-rc.8 <0.2.0`） |

@@ -23,6 +23,8 @@
 
 ## Compatibilidade
 
+Hosts `0.1.2-alpha.1` e posteriores falham de forma fechada no vocabulário de eventos de sessão, então este plugin não grava mais ali seus eventos de fatos somente-registro (`background-agents/fact`, `team-room/fact`): os fatos seguem pelo canal de logger/painel e as projeções degradam para uma dobra vazia. As linhas rc anteriores (até `0.1.1-rc.2`) mantêm a disciplina do marcador ignorable. A metade cliente agora usa os pacotes de cliente atuais (`dsh-api-session-controller`, `dsh-client-web`) e o remoto subagent atual (`interruptByParent`, `prompt` com `requestId` cunhado pelo cliente; o antigo RPC `history` sumiu — os vistores de resultado leem a projeção `conversation` da sessão filha).
+
 | Superfície | Status |
 |---|---|
 | Harness | DeepSeek Harness `0.1.1-rc.2` (peers `>=0.1.0-rc.8 <0.2.0`) |

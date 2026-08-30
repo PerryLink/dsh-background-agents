@@ -4,6 +4,8 @@
 
 ## Durable facts: one structured channel, one model-visible channel
 
+Host gate: `0.1.2-alpha.1` and later fails closed on the session event vocabulary, and the plugin's fact event types are not in KNOWN_SESSION_EVENT_TYPES there. On those hosts the appender (version-classified before the first append) never writes a fact event and routes each record to the logger/panel fallback channel instead; older rc lines (through `0.1.1-rc.2`) keep the ignorable-marker discipline below. `bg_list` requires the deployment's `sessionQuery` service on both lines (the durable catalog reads it).
+
 The plugin writes every fact through **two channels with one discipline each**:
 
 | Fact | Channel | Event type |
