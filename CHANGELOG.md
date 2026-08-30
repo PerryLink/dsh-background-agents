@@ -2,7 +2,7 @@
 
 All notable changes to `dsh-background-agents` are documented here. The repo is pre-release; versions follow the DeepSeek Harness `0.1.x-rc.x` target runtime and bump on every behavior change.
 
-## [Unreleased]
+## [0.7.0] - 2026-08-30
 
 ### Fixed
 
