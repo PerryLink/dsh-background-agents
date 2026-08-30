@@ -6,7 +6,7 @@
  * presenter over the session-list snapshot; this component only binds
  * interactions.
  */
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
 import type { PropsLocale, PropsRuntime, TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import { IconBranchOutline16, Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
@@ -15,8 +15,16 @@ import { buildAgentRows, buildCostReport, relativeTime, type AgentRow, type RowS
 import { NS } from './locales.ts'
 import css from './BackgroundAgentsAction.module.css'
 
+/** Minimal structural snapshot contract (the owner package no longer re-exports the generic). */
+interface ObservableSnapshot<T> {
+  getSnapshot(): T
+  subscribe(listener: () => void): () => void
+}
+
 /** Business actions supplied by the slot registration. */
 export interface BackgroundAgentsInjected {
+  /** The live session-list snapshot the dashboard rows derive from. */
+  sessions: ObservableSnapshot<SessionListLike>
   /**
    * Open the child session through its durable direct-parent address.
    * @returns an error message on failure, undefined on success.
@@ -24,7 +32,7 @@ export interface BackgroundAgentsInjected {
   openChild(parentSessionId: string, childSessionId: string): Promise<string | undefined>
   /**
    * Request interruption of the child's current turn through the official
-   * `subagent.interrupt` RPC.
+   * `subagent.interruptByParent` RPC.
    * @returns an error message on failure, undefined on success.
    */
   stopChild(parentSessionId: string, childSessionId: string): Promise<string | undefined>
@@ -35,9 +43,9 @@ export interface BackgroundAgentsInjected {
    */
   sendMessage(parentSessionId: string, childSessionId: string, text: string): Promise<string | undefined>
   /**
-   * Read the child's final assistant text through the official
-   * `subagent.history` RPC (a read-only transcript peek that never activates
-   * the child Agent).
+   * Read the child's final assistant text through the child session's
+   * `conversation` projection (the `subagent.history` RPC no longer exists;
+   * the peek never activates the child Agent).
    * @returns the extracted text plus an optional error message.
    */
   readResult(parentSessionId: string, childSessionId: string): Promise<{ text: string; error?: string }>
@@ -177,7 +185,7 @@ function Row({ row, t, now, busy, showParent, composing, draft, result, onResult
 
 /** The sidebar footer trigger + floating dashboard panel. */
 export function BackgroundAgentsAction({
-  wide, t, useSessions, openChild, stopChild, sendMessage, readResult,
+  wide, t, sessions, openChild, stopChild, sendMessage, readResult,
 }: BackgroundAgentsActionProps) {
   const [open, setOpen] = useState(false)
   const [error, setError] = useState<string | undefined>(undefined)
@@ -195,7 +203,7 @@ export function BackgroundAgentsAction({
   // The client SessionProjectionMap cannot carry the plugin's key, so the
   // snapshot crosses the boundary structurally and the presenter guards the
   // projection cell at runtime.
-  const rows = useSessions(snapshot => buildAgentRows(snapshot as unknown as SessionListLike))
+  const rows = buildAgentRows(useSyncExternalStore(sessions.subscribe, sessions.getSnapshot) as unknown as SessionListLike)
   const runningCount = rows.filter(row => row.status === 'running').length
   // Parent-session disambiguation: only when several parents project rows.
   const showParent = new Set(rows.map(row => row.parentSessionId)).size > 1

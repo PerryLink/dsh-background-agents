@@ -68,3 +68,31 @@ export function peerSessionVersion(): string | null {
     return null
   }
 }
+
+/**
+ * Host policy for log-only fact events.
+ * `append` = the rc lines through `0.1.1-rc.2`: fact events may be
+ * appended when the `ignorable` marker is honored; `forbidden` = hosts at
+ * `0.1.2-alpha.1` and later, which fail closed on the session event
+ * vocabulary (`background-agents/fact` and `team-room/fact` are not in
+ * KNOWN_SESSION_EVENT_TYPES, so a written fact makes the session
+ * unreadable there) — never append fact events on those hosts.
+ */
+export type FactEventPolicy = 'append' | 'forbidden' | 'unknown'
+
+/**
+ * Classify an installed `@deepseek-ai/dsh-session` version for log-only
+ * fact events: `forbidden` at `0.1.2-alpha.1` and later, `append` on the
+ * earlier rc lines, `unknown` for unresolvable versions.
+ * @param version - the installed peer version string.
+ * @returns the fact-event policy for that host line.
+ */
+export function factEventPolicyForVersion(version: string): FactEventPolicy {
+  const match = /^(\d+)\.(\d+)\.(\d+)/.exec(version.trim())
+  if (match === null) return 'unknown'
+  const major = Number(match[1])
+  const minor = Number(match[2])
+  const patch = Number(match[3])
+  if (major > 0 || minor > 1 || (minor === 1 && patch >= 2)) return 'forbidden'
+  return 'append'
+}

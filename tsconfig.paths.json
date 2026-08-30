@@ -46,6 +46,8 @@
       "@deepseek-ai/dsh-api-gateway": ["../../../packages/api/gateway/lib/types/index.d.ts"],
       "@deepseek-ai/dsh-api-remotes/*": ["../../../packages/api/remotes/lib/types/*"],
       "@deepseek-ai/dsh-api-remotes": ["../../../packages/api/remotes/lib/types/index.d.ts"],
+      "@deepseek-ai/dsh-api-session-controller/*": ["../../../packages/api/session-controller/lib/types/*"],
+      "@deepseek-ai/dsh-api-session-controller": ["../../../packages/api/session-controller/lib/types/index.d.ts"],
       "@deepseek-ai/dsh-app-boot/*": ["../../../packages/boot/app-boot/lib/types/*"],
       "@deepseek-ai/dsh-app-boot": ["../../../packages/boot/app-boot/lib/types/index.d.ts"],
       "@deepseek-ai/dsh-atomic-write/*": ["../../../packages/util/atomic-write/lib/types/*"],

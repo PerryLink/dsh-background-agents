@@ -12,8 +12,9 @@
  *   sanctioned plugin channels.
  */
 import type { Context } from '@deepseek-ai/cordis'
-import type { ConnectionHandle } from '@deepseek-ai/dsh-api-remotes/client'
-import type { ISessions, SessionId, ObservableSnapshot } from '@deepseek-ai/dsh-client-runtime/client'
+import type {} from '@deepseek-ai/dsh-api-remotes/client'
+import type { SessionId } from '@deepseek-ai/dsh-client-connection/client'
+import type { ISessions } from '@deepseek-ai/dsh-api-session-controller/client'
 import { BackgroundAgentsAction, type BackgroundAgentsInjected } from './BackgroundAgentsAction.tsx'
 import { extractResultText } from './presenter.ts'
 import { en, NS, zh, type BackgroundAgentsKey } from './locales.ts'
@@ -50,6 +51,16 @@ export type {
  * because the team-room panel executes `/room` lines through it).
  */
 export const inject = ['sessions', 'slots', 'locale', 'connection', 'remote', 'remote.commands']
+
+/**
+ * Minimal structural contract of an observable snapshot. Declared locally
+ * because the owner package of `ISessions` no longer re-exports the
+ * generic; the runtime contract is structural.
+ */
+interface ObservableSnapshot<T> {
+  getSnapshot(): T
+  subscribe(listener: () => void): () => void
+}
 
 /**
  * Live team-room controller: derives the settings-panel state from the
@@ -117,7 +128,9 @@ class TeamRoomsController implements ObservableSnapshot<TeamRoomsState> {
       return
     }
     const face = this.sessions.binding(current as SessionId)?.session.projections.faceOf('teamRoom')
-    const panels = face === undefined ? undefined : buildRoomPanels(face.getSnapshot(), list)
+    const panels = face === undefined
+      ? undefined
+      : buildRoomPanels(face.getSnapshot() as Parameters<typeof buildRoomPanels>[0], list)
     this.set({ status: 'ready', sessionId: current, rooms: panels ?? [] })
   }
 }
@@ -131,14 +144,55 @@ class TeamRoomsController implements ObservableSnapshot<TeamRoomsState> {
  */
 interface CommandsRemote {
   readonly execute: (
-    agentId: SessionId,
+    agent: SessionId,
     line: string,
-    images: readonly { mediaType: string; data: string; name?: string }[],
+    images?: readonly { mediaType: string; data: string; name?: string }[],
     signal?: AbortSignal,
   ) => Promise<
     | { ok: false; error: { code: string; message: string } }
-    | { ok: true; value?: { result?: { kind?: string; text?: string } } }
+    | { ok: true; value?: { commandId: string; result: { kind: string; text: string } } }
   >
+}
+
+/**
+ * The structural shape of the `subagents` Remote namespace the background
+ * agent panel needs, mirroring the host's current control surface:
+ * `interruptByParent` takes the durable address positionally, `prompt`
+ * requires a client-minted `requestId`, and the transcript `history` RPC
+ * no longer exists (the panel peeks the child session's `conversation`
+ * projection through the sessions binding instead).
+ */
+interface SubagentsRemote {
+  readonly prompt: (
+    request: {
+      requestId: string
+      parentSessionId: SessionId
+      childSessionId: SessionId
+      mode: 'continuable'
+      content: readonly { type: 'text'; text: string }[]
+      clientTimeZone?: string
+    },
+    signal?: AbortSignal,
+  ) => Promise<{
+    result:
+      | { ok: true; value: { messageId: string } }
+      | { ok: false; error: { code: string; message: string } }
+  }>
+  readonly interruptByParent: (
+    childSessionId: SessionId,
+    parentSessionId: SessionId,
+    mode: 'continuable',
+  ) => Promise<{
+    result:
+      | { ok: true; value: { accepted: true } }
+      | { ok: false; error: { code: string; message: string } }
+  }>
+}
+
+/** One row of a `conversation` projection snapshot: role plus content blocks. */
+interface TranscriptEntry {
+  readonly role?: string
+  readonly content?: readonly { readonly type: string; readonly text?: string }[]
 }
 
 /**
@@ -152,14 +206,21 @@ export function apply(ctx: Context): void {
   // The client sessions face is the runtime's ISessions; the host merge can
   // shadow it in mixed programs, so the cast reads the runtime contract.
   const sessions = ctx.get('sessions') as ISessions
-  const { api } = ctx.get('connection') as ConnectionHandle
+  const { api } = ctx.get('connection') as unknown as { api: { subagents: SubagentsRemote } }
   const remote = ctx.remote as unknown as { commands: CommandsRemote }
-  ctx.slots.inject('sidebar.footer.action', () => ctx.slots.register({
+  // The owning package declares the slots service with a different arity;
+  // read it through this structural contract instead.
+  const slots = ctx.get('slots') as unknown as {
+    inject(slot: string, callback: () => unknown): void
+    register(options: unknown, component: unknown): unknown
+  }
+  slots.inject('sidebar.footer.action', () => slots.register({
     name: 'sidebar.footer.action',
     id: 'background-agents',
     order: 0,
     locale: NS,
     inject: (): BackgroundAgentsInjected => ({
+      sessions: sessions.list as unknown as ObservableSnapshot<SessionListLike>,
       async openChild(parentSessionId: string, childSessionId: string): Promise<string | undefined> {
         try {
           await sessions.refreshSubagents(parentSessionId as SessionId)
@@ -175,11 +236,11 @@ export function apply(ctx: Context): void {
       },
       async stopChild(parentSessionId: string, childSessionId: string): Promise<string | undefined> {
         try {
-          const result = await api.subagents.interrupt({
-            parentSessionId: parentSessionId as SessionId,
-            childSessionId: childSessionId as SessionId,
-            mode: 'continuable',
-          })
+          const result = await api.subagents.interruptByParent(
+            childSessionId as SessionId,
+            parentSessionId as SessionId,
+            'continuable',
+          )
           if (result.result.ok) return undefined
           return `${result.result.error.code}: ${result.result.error.message}`
         } catch (error) {
@@ -189,8 +250,11 @@ export function apply(ctx: Context): void {
       async sendMessage(parentSessionId: string, childSessionId: string, text: string): Promise<string | undefined> {
         try {
           // The same wire RPC the shipped subagent catalog uses: a queued
-          // delivery that wakes the child (its next turn answers).
+          // delivery that wakes the child (its next turn answers). The
+          // requestId is the identity the host persists on the accepted
+          // message, minted by the client before the call.
           const result = await api.subagents.prompt({
+            requestId: crypto.randomUUID(),
             parentSessionId: parentSessionId as SessionId,
             childSessionId: childSessionId as SessionId,
             mode: 'continuable',
@@ -203,21 +267,16 @@ export function apply(ctx: Context): void {
           return error instanceof Error ? error.message : String(error)
         }
       },
-      async readResult(parentSessionId: string, childSessionId: string): Promise<{ text: string; error?: string }> {
+      async readResult(_parentSessionId: string, childSessionId: string): Promise<{ text: string; error?: string }> {
         try {
-          // A read-only transcript peek through the official history RPC: the
-          // last few messages suffice for the final assistant text, and the
-          // child Agent is never activated.
-          const result = await api.subagents.history({
-            parentSessionId: parentSessionId as SessionId,
-            childSessionId: childSessionId as SessionId,
-            mode: 'continuable',
-            maxMessages: 4,
-          })
-          if (!result.result.ok) {
-            return { text: '', error: `${result.result.error.code}: ${result.result.error.message}` }
-          }
-          return { text: extractResultText(result.result.value.events) }
+          // The transcript `history` RPC no longer exists: peek the child
+          // session's `conversation` projection through the sessions
+          // binding. The child Agent is never activated.
+          const face = sessions.binding(childSessionId as SessionId)?.session.projections.faceOf('conversation')
+          if (face === undefined) return { text: '', error: 'child transcript projection unavailable' }
+          const snapshot = face.getSnapshot() as unknown as { entries?: readonly TranscriptEntry[] }
+          const events = snapshot.entries ?? (snapshot as unknown as readonly unknown[])
+          return { text: extractResultText(events as unknown as Parameters<typeof extractResultText>[0]) }
         } catch (error) {
           return { text: '', error: error instanceof Error ? error.message : String(error) }
         }
@@ -257,7 +316,7 @@ export function apply(ctx: Context): void {
     assignTask: (roomId, taskId, member) => executeRoom(`/room task assign ${roomId} ${taskId} ${member}`),
   })
 
-  ctx.slots.inject('settings.section', () => ctx.slots.register({
+  slots.inject('settings.section', () => slots.register({
     name: 'settings.section',
     id: 'team-rooms',
     // After Models/Agent Presets: rooms are a collaboration surface, not a

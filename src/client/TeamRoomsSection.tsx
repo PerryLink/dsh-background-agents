@@ -14,7 +14,11 @@
 import { useState } from 'react'
 import type { PropsLocale, PropsRuntime, InjectFace, TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
-import type { ObservableSnapshot } from '@deepseek-ai/dsh-client-runtime/client'
+/** Minimal structural snapshot contract (the owner package no longer re-exports the generic). */
+interface ObservableSnapshot<T> {
+  getSnapshot(): T
+  subscribe(listener: () => void): () => void
+}
 import type { RoomPanel, RoomTaskRow, TeamRoomsState } from './room-presenter.ts'
 import { ROOM_NS } from './room-locales.ts'
 import css from './TeamRoomsSection.module.css'
@@ -278,7 +282,7 @@ function RoomCard({ panel, t, busy, actions }: {
 /** The settings section: room management over the live session's projection. */
 export function TeamRoomsSection(props: TeamRoomsSectionProps) {
   const { useTeamRooms, t } = props
-  const state = useTeamRooms(snapshot => snapshot)
+  const state = useTeamRooms(snapshot => snapshot) as TeamRoomsState
   const [createName, setCreateName] = useState('')
   const [joinId, setJoinId] = useState('')
   const [error, setError] = useState<string | undefined>(undefined)

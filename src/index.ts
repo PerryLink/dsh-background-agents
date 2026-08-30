@@ -298,6 +298,7 @@ export function apply(ctx: Context, config: Config): void {
   const facts = new FactAppender(
     config.allowUnmarkedFacts ?? DEFAULTS.allowUnmarkedFacts,
     message => ctx.logger('background-agents').warn(message),
+    type => ctx.logger('background-agents').info('fact %s recorded (log-only fact events are disabled on this host)', type),
   )
 
   // Team rooms mount only where the storage domain exists (the same optional

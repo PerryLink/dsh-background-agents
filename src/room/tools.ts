@@ -12,7 +12,9 @@
 import type { Context } from '@deepseek-ai/cordis'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { Agent } from '@deepseek-ai/dsh-agent'
-import type { CallId } from '@deepseek-ai/dsh-llm'
+import type { ToolCallId } from '@deepseek-ai/dsh-llm'
+/** Local derived brand: the host renamed CallId to ToolCallId. */
+type CallId = ToolCallId
 import { SessionId } from '@deepseek-ai/dsh-session'
 import { RoomError, type RoomHub } from './hub.ts'
 import { PLUGIN } from '../vocabulary.ts'
