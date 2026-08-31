@@ -10,12 +10,12 @@
  *   detects such hosts before the first append and disables fact appends
  *   with a one-time warning.
  * - `0.1.2-alpha.1` and later: the host fails closed on the session event
- *   vocabulary — `background-agents/fact` and `team-room/fact` are not in
+ *   vocabulary 鈥?`background-agents/fact` and `team-room/fact` are not in
  *   KNOWN_SESSION_EVENT_TYPES, so writing one makes the session unreadable
  *   there. On those hosts fact events are never appended; each fact is
  *   routed to the injected fallback sink (logger/panel channel) instead.
- * `allowUnmarkedFacts: true` opts back into unmarked appends — deliberately
- * dangerous — and already-polluted logs can be repaired with
+ * `allowUnmarkedFacts: true` opts back into unmarked appends 鈥?deliberately
+ * dangerous 鈥?and already-polluted logs can be repaired with
  * `scripts/repair-session-logs.mjs` from `dsh-permission-rules`.
  * @module dsh-background-agents/facts
  */
@@ -40,7 +40,7 @@ export declare class FactAppender {
      * marker. On hosts whose event vocabulary forbids the fact events
      * (`0.1.2-alpha.1+`) the record is routed to the fallback sink instead
      * of the session log; on pre-marker rc hosts (and after a failed probe)
-     * the append is skipped so the session log stays loadable everywhere.
+     * the append is skipped so the session log stays loadable everywhere. On 0.1.2-alpha.2 the envelope field is restored for stored-log read compatibility only - its Session.append still cannot stamp the marker, so the gate behavior is unchanged.
      * Append failures are contained: a fact hiccup never disturbs the
      * caller's operation.
      * @param session - the session whose log carries the fact.
