@@ -24,7 +24,7 @@
 ## 兼容性
 
 宿主 `0.1.2-alpha.2` 及以后对会话事件词汇表采取失败即拒读策略，本插件在这些宿主上不再写入其仅日志事实事件（`background-agents/fact`、`team-room/fact`）：事实改走 logger/面板通道，投影退化为空折叠。更早的 rc 线（截至 `0.1.1-rc.2`）保留 ignorable 标记机制。客户端半面现已使用现行客户端包（`dsh-api-session-controller`、`dsh-client-web`）与现行 subagent 远端（`interruptByParent`、带客户端铸造 `requestId` 的 `prompt`；旧 `history` RPC 已删除——结果窥视改读子会话的 `conversation` 投影）。
-0.1.2-alpha.2（2026-08-31 已适配）：会话信封保留 ignorable 字段但仅用于存量日志读取兼容——Session.append 仍无法盖章，门控行为不变。
+0.1.2-alpha.3（2026-09-01 已适配）：会话信封保留 ignorable 字段但仅用于存量日志读取兼容——Session.append 仍无法盖章，门控行为不变。
 
 | 方面 | 状态 |
 |---|---|

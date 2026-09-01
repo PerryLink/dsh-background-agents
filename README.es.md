@@ -24,7 +24,7 @@
 ## Compatibilidad
 
 Los hosts `0.1.2-alpha.2` y posteriores fallan en cerrado ante el vocabulario de eventos de sesión, así que este plugin ya no escribe allí sus eventos de hechos solo-registro (`background-agents/fact`, `team-room/fact`): los hechos van al canal de logger/panel y las proyecciones se degradan a un pliegue vacío. Las líneas rc anteriores (hasta `0.1.1-rc.2`) mantienen la disciplina del marcador ignorable. La mitad de cliente ahora usa los paquetes de cliente actuales (`dsh-api-session-controller`, `dsh-client-web`) y el remoto subagent actual (`interruptByParent`, `prompt` con `requestId` acuñado por el cliente; el antiguo RPC `history` desapareció — los vistazos de resultado leen la proyección `conversation` de la sesión hija).
-0.1.2-alpha.2 (adaptado el 2026-08-31): el sobre de sesión conserva su campo ignorable solo para compatibilidad de lectura de logs almacenados - Session.append aún no puede estamparlo, por lo que el comportamiento de la puerta no cambia.
+0.1.2-alpha.3 (adaptado el 2026-09-01): el sobre de sesión conserva su campo ignorable solo para compatibilidad de lectura de logs almacenados - Session.append aún no puede estamparlo, por lo que el comportamiento de la puerta no cambia.
 
 | Superficie | Estado |
 |---|---|

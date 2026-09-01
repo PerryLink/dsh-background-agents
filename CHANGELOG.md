@@ -2,6 +2,12 @@
 
 All notable changes to `dsh-background-agents` are documented here. The repo is pre-release; versions follow the DeepSeek Harness `0.1.x-rc.x` target runtime and bump on every behavior change.
 
+## [Unreleased]
+
+### Changed
+
+- Align the devDependency pins to the published dsh `0.1.2-alpha.3` line (`dsh-util-values`, `dsh-attachment`), align the `cordis`/`schemastery` peers to `^4.0.2`/`>=3.18.2`, pin `HARNESS_COMMIT` to `dd6322d604` (alpha.3), and raise the compat probe pins to `0.1.2-alpha.3`. The fact-event gate behavior is unchanged on `0.1.2-alpha.3`; the five-language READMEs record the alpha.3 fact.
+
 ## [0.7.0] - 2026-08-30
 
 ### Fixed
