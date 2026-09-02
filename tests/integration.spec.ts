@@ -100,7 +100,7 @@ describe('dsh-background-agents end-to-end', () => {
       textResponse('noted'),
     ])
     const { ctx, adapter: adapterRef } = await mountWith(adapter)
-    const parent = ctx.agentLoop.create(SessionId('parent'), { provider: 'mock', model: 'mock' })
+    const parent = await ctx.agentLoop.create(SessionId('parent'), { provider: 'mock', model: 'mock' })
     parent.followup(createUserMessage({
       content: [{ type: 'text', text: 'start the writer' }],
       source: { kind: 'user' },
@@ -184,7 +184,7 @@ describe('dsh-background-agents end-to-end', () => {
     ])
     const first = await mountWith(adapter, { allowUnmarkedFacts: false })
     const { ctx, root } = first
-    const parent = ctx.agentLoop.create(SessionId('parent'), { provider: 'mock', model: 'mock' })
+    const parent = await ctx.agentLoop.create(SessionId('parent'), { provider: 'mock', model: 'mock' })
     parent.followup(createUserMessage({
       content: [{ type: 'text', text: 'start it' }],
       source: { kind: 'user' },

@@ -47,7 +47,7 @@ async function setup(config: Partial<plugin.Config> = {}) {
     ...config,
   })
   // No adapter registered here: tests that need model turns register their own.
-  const parent = ctx.agentLoop.create(SessionId('parent'), { provider: 'mock', model: 'mock' })
+  const parent = await ctx.agentLoop.create(SessionId('parent'), { provider: 'mock', model: 'mock' })
   return { ctx, parent, root }
 }
 
@@ -227,7 +227,7 @@ describe('dsh-background-agents tools', () => {
     ctx.provide('agentLoop' as never, {
       create: (id: SessionId) => ({ id }),
     } as never)
-    const parent = ctx.agentLoop.create(SessionId('parent'), { provider: 'mock', model: 'mock' })
+    const parent = await ctx.agentLoop.create(SessionId('parent'), { provider: 'mock', model: 'mock' })
 
     const result = await callTool(ctx, 'bg_list', {}, parent)
     expect(result.isError).toBe(false)

@@ -52,7 +52,7 @@ async function setupWithStuckDomain() {
     allowUnmarkedFacts: true,
     roomOpenTimeoutMs: 200,
   })
-  const parent = ctx.agentLoop.create(SessionId('parent'), { provider: 'mock', model: 'mock' })
+  const parent = await ctx.agentLoop.create(SessionId('parent'), { provider: 'mock', model: 'mock' })
   return { ctx, parent }
 }
 

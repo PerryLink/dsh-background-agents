@@ -46,7 +46,7 @@ async function setup(config: Partial<plugin.Config> = {}) {
     allowUnmarkedFacts: true,
     ...config,
   })
-  const parent = ctx.agentLoop.create(SessionId('parent'), { provider: 'mock', model: 'mock' })
+  const parent = await ctx.agentLoop.create(SessionId('parent'), { provider: 'mock', model: 'mock' })
   return { ctx, parent, root }
 }
 

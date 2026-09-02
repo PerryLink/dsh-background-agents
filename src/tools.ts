@@ -19,12 +19,39 @@ import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { ContentBlock, MessageSource } from '@deepseek-ai/dsh-llm'
 import { SessionId, type SessionEvent } from '@deepseek-ai/dsh-session'
 import { SubagentError, type SubagentDescendantListEntry, type SubagentListEntry } from '@deepseek-ai/dsh-subagent'
-import { queueHostSubagentPrompt } from '@deepseek-ai/dsh-subagent/internal'
 import { countBackgroundAgents, sessionLastText, type BackgroundAgentLifecycle } from './lifecycle.ts'
 import { FACT_EVENT } from './events.ts'
 import type { FactAppender } from './facts.ts'
 import { isBackgroundAgentsProjection } from './projection-schema.ts'
 import { PLUGIN } from './vocabulary.ts'
+
+/**
+ * Queue one host-protocol message for a background child across harness
+ * lines: 0.1.2-alpha.5+ exposes `@deepseek-ai/dsh-subagent/internal` (the
+ * peer-floor rc.8 package has no such subpath export), while older hosts
+ * still ship `subagents.followup`. Both arms fail loudly when unavailable.
+ */
+async function deliverQueuedPrompt(
+  subagents: unknown,
+  parent: Agent,
+  childId: SessionId,
+  content: ContentBlock[],
+  source: MessageSource,
+  signal: AbortSignal,
+): Promise<string> {
+  try {
+    const { queueHostSubagentPrompt } = await import('@deepseek-ai/dsh-subagent/internal')
+    return await queueHostSubagentPrompt(subagents as never, parent, childId, content, source, signal) as string
+  } catch {
+    const followup = (subagents as {
+      followup?: (parent: Agent, childId: SessionId, content: ContentBlock[], opts: { source: MessageSource; signal: AbortSignal }) => Promise<string>
+    }).followup
+    if (typeof followup !== 'function') {
+      throw new Error('bg_message delivery unavailable: this harness line exposes neither the internal queue helper nor subagents.followup')
+    }
+    return await followup.call(subagents, parent, childId, content, { source, signal })
+  }
+}
 
 /** Lifecycle thresholds the tools enforce. */
 export interface ToolConfig {
@@ -425,14 +452,9 @@ export function registerBackgroundAgentTools(
         throw new Error('bg_message requires a non-empty message')
       }
       const childId = SessionId(args.agent_id)
-      const messageId = await queueHostSubagentPrompt(
-        ctx.subagents,
-        parent,
-        childId,
-        [{ type: 'text', text: message }] as ContentBlock[],
-        { kind: 'agent-message', form: 'relay', senderSessionId: parent.id } satisfies MessageSource,
-        exec.signal,
-      )
+      const messageId = await deliverQueuedPrompt(ctx.subagents, parent, childId, [{ type: 'text', text: message }] as ContentBlock[], {
+        kind: 'agent-message', form: 'relay', senderSessionId: parent.id,
+      } satisfies MessageSource, exec.signal)
       // A cold child resumed through bg_message re-enters the live tracking
       // set; the durable label stays with the projection.
       lifecycle.register(childId, parent.id, '', Date.now())
