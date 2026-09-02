@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import { SubagentError } from '@deepseek-ai/dsh-subagent'
 import {
@@ -11,8 +11,17 @@ import { FactAppender } from '../src/facts.ts'
 const childId = SessionId('child-1')
 const parentId = SessionId('parent')
 
-/** Permissive appender: lifecycle specs assert the raw append call shape, not host gating. */
-const facts = new FactAppender(true, () => {})
+/**
+ * Fallback sink: on the 0.1.2-alpha.5 host the session event vocabulary
+ * fails closed on `background-agents/fact`, so the appender routes every
+ * fact here instead of the log. The specs assert that routing plus the raw
+ * fact payload shape.
+ */
+const fallback = vi.fn()
+beforeEach(() => { fallback.mockClear() })
+
+/** Permissive appender: lifecycle specs assert the fallback call shape, not host gating. */
+const facts = new FactAppender(true, () => {}, fallback)
 
 function policy(over: Partial<LifecycleConfig> = {}): LifecycleConfig {
   return {
@@ -101,10 +110,12 @@ describe('reportProgress throttle and bounds', () => {
     const head = parseNotice(message.content[0].text)
     expect(head).toMatchObject({ agentId: childId, kind: 'progress' })
     expect(head!.text).toContain('wrote line 1')
-    expect(parent.session.append).toHaveBeenCalledExactlyOnceWith(
+    // The alpha.5 host forbids the fact event in the session log, so the
+    // progress fact lands in the fallback sink instead.
+    expect(parent.session.append).not.toHaveBeenCalled()
+    expect(fallback).toHaveBeenCalledExactlyOnceWith(
       'background-agents/fact',
       { kind: 'progress', agentId: childId, text: expect.stringContaining('wrote line 1') },
-      { ignorable: true },
     )
   })
 
@@ -145,10 +156,10 @@ describe('reportProgress throttle and bounds', () => {
     const head = parseNotice(followup.mock.calls[0]![0].content[0].text)
     expect(head).toMatchObject({ agentId: childId, kind: 'progress' })
     expect(head!.text).toContain('wake line')
-    expect(parent.session.append).toHaveBeenCalledExactlyOnceWith(
+    expect(parent.session.append).not.toHaveBeenCalled()
+    expect(fallback).toHaveBeenCalledExactlyOnceWith(
       'background-agents/fact',
       { kind: 'progress', agentId: childId, text: expect.stringContaining('wake line') },
-      { ignorable: true },
     )
   })
 
@@ -198,10 +209,10 @@ describe('idle sweep', () => {
     const message = inject.mock.calls[0]![0]
     const head = parseNotice(message.content[0].text)
     expect(head).toMatchObject({ agentId: childId, kind: 'archived' })
-    expect(parent.session.append).toHaveBeenCalledExactlyOnceWith(
+    expect(parent.session.append).not.toHaveBeenCalled()
+    expect(fallback).toHaveBeenCalledExactlyOnceWith(
       'background-agents/fact',
       { kind: 'archived', agentId: childId },
-      { ignorable: true },
     )
   })
 

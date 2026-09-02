@@ -38,11 +38,11 @@ async function setup(config: Partial<plugin.Config> = {}) {
     provider: 'spawn',
     autoReport: false,
     idleSweepIntervalMs: 60_000,
-    // The rc.8 peer drops the ignorable marker, so direct tool execution has
-    // no stamped fact channel; the specs assert the durable fact chain (the
-    // registration record of direct execution IS the fact), so mount with
-    // the documented opt-in — these sessions never reopen, so the unmarked
-    // events stay harmless here.
+    // On the 0.1.2-alpha.5 host the session event vocabulary fails closed on
+    // `background-agents/fact`, so facts never land in the log: the appender
+    // routes them to the logger fallback. The opt-in only bypasses the rc
+    // line's marker check and changes nothing here, but mounting with it
+    // keeps the direct-execution config surface exercised.
     allowUnmarkedFacts: true,
     ...config,
   })
@@ -98,15 +98,17 @@ describe('dsh-background-agents tools', () => {
     })
     const child = ctx.agents.get(SessionId(started.agentId))
     expect(child).toBeDefined()
-    // The structured registered fact rides the parent log next to the replay
-    // meta. The rc.8 host drops the envelope marker (the stamping fix exists
-    // on harness master only), so with the documented opt-in the fact lands
-    // unmarked — this in-memory session never reopens, so it stays harmless.
-    const fact = parent.session.snapshotEvents().find(event => event.type === 'background-agents/fact')
-    expect(fact).toMatchObject({
-      type: 'background-agents/fact',
-      data: { kind: 'registered', agentId: started.agentId, label: 'write one line' },
-    })
+    // The alpha.5 host fails closed on the session event vocabulary, so the
+    // registered fact never lands in the log; the appender routes it to the
+    // logger fallback channel instead. The replay meta above is the durable
+    // registration record the model and the reopen fold see.
+    expect(parent.session.snapshotEvents().some(event => event.type === 'background-agents/fact')).toBe(false)
+    expect(ctx.logger.buffer.some(message =>
+      message.name === 'background-agents'
+      && message.type === 'info'
+      && typeof message.args[0] === 'string'
+      && message.args[0].includes('log-only fact events are disabled')
+      && message.args[1] === 'background-agents/fact')).toBe(true)
   })
 
   it('derives the label from the optional argument and bounds it by maxLabelChars', async () => {
@@ -249,17 +251,18 @@ describe('dsh-background-agents tools', () => {
     const value = valueOf<{ kind: string; agents: Array<Record<string, unknown>> }>(listing)
     expect(value.kind).toBe('listing')
     expect(value.agents).toHaveLength(1)
-    // The structured registered fact lands even for direct tool execution
-    // (unmarked on the rc.8 host, per the documented opt-in); the child then
-    // settles (no adapter), so the row reads the settled state with the
-    // initial message counted.
+    // The alpha.5 host keeps the fact channel closed, so the row's lifecycle
+    // fields resolve from the official catalog and the live registry instead
+    // of the projection fold: the settled child reads 'ready' (exists only in
+    // storage, resumable via bg_message) and the fact-only messageCount stays
+    // absent.
     expect(value.agents[0]).toMatchObject({
       agentId: startedValue.agentId,
       label: 'writer',
       mode: 'continuable',
-      activity: 'settled',
-      messageCount: 1,
+      activity: 'ready',
     })
+    expect(value.agents[0]!.messageCount).toBeUndefined()
   })
 
   it('rejects a tool_filter without allow or deny', async () => {
@@ -323,14 +326,14 @@ describe('dsh-background-agents tools', () => {
 
     const result = await callTool(ctx, 'bg_result', { agent_id: childId }, parent)
     expect(result.isError).toBe(false)
-    // The structured registered fact lands even for direct tool execution and
-    // the official settled account folds over it, so the activity reads the
-    // durable settled state instead of the live-catalog fallback. The label
-    // rides the same fact (unmarked on the rc.8 host, per the opt-in).
-    expect(valueOf<{ agentId: string; label: string; activity: string; text?: string }>(result)).toEqual({
+    // The alpha.5 host lets no fact land in the log, so the projection fold
+    // cannot supply the label or the settled account: the label stays absent
+    // and the activity resolves from the live registry as 'ready' (exists
+    // only in storage, resumable via bg_message). The final text still reads
+    // from the durable child log.
+    expect(valueOf<{ agentId: string; label?: string; activity: string; text?: string }>(result)).toEqual({
       agentId: childId,
-      label: 'answer one thing',
-      activity: 'settled',
+      activity: 'ready',
       text: 'final answer text',
     })
 
@@ -448,10 +451,16 @@ describe('dsh-background-agents tools', () => {
     expect(result.isError).toBe(false)
     expect(result.value).toEqual({ outcome: 'interrupt-requested', agentId: started.childId })
     expect(cancelSpy).toHaveBeenCalledExactlyOnceWith({ kind: 'parent' }, { keepInbox: true })
-    expect(parent.session.snapshotEvents().some(event =>
-      event.type === 'background-agents/fact'
-      && event.data.kind === 'stop'
-      && event.data.agentId === started.childId)).toBe(true)
+    // The alpha.5 host forbids the fact event in the log; the stop fact is
+    // routed to the logger fallback channel instead, and the outcome above
+    // is the model-visible record of the request.
+    expect(parent.session.snapshotEvents().some(event => event.type === 'background-agents/fact')).toBe(false)
+    expect(ctx.logger.buffer.some(message =>
+      message.name === 'background-agents'
+      && message.type === 'info'
+      && typeof message.args[0] === 'string'
+      && message.args[0].includes('log-only fact events are disabled')
+      && message.args[1] === 'background-agents/fact')).toBe(true)
     await vi.waitFor(() => { expect(ctx.agents.get(started.childId)).toBeUndefined() }, { timeout: 5_000 })
   })
 

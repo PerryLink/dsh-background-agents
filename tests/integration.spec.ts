@@ -54,9 +54,10 @@ async function mount(root: string, adapter: MockAdapter, config: Partial<plugin.
     autoReport: true,
     reportThrottleMs: 0,
     idleSweepIntervalMs: 60_000,
-    // The rc.8 peer drops the ignorable marker; the default detect-and-skip
-    // gate keeps logs loadable (the reopen test), while the in-memory fact
-    // assertions opt back in so the fact pipeline is still exercised.
+    // The alpha.5 host fails closed on the session event vocabulary, so fact
+    // events never reach the log regardless of the marker opt-in. The reopen
+    // test below covers the durable log's loadability, while the in-memory
+    // assertions observe the logger fallback channel instead.
     allowUnmarkedFacts: true,
     ...config,
   })
@@ -153,16 +154,21 @@ describe('dsh-background-agents end-to-end', () => {
       .find(meta => meta !== undefined && (meta as { plugin?: unknown }).plugin === PLUGIN)
     expect(registeredMeta).toMatchObject({ plugin: PLUGIN, action: 'registered', agentId: childId, label: 'writer' })
 
-    // The structured fact channel rides the same log. The rc.8 host drops
-    // the envelope marker (the stamping fix exists on harness master only),
-    // so with the documented opt-in the facts land unmarked — this session
-    // never reopens, so the unmarked records stay harmless here; the reopen
-    // test below covers the default detect-and-skip gate instead.
-    const facts = events.filter(event => event.type === 'background-agents/fact')
-    expect(facts.map(fact => fact.data.kind)).toEqual(expect.arrayContaining(['registered', 'progress']))
+    // The alpha.5 host fails closed on the session event vocabulary, so the
+    // fact events never land in the log; each fact is routed to the logger
+    // fallback channel instead, while the replay meta and the injected
+    // notices above stay the model-visible record.
+    expect(events.some(event => event.type === 'background-agents/fact')).toBe(false)
+    expect(ctx.logger.buffer.some(message =>
+      message.name === 'background-agents'
+      && message.type === 'info'
+      && typeof message.args[0] === 'string'
+      && message.args[0].includes('log-only fact events are disabled')
+      && message.args[1] === 'background-agents/fact')).toBe(true)
 
-    // The projection folds the parent log into the dashboard value, including
-    // the settled account from the official notice.
+    // The projection folds the parent log into the dashboard value from the
+    // channels the alpha.5 host still accepts — the tool/result replay meta
+    // and the official settled account — including the settled fold.
     const snapshot = ctx.sessionProjections.snapshot(parent.session)
     const projection = isBackgroundAgentsProjection(snapshot.values.backgroundAgents)
     expect(projection?.agents).toHaveLength(1)
@@ -240,11 +246,11 @@ describe('dsh-background-agents end-to-end', () => {
     const projection = isBackgroundAgentsProjection(snapshot.values.backgroundAgents)
     expect(projection?.agents.map(row => row.agentId)).toEqual([childId])
 
-    // The rc.8 peer drops the ignorable marker, so no fact event ever
-    // reached the durable log (the detect-and-skip gate runs before the
-    // first append) — the log stays loadable precisely because the fact
-    // channel stayed off; the catalog and projection above reconstructed
-    // from the official replay meta + settled account alone.
+    // The alpha.5 host fails closed on the fact event vocabulary, so no fact
+    // event ever reached the durable log (the appender routes facts to the
+    // logger fallback) — the log stays loadable and the catalog and
+    // projection above reconstructed from the official replay meta + settled
+    // account alone.
     const handle = await second.sessionPersistence.open(SessionId('parent'), 'read')
     const reopenedFacts = (await handle.read())
       .filter(event => event.type === 'background-agents/fact')
