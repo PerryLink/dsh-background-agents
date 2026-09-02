@@ -29,7 +29,7 @@ Host `0.1.2-alpha.2` and later fails closed on the session event vocabulary, so 
 
 | Surface | Status |
 |---|---|
-| Harness | DeepSeek Harness `0.1.1-rc.2` (peers `>=0.1.0-rc.8 <0.2.0`) |
+| Harness | DeepSeek Harness `0.1.2-alpha.5` (peers `>=0.1.0-rc.8 <0.2.0`) |
 | Node | `^22.19.0 \|\| >=24.0.0` |
 | Platforms | All (host tools; optional Web sidebar panel and team rooms via the storage-domain capability) |
 | Model | Any (children inherit the parent's route; `childProvider`/`childModel` override) |

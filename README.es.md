@@ -28,7 +28,7 @@ Los hosts `0.1.2-alpha.2` y posteriores fallan en cerrado ante el vocabulario de
 
 | Superficie | Estado |
 |---|---|
-| Harness | DeepSeek Harness `0.1.1-rc.2` (peers `>=0.1.0-rc.8 <0.2.0`) |
+| Harness | DeepSeek Harness `0.1.2-alpha.5` (peers `>=0.1.0-rc.8 <0.2.0`) |
 | Node | `^22.19.0 \|\| >=24.0.0` |
 | Plataformas | Todas (herramientas de host; panel lateral web y salas de equipo opcionales mediante la capacidad de dominio de almacenamiento) |
 | Modelo | Cualquiera (los hijos heredan la ruta del padre; `childProvider`/`childModel` la reemplazan) |
