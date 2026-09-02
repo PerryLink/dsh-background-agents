@@ -448,7 +448,7 @@ describe('dsh-background-agents tools', () => {
     expect(result.isError).toBe(false)
     expect(result.value).toEqual({ outcome: 'interrupt-requested', agentId: started.childId })
     expect(cancelSpy).toHaveBeenCalledExactlyOnceWith({ kind: 'parent' }, { keepInbox: true })
-    expect(parent.session.events.some(event =>
+    expect(parent.session.snapshotEvents().some(event =>
       event.type === 'background-agents/fact'
       && event.data.kind === 'stop'
       && event.data.agentId === started.childId)).toBe(true)

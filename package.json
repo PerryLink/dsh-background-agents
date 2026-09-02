@@ -130,7 +130,7 @@
   "dependencies": {
     "zod": "^3.24.0"
   },
-  "devDependencies": {"@deepseek-ai/dsh-util-values": "0.1.2-alpha.5", "@deepseek-ai/dsh-attachment": "0.1.2-alpha.5", "@deepseek-ai/dsh-subagent": "0.1.2-alpha.5", 
+  "devDependencies": {"@deepseek-ai/dsh-util-values": "0.1.2-alpha.5", "@deepseek-ai/dsh-attachment": "0.1.2-alpha.5", "@deepseek-ai/dsh-subagent": "0.1.2-alpha.5", "@deepseek-ai/dsh-typert-protocol": "0.1.2-alpha.5", 
     "@deepseek-ai/cordis-plugin-include": "1.0.6",
     "@deepseek-ai/cordis-plugin-loader": "1.0.2",
     "@types/node": "^22.19.0",
