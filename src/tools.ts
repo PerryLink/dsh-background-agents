@@ -27,9 +27,10 @@ import { PLUGIN } from './vocabulary.ts'
 
 /**
  * Queue one host-protocol message for a background child across harness
- * lines: 0.1.2-alpha.5+ exposes `@deepseek-ai/dsh-subagent/internal` (the
- * peer-floor rc.8 package has no such subpath export), while older hosts
- * still ship `subagents.followup`. Both arms fail loudly when unavailable.
+ * lines. 0.1.2-alpha.5+ ships the process-stable queue symbols on the
+ * subagent runtime (`dsh.subagent.queuePrompt` in the published alpha.5,
+ * `dsh.subagent.deliverPrompt` on master), and older hosts still ship
+ * `subagents.followup`. Both arms fail loudly when unavailable.
  */
 async function deliverQueuedPrompt(
   subagents: unknown,
@@ -39,18 +40,19 @@ async function deliverQueuedPrompt(
   source: MessageSource,
   signal: AbortSignal,
 ): Promise<string> {
-  try {
-    const { queueHostSubagentPrompt } = await import('@deepseek-ai/dsh-subagent/internal')
-    return await queueHostSubagentPrompt(subagents as never, parent, childId, content, source, signal) as string
-  } catch {
-    const followup = (subagents as {
-      followup?: (parent: Agent, childId: SessionId, content: ContentBlock[], opts: { source: MessageSource; signal: AbortSignal }) => Promise<string>
-    }).followup
-    if (typeof followup !== 'function') {
-      throw new Error('bg_message delivery unavailable: this harness line exposes neither the internal queue helper nor subagents.followup')
-    }
-    return await followup.call(subagents, parent, childId, content, { source, signal })
+  type QueueFn = (parent: Agent, childId: SessionId, content: ContentBlock[], source: MessageSource, signal: AbortSignal, ...rest: unknown[]) => Promise<string>
+  const runtime = subagents as Record<symbol, unknown>
+  const masterQueue = runtime[Symbol.for('dsh.subagent.deliverPrompt')] as QueueFn | undefined
+  if (typeof masterQueue === 'function') return await masterQueue.call(runtime, parent, childId, content, source, signal, 'queue')
+  const alphaQueue = runtime[Symbol.for('dsh.subagent.queuePrompt')] as QueueFn | undefined
+  if (typeof alphaQueue === 'function') return await alphaQueue.call(runtime, parent, childId, content, source, signal)
+  const followup = (subagents as {
+    followup?: (parent: Agent, childId: SessionId, content: ContentBlock[], opts: { source: MessageSource; signal: AbortSignal }) => Promise<string>
+  }).followup
+  if (typeof followup !== 'function') {
+    throw new Error('bg_message delivery unavailable: this harness line exposes neither the queue symbols nor subagents.followup')
   }
+  return await followup.call(subagents, parent, childId, content, { source, signal })
 }
 
 /** Lifecycle thresholds the tools enforce. */
