@@ -218,6 +218,13 @@ describe('dsh-background-agents tools', () => {
     await ctx.plugin(SubagentSpawn, { providerName: 'spawn' })
     await ctx.plugin(plugin, { provider: 'spawn', autoReport: false, allowUnmarkedFacts: true })
     ctx.llm.registerAdapter(['mock'], new MockAdapter([]))
+    // The alpha.3 AgentLoop hard-injects sessionProjections, so this
+    // registry-less context never materializes ctx.agentLoop; provide a
+    // minimal stand-in to reach the guarded listing path (the guard lives in
+    // the subagent control's listChildren, not in the loop).
+    ctx.provide('agentLoop' as never, {
+      create: (id: SessionId) => ({ id }),
+    } as never)
     const parent = ctx.agentLoop.create(SessionId('parent'), { provider: 'mock', model: 'mock' })
 
     const result = await callTool(ctx, 'bg_list', {}, parent)
