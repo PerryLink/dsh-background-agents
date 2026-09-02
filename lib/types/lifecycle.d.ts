@@ -103,9 +103,7 @@ export declare class BackgroundAgentLifecycle {
  * @param options.reasoning - set by the caller to observe which source the
  *   fold used (text when the fallback was not needed).
  */
-export declare function sessionLastText(session: {
-    events: readonly SessionEvent[];
-}, options?: {
+export declare function sessionLastText(events: readonly SessionEvent[], options?: {
     allowReasoning?: boolean;
     reasoning?: {
         used: boolean;
