@@ -40,7 +40,7 @@ export declare class FactAppender {
      * marker. On hosts whose event vocabulary forbids the fact events
      * (`0.1.2-alpha.1+`) the record is routed to the fallback sink instead
      * of the session log; on pre-marker rc hosts (and after a failed probe)
-     * the append is skipped so the session log stays loadable everywhere. On 0.1.2-alpha.2 the envelope field is restored for stored-log read compatibility only - its Session.append still cannot stamp the marker, so the gate behavior is unchanged.
+     * the append is skipped so the session log stays loadable everywhere. On 0.1.2-alpha.3 the envelope field is retained for stored-log read compatibility only - its Session.append still cannot stamp the marker, so the gate behavior is unchanged.
      * Append failures are contained: a fact hiccup never disturbs the
      * caller's operation.
      * @param session - the session whose log carries the fact.
