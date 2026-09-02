@@ -1,6 +1,6 @@
 {
   "name": "dsh-background-agents",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "packageManager": "pnpm@11.7.0",
   "description": "Interactive long-session background agents plus persistent multi-agent team rooms for DeepSeek Harness: durable continuable child agents with progress, steering and interruption, and cross-session team rooms with a message bus, shared task board, approval-gated handoffs and a shared timeline that survive DSH restarts.",
   "repository": {
