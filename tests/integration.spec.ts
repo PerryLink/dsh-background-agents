@@ -132,7 +132,7 @@ describe('dsh-background-agents end-to-end', () => {
     await vi.waitFor(() => { expect(adapterRef.requests.length).toBeGreaterThanOrEqual(4) }, { timeout: 5_000 })
     await parent.whenIdle()
 
-    const events = parent.session.events
+    const events = parent.session.snapshotEvents()
     const progress = events.filter((event): event is Extract<typeof events[number], { type: 'user/message' }> =>
       event.type === 'user/message' && event.data.source.kind === 'plugin'
       && event.data.source.plugin === PLUGIN
@@ -245,8 +245,10 @@ describe('dsh-background-agents end-to-end', () => {
     // first append) — the log stays loadable precisely because the fact
     // channel stayed off; the catalog and projection above reconstructed
     // from the official replay meta + settled account alone.
-    const reopenedFacts = (await second.sessionPersistence.load(SessionId('parent'))).events
+    const handle = await second.sessionPersistence.open(SessionId('parent'), 'read')
+    const reopenedFacts = (await handle.read())
       .filter(event => event.type === 'background-agents/fact')
+    await handle.close()
     expect(reopenedFacts).toHaveLength(0)
     await second.fiber.dispose()
   })

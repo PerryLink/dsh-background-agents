@@ -102,7 +102,7 @@ describe('dsh-background-agents tools', () => {
     // meta. The rc.8 host drops the envelope marker (the stamping fix exists
     // on harness master only), so with the documented opt-in the fact lands
     // unmarked — this in-memory session never reopens, so it stays harmless.
-    const fact = parent.session.events.find(event => event.type === 'background-agents/fact')
+    const fact = parent.session.snapshotEvents().find(event => event.type === 'background-agents/fact')
     expect(fact).toMatchObject({
       type: 'background-agents/fact',
       data: { kind: 'registered', agentId: started.agentId, label: 'write one line' },
@@ -190,10 +190,12 @@ describe('dsh-background-agents tools', () => {
       messageId: message.messageId,
     })
     await vi.waitFor(() => { expect(ctx.agents.get(started.childId)).toBeUndefined() }, { timeout: 5_000 })
-    const loaded = await ctx.sessionPersistence.load(started.childId)
-    const followUp = loaded.events.findLast(event => event.type === 'user/message')
+    const handle = await ctx.sessionPersistence.open(started.childId, 'read')
+    const loadedEvents = await handle.read()
+    await handle.close()
+    const followUp = loadedEvents.findLast(event => event.type === 'user/message')
     expect(followUp?.type === 'user/message' && followUp.data.source).toEqual({
-      kind: 'coordinator',
+      kind: 'agent-message',
       form: 'relay',
       senderSessionId: parent.id,
     })

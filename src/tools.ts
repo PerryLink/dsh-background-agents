@@ -16,9 +16,10 @@
 import type { Context } from '@deepseek-ai/cordis'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { Agent } from '@deepseek-ai/dsh-agent'
-import type { ContentBlock } from '@deepseek-ai/dsh-llm'
+import type { ContentBlock, MessageSource } from '@deepseek-ai/dsh-llm'
 import { SessionId, type SessionEvent } from '@deepseek-ai/dsh-session'
 import { SubagentError, type SubagentDescendantListEntry, type SubagentListEntry } from '@deepseek-ai/dsh-subagent'
+import { queueHostSubagentPrompt } from '@deepseek-ai/dsh-subagent/internal'
 import { countBackgroundAgents, sessionLastText, type BackgroundAgentLifecycle } from './lifecycle.ts'
 import { FACT_EVENT } from './events.ts'
 import type { FactAppender } from './facts.ts'
@@ -424,14 +425,13 @@ export function registerBackgroundAgentTools(
         throw new Error('bg_message requires a non-empty message')
       }
       const childId = SessionId(args.agent_id)
-      const messageId = await ctx.subagents.followup(
+      const messageId = await queueHostSubagentPrompt(
+        ctx.subagents,
         parent,
         childId,
         [{ type: 'text', text: message }] as ContentBlock[],
-        {
-          source: { kind: 'coordinator', form: 'relay', senderSessionId: parent.id },
-          signal: exec.signal,
-        },
+        { kind: 'agent-message', form: 'relay', senderSessionId: parent.id } satisfies MessageSource,
+        exec.signal,
       )
       // A cold child resumed through bg_message re-enters the live tracking
       // set; the durable label stays with the projection.
@@ -669,17 +669,26 @@ export function registerBackgroundAgentTools(
       const fact = factsFor(ctx, parent).get(childId) ?? fallbackFact(childId)
       // Settled children leave the live session store, so the durable log is
       // the text source of record; a persistence read failure is loud.
-      let session: { events: readonly SessionEvent[] } | undefined = ctx.sessions.get(childId)
-      if (session === undefined) {
+      let events: readonly SessionEvent[] | undefined
+      const live = ctx.sessions.get(childId)
+      if (live !== undefined) {
+        events = typeof live.snapshotEvents === 'function'
+          ? live.snapshotEvents()
+          : (live as unknown as { events: readonly SessionEvent[] }).events
+      } else {
         const persistence = ctx.get('sessionPersistence')
-        if (persistence !== undefined) session = await persistence.load(childId)
+        if (persistence !== undefined) {
+          const handle = await persistence.open(childId, 'read')
+          events = await handle.read()
+          await handle.close()
+        }
       }
       // A thinking model's last message may carry reasoning blocks only; the
       // fallback keeps bg_result honest instead of reporting "no output".
       const reasoning = { used: false }
-      const text = session === undefined
+      const text = events === undefined
         ? ''
-        : sessionLastText(session, { allowReasoning: true, reasoning })
+        : sessionLastText(events, { allowReasoning: true, reasoning })
       const truncated = text.length > config.resultMaxChars
       const capped = truncated ? `${text.slice(0, config.resultMaxChars - 1)}…` : text
       return {

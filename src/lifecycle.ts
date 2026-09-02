@@ -169,10 +169,10 @@ export class BackgroundAgentLifecycle {
  *   fold used (text when the fallback was not needed).
  */
 export function sessionLastText(
-  session: { events: readonly SessionEvent[] },
+  events: readonly SessionEvent[],
   options: { allowReasoning?: boolean; reasoning?: { used: boolean } } = {},
 ): string {
-  const output = finalAssistantOutput(session.events)
+  const output = finalAssistantOutput(events)
   if (output === undefined) return ''
   const text = output
     .filter((block): block is Extract<(typeof output)[number], { type: 'text' }> => block.type === 'text')
@@ -193,7 +193,10 @@ export function sessionLastText(
 export function childLastText(sessions: LiveSessions, childId: SessionId): string {
   const session = sessions.get(childId)
   if (session === undefined) return ''
-  return sessionLastText(session)
+  const events = typeof session.snapshotEvents === 'function'
+    ? session.snapshotEvents()
+    : (session as unknown as { events: readonly SessionEvent[] }).events
+  return sessionLastText(events)
 }
 
 /** Bound one line to the configured report cap with an explicit ellipsis. */

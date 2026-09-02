@@ -263,22 +263,22 @@ describe('idle sweep', () => {
 
 describe('sessionLastText extraction', () => {
   it('returns the text blocks by default', () => {
-    expect(sessionLastText(childSessionWithAssistant('final answer') as never)).toBe('final answer')
+    expect(sessionLastText(childSessionWithAssistant('final answer').events as never)).toBe('final answer')
   })
 
   it('returns empty for a reasoning-only message without the fallback', () => {
-    expect(sessionLastText(childSessionWithReasoning('thinking hard') as never)).toBe('')
+    expect(sessionLastText(childSessionWithReasoning('thinking hard').events as never)).toBe('')
   })
 
   it('falls back to reasoning blocks when allowed and flags the source', () => {
     const reasoning = { used: false }
-    expect(sessionLastText(childSessionWithReasoning('thinking hard') as never, { allowReasoning: true, reasoning })).toBe('thinking hard')
+    expect(sessionLastText(childSessionWithReasoning('thinking hard').events as never, { allowReasoning: true, reasoning })).toBe('thinking hard')
     expect(reasoning.used).toBe(true)
   })
 
   it('does not flag the source when the fallback finds no reasoning either', () => {
     const reasoning = { used: false }
-    expect(sessionLastText({ events: [] } as never, { allowReasoning: true, reasoning })).toBe('')
+    expect(sessionLastText([] as never, { allowReasoning: true, reasoning })).toBe('')
     expect(reasoning.used).toBe(false)
   })
 })
