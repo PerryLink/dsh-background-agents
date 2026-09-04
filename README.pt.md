@@ -24,11 +24,11 @@
 ## Compatibilidade
 
 Hosts `0.1.2-alpha.2` e posteriores falham de forma fechada no vocabulário de eventos de sessão, então este plugin não grava mais ali seus eventos de fatos somente-registro (`background-agents/fact`, `team-room/fact`): os fatos seguem pelo canal de logger/painel e as projeções degradam para uma dobra vazia. As linhas rc anteriores (até `0.1.1-rc.2`) mantêm a disciplina do marcador ignorable. A metade cliente agora usa os pacotes de cliente atuais (`dsh-api-session-controller`, `dsh-client-web`) e o remoto subagent atual (`interruptByParent`, `prompt` com `requestId` cunhado pelo cliente; o antigo RPC `history` sumiu — os vistores de resultado leem a projeção `conversation` da sessão filha).
-0.1.2-alpha.5 (adaptado em 2026-09-02): o envelope de sessão mantém seu campo ignorable apenas para compatibilidade de leitura de logs armazenados - o Session.append ainda não consegue estampá-lo, então o comportamento da porta não muda.
+0.1.2-rc.1 (adaptado em 2026-09-04): o envelope de sessão mantém seu campo ignorable apenas para compatibilidade de leitura de logs armazenados - o Session.append ainda não consegue estampá-lo (o terceiro parâmetro é SurfaceIntent, apenas para tipos de eventos de superfície, nunca um pacote de opções), então o comportamento da porta de fatos não muda.
 
 | Superfície | Status |
 |---|---|
-| Harness | DeepSeek Harness `0.1.2-alpha.5` (peers `>=0.1.0-rc.8 <0.2.0`) |
+| Harness | DeepSeek Harness `0.1.2-rc.1` (peers `>=0.1.0-rc.8 <0.2.0`) |
 | Node | `^22.19.0 \|\| >=24.0.0` |
 | Plataformas | Todas (ferramentas de host; painel lateral web e salas de equipe opcionais via capacidade de domínio de armazenamento) |
 | Modelo | Qualquer (os filhos herdam a rota do pai; `childProvider`/`childModel` sobrescrevem) |
