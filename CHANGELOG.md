@@ -2,6 +2,17 @@
 
 All notable changes to `dsh-background-agents` are documented here. The repo is pre-release; versions follow the DeepSeek Harness `0.1.x-rc.x` target runtime and bump on every behavior change.
 
+## [0.9.0] - 2026-09-04
+
+### Fixed
+
+- `bg_result` now cold-reads a settled child through both persistence surfaces: the master/checkout handle seam (`open` → `read` → `close`) and, when `open` is absent, the published-rc `load()` fallback (`load(child).events`). Previously the published line (no `open`) made the cold read throw a TypeError.
+- `isUnmarkedHostVersion` now classifies every `0.1.2-rc` build as marker-unaware (that line ships the alpha.5 surface: the third `Session.append` parameter is `SurfaceIntent` for surface event types only, never an options bag). Previously `0.1.2-rc.1` fell through the rc bound and read as marker-aware; the fact gate still forbids appends there via `factEventPolicyForVersion`, and the classifier now agrees with it.
+
+### Changed
+
+- Align the devDependency pins to the published dsh `0.1.2-rc.1` line (source-identical to `0.1.2-alpha.5`), repin `HARNESS_COMMIT` to the rc.1 release commit, raise the compat probes to `0.1.2-rc.1`, and sync the five-language READMEs and ARCHITECTURE.md to the rc.1 facts.
+
 ## [0.8.1] - 2026-09-02
 
 ### Docs
