@@ -1,8 +1,10 @@
 /**
  * Fact-appender gating and the room-store open-timeout tests: on hosts
- * whose `Session.append` drops the `ignorable` marker (the rc.1–rc.8
- * lines), fact events must NEVER land unmarked, and a stuck storage
- * provider must fail `/room` operations loud instead of hanging.
+ * whose `Session.append` drops the `ignorable` marker (the `0.1.0`/`0.1.1`
+ * rc lines and every `0.1.2-rc` build) fact events must NEVER land
+ * unmarked — and on `0.1.2+` the fact vocabulary gate forbids them
+ * outright — while a stuck storage provider must fail `/room` operations
+ * loud instead of hanging.
  * @module dsh-background-agents/tests/facts.spec
  */
 
@@ -10,7 +12,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { FactAppender } from '../src/facts.ts'
 import type { FactAppender as FactAppenderType } from '../src/facts.ts'
-import { isUnmarkedHostVersion } from '../src/audit.ts'
+import { factEventPolicyForVersion, isUnmarkedHostVersion } from '../src/audit.ts'
 import { RoomHub, RoomError } from '../src/room/hub.ts'
 import type { RoomConfig } from '../src/room/hub.ts'
 
@@ -39,9 +41,18 @@ function roomConfig(over: Partial<RoomConfig> = {}): RoomConfig {
 }
 
 describe('isUnmarkedHostVersion', () => {
-  it('flags the 0.1.0/0.1.1 rc.1–rc.8 lines and nothing else', () => {
-    for (const version of ['0.1.0-rc.1', '0.1.0-rc.8', '0.1.1-rc.1', '0.1.1-rc.2', '0.1.1-rc.8']) expect(isUnmarkedHostVersion(version)).toBe(true)
+  it('flags the 0.1.0/0.1.1 rc.1–rc.8 lines, every 0.1.2-rc build, and nothing else', () => {
+    for (const version of ['0.1.0-rc.1', '0.1.0-rc.8', '0.1.1-rc.1', '0.1.1-rc.2', '0.1.1-rc.8', '0.1.2-rc.1', '0.1.2-rc.9']) expect(isUnmarkedHostVersion(version)).toBe(true)
     for (const version of ['0.1.0-rc.9', '0.1.1-rc.9', '0.1.0', '0.2.0', '0.1.0-rc.6-pre', 'garbage']) expect(isUnmarkedHostVersion(version)).toBe(false)
+  })
+})
+
+describe('factEventPolicyForVersion', () => {
+  it('forbids fact appends on 0.1.2-alpha.1+ and every 0.1.2-rc build, allows the older rc lines', () => {
+    for (const version of ['0.1.2-alpha.1', '0.1.2-alpha.5', '0.1.2-rc.1', '0.1.2', '0.2.0']) expect(factEventPolicyForVersion(version)).toBe('forbidden')
+    expect(factEventPolicyForVersion('0.1.0-rc.8')).toBe('append')
+    expect(factEventPolicyForVersion('0.1.1-rc.2')).toBe('append')
+    expect(factEventPolicyForVersion('garbage')).toBe('unknown')
   })
 })
 

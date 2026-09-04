@@ -4,7 +4,7 @@
 
 ## Durable facts: one structured channel, one model-visible channel
 
-Host gate: `0.1.2-alpha.1` and later fails closed on the session event vocabulary, and the plugin's fact event types are not in KNOWN_SESSION_EVENT_TYPES there. On those hosts the appender (version-classified before the first append) never writes a fact event and routes each record to the logger/panel fallback channel instead; older rc lines (through `0.1.1-rc.2`) keep the ignorable-marker discipline below. `bg_list` requires the deployment's `sessionQuery` service on both lines (the durable catalog reads it).
+Host gate: `0.1.2-alpha.1` and later (including the published `0.1.2-rc.1` line) fails closed on the session event vocabulary, and the plugin's fact event types are not in KNOWN_SESSION_EVENT_TYPES there. On those hosts the appender (version-classified before the first append) never writes a fact event and routes each record to the logger/panel fallback channel instead; older rc lines (through `0.1.1-rc.2`) keep the ignorable-marker discipline below. `bg_list` requires the deployment's `sessionQuery` service on both lines (the durable catalog reads it).
 
 The plugin writes every fact through **two channels with one discipline each**:
 
@@ -15,7 +15,7 @@ The plugin writes every fact through **two channels with one discipline each**:
 | per-turn progress and idle-archive lines the model sees | **injected notice** via `agent.inject()` / `agent.followup()`, source `{ kind: 'plugin', plugin: 'dsh-background-agents', form: 'notice' }`, canonical line prefix `[background-agent <id>] progress: …` | `user/message` |
 | settled (inactive, closing message) | the **official** `subagent-settled` notice the continuation manager delivers | `user/message` |
 
-The structured channel rides the harness's ignorable-append surface (`Session.append(type, data, { ignorable: true })`, open at the plugin's pinned baseline): readers that do not know the type skip the record instead of refusing the log, so older harness builds and older plugin versions still load parents written by this one. Hosts whose `Session.append` PREDATES the surface (every released rc line through rc.8 — and the `0.1.1-rc` line up to rc.2 — silently drops the options bag; the stamping fix exists on harness master only, and the unmarked event breaks resume on stricter builds) are detected before the first append by the `FactAppender` (installed-peer version pre-check, then a probe of the first appended envelope's return value): on such hosts fact appends are skipped with a one-time warning, the durable store + notices + tools keep working, and the projections degrade to an empty fact fold (`allowUnmarkedFacts: true` opts back in — deliberately dangerous). The `backgroundAgents` projection folds the structured channel, keeps the legacy folds for pre-v0.3.0 logs, and switches a row to structured provenance on its first fact — so a log that carries both channels (the v0.3.0 write path keeps writing both) never double-counts. The official `subagent-settled` account folds regardless of provenance: it has no structured counterpart.
+The structured channel rides the harness's ignorable-append surface (`Session.append(type, data, { ignorable: true })`): readers that do not know the type skip the record instead of refusing the log, so older harness builds and older plugin versions still load parents written by this one. No released line exposes that surface — `Session.append`'s third parameter is `SurfaceIntent` for surface event types only (never an options bag), on alpha.5, rc.1, and master alike — and hosts at `0.1.2+` fail closed on the fact vocabulary, so the `FactAppender` forbids the append before it is attempted there (installed-peer version pre-check). On the older hosts whose `Session.append` PREDATES the surface (every released rc line through rc.8 — and the `0.1.1-rc` line up to rc.2 — silently drops the options bag, and the unmarked event breaks resume on stricter builds), the same pre-check skips fact appends with a one-time warning (unresolvable versions probe the first appended envelope's return value instead): the durable store + notices + tools keep working, and the projections degrade to an empty fact fold (`allowUnmarkedFacts: true` opts back in — deliberately dangerous). The `backgroundAgents` projection folds the structured channel, keeps the legacy folds for pre-v0.3.0 logs, and switches a row to structured provenance on its first fact — so a log that carries both channels (the v0.3.0 write path keeps writing both) never double-counts. The official `subagent-settled` account folds regardless of provenance: it has no structured counterpart.
 
 This satisfies model-visible ⟺ logged for every injected line (the notice is a real user message in the parent log) and makes the dashboard value reconstructable without a second database — and it decouples the dashboard facts from the human-readable notice wording, which is now free to evolve.
 
@@ -43,7 +43,11 @@ bg_list ──▶ ctx.subagents.listChildren / listDescendants(parent)  (durable
             + ctx.sessionProjections.snapshot(parent).backgroundAgents (facts)
             + ctx.agents.get(id)                 (running/idle/ready overlay)
 
-bg_result ──▶ ctx.sessions.get(child) → sessionPersistence.load(child) → final assistant text
+bg_result ──▶ ctx.sessions.get(child) ──▶ sessionPersistence.open(child, 'read')
+                       → handle.read() → handle.close() → final assistant text
+            (the handle seam exists on harness master/checkout; the published
+             rc line has no open(), so the cold read falls back to
+             load(child).events there)
                                                     (text blocks; reasoning fallback flagged `textSource`)
 ```
 

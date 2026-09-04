@@ -54,7 +54,7 @@ async function mount(root: string, adapter: MockAdapter, config: Partial<plugin.
     autoReport: true,
     reportThrottleMs: 0,
     idleSweepIntervalMs: 60_000,
-    // The alpha.5 host fails closed on the session event vocabulary, so fact
+    // The rc.1 host fails closed on the session event vocabulary, so fact
     // events never reach the log regardless of the marker opt-in. The reopen
     // test below covers the durable log's loadability, while the in-memory
     // assertions observe the logger fallback channel instead.
@@ -154,7 +154,7 @@ describe('dsh-background-agents end-to-end', () => {
       .find(meta => meta !== undefined && (meta as { plugin?: unknown }).plugin === PLUGIN)
     expect(registeredMeta).toMatchObject({ plugin: PLUGIN, action: 'registered', agentId: childId, label: 'writer' })
 
-    // The alpha.5 host fails closed on the session event vocabulary, so the
+    // The rc.1 host fails closed on the session event vocabulary, so the
     // fact events never land in the log; each fact is routed to the logger
     // fallback channel instead, while the replay meta and the injected
     // notices above stay the model-visible record.
@@ -167,7 +167,7 @@ describe('dsh-background-agents end-to-end', () => {
       && message.args[1] === 'background-agents/fact')).toBe(true)
 
     // The projection folds the parent log into the dashboard value from the
-    // channels the alpha.5 host still accepts — the tool/result replay meta
+    // channels the rc.1 host still accepts — the tool/result replay meta
     // and the official settled account — including the settled fold.
     const snapshot = ctx.sessionProjections.snapshot(parent.session)
     const projection = isBackgroundAgentsProjection(snapshot.values.backgroundAgents)
@@ -246,7 +246,7 @@ describe('dsh-background-agents end-to-end', () => {
     const projection = isBackgroundAgentsProjection(snapshot.values.backgroundAgents)
     expect(projection?.agents.map(row => row.agentId)).toEqual([childId])
 
-    // The alpha.5 host fails closed on the fact event vocabulary, so no fact
+    // The rc.1 host fails closed on the fact event vocabulary, so no fact
     // event ever reached the durable log (the appender routes facts to the
     // logger fallback) — the log stays loadable and the catalog and
     // projection above reconstructed from the official replay meta + settled

@@ -27,8 +27,9 @@ import { PLUGIN } from './vocabulary.ts'
 
 /**
  * Queue one host-protocol message for a background child across harness
- * lines. 0.1.2-alpha.5+ ships the process-stable queue symbols on the
- * subagent runtime (`dsh.subagent.queuePrompt` in the published alpha.5,
+ * lines. 0.1.2-alpha.5+ (including the published rc.1 line, which is
+ * source-identical) ships the process-stable queue symbols on the
+ * subagent runtime (`dsh.subagent.queuePrompt` in the published line,
  * `dsh.subagent.deliverPrompt` on master), and older hosts still ship
  * `subagents.followup`. Both arms fail loudly when unavailable.
  */
@@ -702,9 +703,21 @@ export function registerBackgroundAgentTools(
       } else {
         const persistence = ctx.get('sessionPersistence')
         if (persistence !== undefined) {
-          const handle = await persistence.open(childId, 'read')
-          events = await handle.read()
-          await handle.close()
+          // The handle seam (open → read → close) exists on harness
+          // master/checkout only; every published rc line predates open().
+          // Feature-detect it and fall back to load()'s balanced inspection
+          // on the published surface. Either path failing is loud: a
+          // persistence read failure must not fabricate empty text.
+          if (typeof persistence.open === 'function') {
+            const handle = await persistence.open(childId, 'read')
+            events = await handle.read()
+            await handle.close()
+          } else {
+            const loaded = await (persistence as unknown as {
+              load: (id: SessionId) => Promise<{ events: readonly SessionEvent[] }>
+            }).load(childId)
+            events = loaded.events
+          }
         }
       }
       // A thinking model's last message may carry reasoning blocks only; the

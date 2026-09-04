@@ -28,7 +28,7 @@ async function setup(config: Partial<plugin.Config> = {}) {
   await mountAgentLoopTestDependencies(ctx)
   const root = mkdtempSync(join(tmpdir(), 'dsh-background-agents-'))
   roots.push(root)
-  await ctx.plugin(JsonlSessionPersistence, { root })
+  const persistenceFiber = await ctx.plugin(JsonlSessionPersistence, { root })
   await ctx.plugin(AgentLoop, { agents: [] })
   await ctx.plugin(SessionProjectionRegistry)
   await ctx.plugin(TestSessionQuery)
@@ -38,7 +38,7 @@ async function setup(config: Partial<plugin.Config> = {}) {
     provider: 'spawn',
     autoReport: false,
     idleSweepIntervalMs: 60_000,
-    // On the 0.1.2-alpha.5 host the session event vocabulary fails closed on
+    // On the 0.1.2-rc.1 host the session event vocabulary fails closed on
     // `background-agents/fact`, so facts never land in the log: the appender
     // routes them to the logger fallback. The opt-in only bypasses the rc
     // line's marker check and changes nothing here, but mounting with it
@@ -48,7 +48,7 @@ async function setup(config: Partial<plugin.Config> = {}) {
   })
   // No adapter registered here: tests that need model turns register their own.
   const parent = await ctx.agentLoop.create(SessionId('parent'), { provider: 'mock', model: 'mock' })
-  return { ctx, parent, root }
+  return { ctx, parent, root, persistenceFiber }
 }
 
 let calls = 0
@@ -98,7 +98,7 @@ describe('dsh-background-agents tools', () => {
     })
     const child = ctx.agents.get(SessionId(started.agentId))
     expect(child).toBeDefined()
-    // The alpha.5 host fails closed on the session event vocabulary, so the
+    // The rc.1 host fails closed on the session event vocabulary, so the
     // registered fact never lands in the log; the appender routes it to the
     // logger fallback channel instead. The replay meta above is the durable
     // registration record the model and the reopen fold see.
@@ -251,7 +251,7 @@ describe('dsh-background-agents tools', () => {
     const value = valueOf<{ kind: string; agents: Array<Record<string, unknown>> }>(listing)
     expect(value.kind).toBe('listing')
     expect(value.agents).toHaveLength(1)
-    // The alpha.5 host keeps the fact channel closed, so the row's lifecycle
+    // The rc.1 host keeps the fact channel closed, so the row's lifecycle
     // fields resolve from the official catalog and the live registry instead
     // of the projection fold: the settled child reads 'ready' (exists only in
     // storage, resumable via bg_message) and the fact-only messageCount stays
@@ -326,7 +326,7 @@ describe('dsh-background-agents tools', () => {
 
     const result = await callTool(ctx, 'bg_result', { agent_id: childId }, parent)
     expect(result.isError).toBe(false)
-    // The alpha.5 host lets no fact land in the log, so the projection fold
+    // The rc.1 host lets no fact land in the log, so the projection fold
     // cannot supply the label or the settled account: the label stays absent
     // and the activity resolves from the live registry as 'ready' (exists
     // only in storage, resumable via bg_message). The final text still reads
@@ -340,6 +340,42 @@ describe('dsh-background-agents tools', () => {
     const ghost = await callTool(ctx, 'bg_result', { agent_id: 'ghost-child' }, parent)
     expect(ghost.isError).toBe(true)
     expect(text(ghost)).toContain('not one of this conversation\'s tracked children')
+  })
+
+  it('bg_result cold-reads a settled child through the published-line load() surface when open is absent', async () => {
+    const { ctx, parent, persistenceFiber } = await setup()
+    ctx.llm.registerAdapter(['mock'], new MockAdapter([textResponse('load arm text')]))
+    const started = await callTool(ctx, 'background_agent', { task: 'answer via load' }, parent)
+    expect(started.isError).toBe(false)
+    const childId = valueOf<{ agentId: string }>(started).agentId
+    await vi.waitFor(() => { expect(ctx.agents.get(SessionId(childId))).toBeUndefined() }, { timeout: 5_000 })
+
+    // Capture the settled child's durable log through the checkout's handle
+    // seam, then swap in the published-rc persistence surface (load only,
+    // no open): bg_result's cold read must take the load fallback arm. The
+    // discovery catalog is stubbed because the checkout's listChildren cold
+    // reads go through the handle seam; on the published line the catalog
+    // rides load()/inspect() and needs no stubbing.
+    const persistence = ctx.get('sessionPersistence')
+    if (persistence === undefined) throw new Error('fixture missing sessionPersistence')
+    const handle = await persistence.open(SessionId(childId), 'read')
+    const durable = await handle.read()
+    await handle.close()
+    const load = vi.fn(async () => ({ events: durable }))
+    vi.spyOn(ctx.subagents, 'listChildren').mockResolvedValue([
+      { kind: 'child', mode: 'continuable', id: SessionId(childId), label: 'load arm' },
+    ] as never)
+    await persistenceFiber.dispose() // unregisters the handle-seam service
+    ctx.provide('sessionPersistence', { load } as never)
+
+    const result = await callTool(ctx, 'bg_result', { agent_id: childId }, parent)
+    expect(result.isError).toBe(false)
+    expect(load).toHaveBeenCalledExactlyOnceWith(SessionId(childId))
+    expect(valueOf<{ agentId: string; text?: string }>(result)).toEqual({
+      agentId: childId,
+      activity: 'ready',
+      text: 'load arm text',
+    })
   })
 
   it('bg_result falls back to reasoning blocks when the final message carried no text', async () => {
@@ -451,7 +487,7 @@ describe('dsh-background-agents tools', () => {
     expect(result.isError).toBe(false)
     expect(result.value).toEqual({ outcome: 'interrupt-requested', agentId: started.childId })
     expect(cancelSpy).toHaveBeenCalledExactlyOnceWith({ kind: 'parent' }, { keepInbox: true })
-    // The alpha.5 host forbids the fact event in the log; the stop fact is
+    // The rc.1 host forbids the fact event in the log; the stop fact is
     // routed to the logger fallback channel instead, and the outcome above
     // is the model-visible record of the request.
     expect(parent.session.snapshotEvents().some(event => event.type === 'background-agents/fact')).toBe(false)

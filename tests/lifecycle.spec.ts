@@ -12,7 +12,7 @@ const childId = SessionId('child-1')
 const parentId = SessionId('parent')
 
 /**
- * Fallback sink: on the 0.1.2-alpha.5 host the session event vocabulary
+ * Fallback sink: on the 0.1.2-rc.1 host the session event vocabulary
  * fails closed on `background-agents/fact`, so the appender routes every
  * fact here instead of the log. The specs assert that routing plus the raw
  * fact payload shape.
@@ -110,7 +110,7 @@ describe('reportProgress throttle and bounds', () => {
     const head = parseNotice(message.content[0].text)
     expect(head).toMatchObject({ agentId: childId, kind: 'progress' })
     expect(head!.text).toContain('wrote line 1')
-    // The alpha.5 host forbids the fact event in the session log, so the
+    // The rc.1 host forbids the fact event in the session log, so the
     // progress fact lands in the fallback sink instead.
     expect(parent.session.append).not.toHaveBeenCalled()
     expect(fallback).toHaveBeenCalledExactlyOnceWith(
