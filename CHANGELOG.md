@@ -2,11 +2,12 @@
 
 All notable changes to `dsh-background-agents` are documented here. The repo is pre-release; versions follow the DeepSeek Harness `0.1.x-rc.x` target runtime and bump on every behavior change.
 
-## [0.9.1] - 2026-09-04
+## [0.9.2] - 2026-09-04
 
 ### Fixed
 
-- Remove the `storage` / `storage-json` / `storage-domain` rows from the bundle patch: the shipped profiles compose that stack through `dsh-base`, so the inserted rows collided with the same ids and made the profile refuse to boot (`duplicate loader entry id: storage`). The patch now mounts only the `background-agents` row; bare profiles compose the storage stack themselves.
+- Remove the `storage` / `storage-json` / `storage-domain` rows from the bundle patch: the shipped profiles compose that stack through `dsh-base`, so the inserted rows collided with the same ids and made the profile refuse to boot (`duplicate loader entry id: storage`). The patch now mounts only the `background-agents` row; bare profiles compose the storage stack themselves. The manifest test asserts the new patch contract (plugin row only).
+- Carry an empty `stream` on the `assistant/message` fixtures so the local suite stays green against both event shapes: the checkout-resolved peers read the v2 embedded stream, while the published rc.1 peers read `message.content` (dual-ruler fixture, no behavior change).
 
 ## [0.9.0] - 2026-09-04
 

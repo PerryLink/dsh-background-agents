@@ -32,14 +32,15 @@ describe('cordis.patch.yml manifest consistency', () => {
     }
   })
 
-  it('inserts the full storage stack so a bare profile gets a storage domain', () => {
+  it('inserts only the plugin row: the storage stack comes from dsh-base', () => {
     const names = rowNames(patch)
+    expect(names).toEqual(['dsh-background-agents'])
     for (const storage of [
       '@deepseek-ai/dsh-storage',
       '@deepseek-ai/dsh-storage-json',
       '@deepseek-ai/dsh-storage-domain',
     ]) {
-      expect(names, `patch must insert ${storage}`).toContain(storage)
+      expect(names, `patch must not insert ${storage} (dsh-base composes it; a same-id insert fails the boot)`).not.toContain(storage)
     }
   })
 })

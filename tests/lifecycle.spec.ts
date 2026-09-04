@@ -61,7 +61,7 @@ function childSessionWithAssistant(text: string): { events: unknown[] } {
       type: 'assistant/message',
       seq: 0,
       time: 1,
-      data: { turn: 1, step: 1, message },
+      data: { turn: 1, step: 1, message, stream: [] },
     }],
   }
 }
@@ -78,7 +78,7 @@ function childSessionWithReasoning(text: string): { events: unknown[] } {
       type: 'assistant/message',
       seq: 0,
       time: 1,
-      data: { turn: 1, step: 1, message },
+      data: { turn: 1, step: 1, message, stream: [] },
     }],
   }
 }
