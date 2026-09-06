@@ -26,7 +26,7 @@
 
 Host `0.1.2-alpha.2` and later fails closed on the session event vocabulary, so this plugin no longer writes its log-only fact events (`background-agents/fact`, `team-room/fact`) there: facts route to the logger/panel channel instead and the projections degrade to an empty fold. Older rc lines (through `0.1.1-rc.2`) keep the ignorable-marker discipline. The client half now rides the current client packages (`dsh-api-session-controller`, `dsh-client-web`) and the current subagent remote (`interruptByParent`, `prompt` with a client-minted `requestId`; the old `history` RPC is gone — result peeks read the child session's `conversation` projection).
 0.1.2-rc.1 (adapted 2026-09-04): the session envelope keeps its ignorable field for stored-log read compatibility only - Session.append still cannot stamp it (the third parameter is SurfaceIntent for surface event types only, never an options bag), so fact-gate behavior is unchanged.
-0.1.3-alpha.1 (adapted 2026-09-06): the CI harness pin moves to the master checkout (`d347e7039`) - the handle seam (`open → read → close`) of the session-persistence service. The published 0.1.2-rc.1 runtime predates open(), so the cold bg_result read feature-detects the seam and falls back to load() - same behavior on both lines.
+0.1.3-alpha.1 (adapted 2026-09-06): the CI harness pin moves to the master checkout (`d347e7039`) - the handle seam (`open → read → close`) of the session-persistence service. The published 0.1.2-rc.1 runtime predates open(), so the cold bg_result read feature-detects the seam and falls back to load() - same behavior on both lines. Verified 2026-09-06 against the dsh-v0.1.3-alpha.1 master checkout (full gate chain + profile install smoke).
 
 | Surface | Status |
 |---|---|
