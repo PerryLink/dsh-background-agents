@@ -30,7 +30,7 @@ Host `0.1.2-alpha.2` and later fails closed on the session event vocabulary, so 
 
 | Surface | Status |
 |---|---|
-| Harness | DeepSeek Harness `0.1.3-alpha.1` (pinned checkout `d347e7039`; peers `>=0.1.2-rc.1 <0.2.0`) |
+| Harness | DeepSeek Harness `dsh-v0.1.3-alpha.1` (GitHub tag, verified 2026-09-06; npm pin `0.1.2-rc.1`, peers `>=0.1.2-rc.1 <0.2.0`) |
 | Node | `^22.19.0 \|\| >=24.0.0` |
 | Platforms | All (host tools; optional Web sidebar panel and team rooms via the storage-domain capability) |
 | Model | Any (children inherit the parent's route; `childProvider`/`childModel` override) |

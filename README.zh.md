@@ -29,7 +29,7 @@
 
 | 方面 | 状态 |
 |---|---|
-| Harness | DeepSeek Harness `0.1.3-alpha.1`（钉住的 checkout `d347e7039`；peer 依赖 `>=0.1.2-rc.1 <0.2.0`） |
+| Harness | DeepSeek Harness `dsh-v0.1.3-alpha.1`（GitHub tag，2026-09-06 已核验；npm 依赖钉号 `0.1.2-rc.1`，peer 依赖 `>=0.1.2-rc.1 <0.2.0`） |
 | Node | `^22.19.0 \|\| >=24.0.0` |
 | 平台 | 全部（宿主工具；可选 Web 侧栏面板与团队房间，依赖存储域能力） |
 | 模型 | 任意（子代理继承父代理的路由；`childProvider`/`childModel` 可覆盖） |
