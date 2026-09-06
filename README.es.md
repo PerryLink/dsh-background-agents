@@ -25,10 +25,11 @@
 
 Los hosts `0.1.2-alpha.2` y posteriores fallan en cerrado ante el vocabulario de eventos de sesión, así que este plugin ya no escribe allí sus eventos de hechos solo-registro (`background-agents/fact`, `team-room/fact`): los hechos van al canal de logger/panel y las proyecciones se degradan a un pliegue vacío. Las líneas rc anteriores (hasta `0.1.1-rc.2`) mantienen la disciplina del marcador ignorable. La mitad de cliente ahora usa los paquetes de cliente actuales (`dsh-api-session-controller`, `dsh-client-web`) y el remoto subagent actual (`interruptByParent`, `prompt` con `requestId` acuñado por el cliente; el antiguo RPC `history` desapareció — los vistazos de resultado leen la proyección `conversation` de la sesión hija).
 0.1.2-rc.1 (adaptado el 2026-09-04): el sobre de sesión conserva su campo ignorable solo para compatibilidad de lectura de logs almacenados - Session.append aún no puede estamparlo (el tercer parámetro es SurfaceIntent, solo para tipos de eventos de superficie, nunca un paquete de opciones), por lo que el comportamiento de la puerta de hechos no cambia.
+0.1.3-alpha.1 (adaptado el 2026-09-06): el pin de CI del harness pasa al checkout master (`d347e7039`) - el seam de handles (`open → read → close`) del servicio session-persistence. El runtime publicado 0.1.2-rc.1 es anterior a open(), así que la lectura fría de bg_result detecta el seam y recurre a load() - mismo comportamiento en ambas líneas.
 
 | Superficie | Estado |
 |---|---|
-| Harness | DeepSeek Harness `0.1.2-rc.1` (peers `>=0.1.0-rc.8 <0.2.0`) |
+| Harness | DeepSeek Harness `0.1.3-alpha.1` (checkout fijado `d347e7039`; peers `>=0.1.2-rc.1 <0.2.0`) |
 | Node | `^22.19.0 \|\| >=24.0.0` |
 | Plataformas | Todas (herramientas de host; panel lateral web y salas de equipo opcionales mediante la capacidad de dominio de almacenamiento) |
 | Modelo | Cualquiera (los hijos heredan la ruta del padre; `childProvider`/`childModel` la reemplazan) |
