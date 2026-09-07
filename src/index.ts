@@ -52,6 +52,9 @@ import { teamRoomProjectionDefinition } from './room/projection.ts'
 
 export const name = 'background-agents'
 
+// Consumer — this plugin consumes the subagent runtime, the agent registry, the
+// session store, and the tool registry (declared in `inject`), plus optional
+// services (storageDomain, sessionProjections, systemPrompt) via ctx.inject/get.
 /** Hard service dependencies: tools, the subagent runtime, the agent registry, and the session store. */
 export const inject = ['tools', 'subagents', 'agents', 'sessions']
 
@@ -61,6 +64,8 @@ export const inject = ['tools', 'subagents', 'agents', 'sessions']
  * the Schemastery schema materializes the documented defaults from
  * {@link DEFAULTS}, and direct apply() callers keep the same defaults.
  */
+// Service Definition — the plugin's public contract: the Config interface and the
+// Schemastery schema below declare the entire tunable surface (config + tool schema).
 export interface Config {
   /** The `ctx.subagents` provider name that starts continuable children (e.g. `spawn`). */
   provider: string
@@ -241,6 +246,9 @@ export const Config: Schema<Config> = Schema.object({
  * @param config - provider and lifecycle policy (Schemastery-validated).
  */
 export function apply(ctx: Context, config: Config): void {
+  // Service Provider — everything mounted below registers into ctx: the five bg_*
+  // tools, the room_* tools + /room command, the session projections, the prompt
+  // sections, the turn observer, and the idle-archive sweep.
   // Direct apply() bypasses Schemastery's constraints; every loader-omitted
   // field keeps its documented default from the shared DEFAULTS constant.
   const policy = {
