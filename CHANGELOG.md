@@ -2,6 +2,18 @@
 
 All notable changes to `dsh-background-agents` are documented here. The repo is pre-release; versions follow the DeepSeek Harness `0.1.x-rc.x` target runtime and bump on every behavior change.
 
+## [0.9.3] - 2026-09-07
+
+### Fixed
+
+- Align the `@deepseek-ai/dsh-*` peer ranges to `>=0.1.2-rc.1 <0.2.0`: the older `>=0.1.0-rc.8 <0.2.0` band resolved to only the `0.1.0-rc.8` prerelease under registry-driven resolution and broke fresh tarball installs; no behavior change.
+- Repin the CI harness checkout to the dsh-v0.1.3-alpha.1 master commit so `typecheck` matches the `open`-handle persistence seam in the code; runtime behavior is unchanged (the published `0.1.2-rc.1` host keeps the feature-detect fallback).
+
+### Docs
+
+- Refresh the five-language README support-version wording: the verified GitHub tag `dsh-v0.1.3-alpha.1` now leads the compatibility claim, while npm `0.1.2-rc.1` stays the published dependency-pin line (peers `>=0.1.2-rc.1 <0.2.0`); no behavior change.
+
+
 ## [0.9.2] - 2026-09-04
 
 ### Fixed
