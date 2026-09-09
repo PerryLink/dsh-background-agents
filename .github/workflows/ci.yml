@@ -32,7 +32,7 @@ jobs:
         with:
           path: |
             /tmp/dsh-harness
-          key: harness-${{ steps.harness.outputs.commit }}
+          key: harness-native-${{ steps.harness.outputs.commit }}
       - name: Checkout harness
         if: steps.harness-cache.outputs.cache-hit != 'true'
         run: |
@@ -44,6 +44,12 @@ jobs:
         run: |
           corepack enable
           pnpm install --frozen-lockfile
+          # The 0.1.5 line locks session files through the native flock addon
+          # (native/system/packages/<host>/bin/<libc>/system.node); build:lib
+          # does not compile it, so a harness cache built without this step
+          # fails every test that touches session persistence with
+          # "Cannot find module '.../system.node'".
+          pnpm run build:native-system
           pnpm run build:lib
       - name: Install plugin and map harness paths
         run: |
