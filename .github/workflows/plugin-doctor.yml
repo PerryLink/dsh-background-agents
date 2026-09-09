@@ -29,14 +29,6 @@ jobs:
           fi
       - name: Build (if present)
         run: npm run build --if-present || true
-      - name: Diagnose npm pack output
-        run: |
-          echo "node $(node --version) npm $(npm --version)"
-          npm pack --dry-run --json --ignore-scripts > /tmp/pack.out 2>/tmp/pack.err || true
-          echo "pack.out bytes: $(wc -c < /tmp/pack.out) | pack.err bytes: $(wc -c < /tmp/pack.err)"
-          echo "--- first 400 ---"; head -c 400 /tmp/pack.out; echo
-          echo "--- last 200 ---"; tail -c 200 /tmp/pack.out; echo
-          echo "--- stderr last 400 ---"; tail -c 400 /tmp/pack.err
       - name: Run dsh-plugin-doctor
         env:
           # Group names are YAML \u escapes so this file stays pure ASCII: a mojibake
@@ -53,3 +45,14 @@ jobs:
           echo "$out" | grep -q 'R0 ' || { echo "::error::doctor ran no R checks"; exit 1; }
           echo "$out" | grep -q 'K1 ' || { echo "::error::doctor ran no K checks"; exit 1; }
           exit $code
+      - name: Diagnose doctor logs
+        if: always()
+        run: |
+          d=$(ls -dt /home/runner/work/_temp/dsh-doctor-logs-* 2>/dev/null | head -1)
+          echo "logdir=$d"; ls -la "$d" 2>/dev/null || true
+          for f in "$d"/r2-pack.out.log "$d"/r2-pack.err.log; do
+            if [ -f "$f" ]; then
+              echo "=== $f ($(wc -c < "$f") bytes) ==="
+              head -c 300 "$f"; echo; echo '--- tail ---'; tail -c 200 "$f"; echo
+            fi
+          done
