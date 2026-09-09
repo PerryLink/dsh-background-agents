@@ -29,6 +29,14 @@ jobs:
           fi
       - name: Build (if present)
         run: npm run build --if-present || true
+      - name: Diagnose npm pack output
+        run: |
+          echo "node $(node --version) npm $(npm --version)"
+          npm pack --dry-run --json --ignore-scripts > /tmp/pack.out 2>/tmp/pack.err || true
+          echo "pack.out bytes: $(wc -c < /tmp/pack.out) | pack.err bytes: $(wc -c < /tmp/pack.err)"
+          echo "--- first 400 ---"; head -c 400 /tmp/pack.out; echo
+          echo "--- last 200 ---"; tail -c 200 /tmp/pack.out; echo
+          echo "--- stderr last 400 ---"; tail -c 400 /tmp/pack.err
       - name: Run dsh-plugin-doctor
         env:
           # Group names are YAML \u escapes so this file stays pure ASCII: a mojibake
