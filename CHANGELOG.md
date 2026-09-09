@@ -2,6 +2,23 @@
 
 All notable changes to `dsh-background-agents` are documented here. The repo is pre-release; versions follow the DeepSeek Harness `0.1.x-rc.x` target runtime and bump on every behavior change.
 
+## [0.9.5] - 2026-09-09
+
+### Fixed
+
+- Destructure `.events` from the session-persistence handle read result: on `dsh-v0.1.5-alpha.1` `SessionHandleReadResult` is `{ eventState, events }`, so the cold `bg_result` read no longer feeds the wrapper object to the transcript extractor. The published-rc `load()` fallback arm is unchanged and the `open()` feature-detect is retained for the still-published `0.1.2-rc.1` line.
+- Stop double-mounting `SessionProjectionRegistry` in the test wiring: the shared `@deepseek-ai/dsh-agent-loop-testkit` now mounts it itself, and the eight explicit mounts made 38 tests fail with `service "sessionProjections" has been registered`. The registry-absent negative test now mounts its prerequisites by hand (including `systemPrompt`, which `ToolRuntime` hard-injects), and the two test handle reads destructure `.events`.
+
+### Changed
+
+- Repin the CI harness checkout to the public `dsh-v0.1.5-alpha.1` tag commit (`5dda764ed3aa`): the local checkout is 13 infra commits ahead of the tag and unreachable from CI.
+- Raise the compat probes to the alpha line (`@deepseek-ai/dsh`, `@deepseek-ai/dsh-base`, `@deepseek-ai/dsh-headless` `0.1.5-alpha.1`) while `0.1.2-rc.1` stays the published npm pin, so `dshWorkshop.compatibility.dshVersions` carries both baselines.
+
+### Docs
+
+- Sync the five-language README compatibility sections and support table to the `dsh-v0.1.5-alpha.1` baseline (verified 2026-09-09), the widened peer range `>=0.1.2-rc.1 <0.2.0 || >=0.1.5-alpha.1 <0.2.0`, and the `0.1.5-alpha.1` devDependency pin; the superseded `0.1.3-alpha.1` claim is called out.
+- Correct `ARCHITECTURE.md`: the result peek reads the child session's `conversation` projection rather than the removed `api.subagents.history` RPC, and the cold-read diagram documents `handle.read().events`.
+
 ## [0.9.4] - 2026-09-07
 
 ### Fixed
