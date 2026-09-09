@@ -710,7 +710,7 @@ export function registerBackgroundAgentTools(
           // persistence read failure must not fabricate empty text.
           if (typeof persistence.open === 'function') {
             const handle = await persistence.open(childId, 'read')
-            events = await handle.read()
+            events = (await handle.read()).events
             await handle.close()
           } else {
             const loaded = await (persistence as unknown as {
