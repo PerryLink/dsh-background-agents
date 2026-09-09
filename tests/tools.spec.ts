@@ -4,13 +4,15 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
 import { CallId } from './call-id.ts'
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import AgentRegistry from '@deepseek-ai/dsh-agent'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
-import { SessionId } from '@deepseek-ai/dsh-session'
+import LlmRuntime from '@deepseek-ai/dsh-llm'
+import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
-import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import SubagentRuntime from '@deepseek-ai/dsh-subagent'
+import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
+import ToolRuntime, { defineTool } from '@deepseek-ai/dsh-tools'
 import * as SubagentSpawn from '@deepseek-ai/dsh-subagent-spawn-in-process'
 import { TestSessionQuery } from './test-session-query.ts'
 import * as plugin from '../src/index.ts'
@@ -30,7 +32,6 @@ async function setup(config: Partial<plugin.Config> = {}) {
   roots.push(root)
   const persistenceFiber = await ctx.plugin(JsonlSessionPersistence, { root })
   await ctx.plugin(AgentLoop, { agents: [] })
-  await ctx.plugin(SessionProjectionRegistry)
   await ctx.plugin(TestSessionQuery)
   await ctx.plugin(SubagentRuntime)
   await ctx.plugin(SubagentSpawn, { providerName: 'spawn' })
@@ -193,7 +194,7 @@ describe('dsh-background-agents tools', () => {
     })
     await vi.waitFor(() => { expect(ctx.agents.get(started.childId)).toBeUndefined() }, { timeout: 5_000 })
     const handle = await ctx.sessionPersistence.open(started.childId, 'read')
-    const loadedEvents = await handle.read()
+    const { events: loadedEvents } = await handle.read()
     await handle.close()
     const followUp = loadedEvents.findLast(event => event.type === 'user/message')
     expect(followUp?.type === 'user/message' && followUp.data.source).toEqual({
@@ -211,7 +212,16 @@ describe('dsh-background-agents tools', () => {
 
   it('reports an explicit unrecoverable listing when the projection registry is absent', async () => {
     const ctx = new Context()
-    await mountAgentLoopTestDependencies(ctx)
+    // Mount the prerequisites by hand instead of using
+    // mountAgentLoopTestDependencies: the shared testkit now mounts
+    // SessionProjectionRegistry itself, and this test needs a registry-less
+    // context. Order matches the helper minus the registry, plus the
+    // systemPrompt registry that ToolRuntime hard-injects.
+    await ctx.plugin(LlmRuntime)
+    await ctx.plugin(SessionStore)
+    await ctx.plugin(SystemPrompt, {})
+    await ctx.plugin(ToolRuntime, {})
+    await ctx.plugin(AgentRegistry)
     const root = mkdtempSync(join(tmpdir(), 'dsh-background-agents-'))
     roots.push(root)
     await ctx.plugin(JsonlSessionPersistence, { root })
@@ -359,7 +369,7 @@ describe('dsh-background-agents tools', () => {
     const persistence = ctx.get('sessionPersistence')
     if (persistence === undefined) throw new Error('fixture missing sessionPersistence')
     const handle = await persistence.open(SessionId(childId), 'read')
-    const durable = await handle.read()
+    const { events: durable } = await handle.read()
     await handle.close()
     const load = vi.fn(async () => ({ events: durable }))
     vi.spyOn(ctx.subagents, 'listChildren').mockResolvedValue([
@@ -414,7 +424,6 @@ describe('dsh-background-agents tools', () => {
     const ctx = new Context()
     await mountAgentLoopTestDependencies(ctx)
     await ctx.plugin(AgentLoop, { agents: [] })
-    await ctx.plugin(SessionProjectionRegistry)
     await ctx.plugin(SubagentRuntime)
     const capabilities = { outputSchema: false, depthLimit: false, toolFilter: false, persona: false, agentOptions: false } as Parameters<typeof ctx.subagents.registerProvider>[0]['capabilities']
     ctx.subagents.registerProvider({
@@ -518,7 +527,6 @@ describe('dsh-background-agents tools', () => {
     const ctx = new Context()
     await mountAgentLoopTestDependencies(ctx)
     await ctx.plugin(AgentLoop, { agents: [] })
-    await ctx.plugin(SessionProjectionRegistry)
     await ctx.plugin(SubagentRuntime)
     await ctx.plugin(SubagentSpawn, { providerName: 'spawn' })
     const fiber = await ctx.plugin(plugin, { provider: 'spawn', allowUnmarkedFacts: true })
