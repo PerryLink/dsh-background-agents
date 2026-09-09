@@ -44,10 +44,10 @@ bg_list ──▶ ctx.subagents.listChildren / listDescendants(parent)  (durable
             + ctx.agents.get(id)                 (running/idle/ready overlay)
 
 bg_result ──▶ ctx.sessions.get(child) ──▶ sessionPersistence.open(child, 'read')
-                       → handle.read() → handle.close() → final assistant text
-            (the handle seam exists on harness master/checkout; the published
-             rc line has no open(), so the cold read falls back to
-             load(child).events there)
+                       → handle.read().events → handle.close() → final assistant text
+            (the handle seam exists on the 0.1.3-alpha.2+/0.1.5-alpha.1 lines and
+             returns `{ eventState, events }`; the published rc line has no
+             open(), so the cold read falls back to load(child).events there)
                                                     (text blocks; reasoning fallback flagged `textSource`)
 ```
 
@@ -65,7 +65,7 @@ log, and `bg_list` recovers through the official catalog.
 
 ## Web UI
 
-The client half registers into the `sidebar.footer.action` slot (the one list hole the sidebar shell declares): a trigger with a live running-count badge opens a floating panel. All rows derive from the `backgroundAgents` projection values riding the session-list snapshot — zero RPC for the rows themselves. Jump, message, stop, and the result peek go through the official client APIs: `sessions.refreshSubagents` + `sessions.openSubagent` (jump), `api.subagents.prompt` with `mode: 'continuable'` (message — a queued delivery whose answer is the child's next turn), `api.subagents.interrupt` with the durable parent/child address (stop), and the read-only `api.subagents.history` tail page (result — the last assistant text, extracted by a pure presenter function, never activating the child Agent). Rows carry the parent session title for disambiguation when several parents project agents; panel open/close moves focus into the dialog and back to the trigger. The presenter (`src/client/presenter.ts`) is a pure function of the snapshot — testable without a DOM.
+The client half registers into the `sidebar.footer.action` slot (the one list hole the sidebar shell declares): a trigger with a live running-count badge opens a floating panel. All rows derive from the `backgroundAgents` projection values riding the session-list snapshot — zero RPC for the rows themselves. Jump, message, stop, and the result peek go through the official client APIs: `sessions.refreshSubagents` + `sessions.openSubagent` (jump), `api.subagents.prompt` with `mode: 'continuable'` (message — a queued delivery whose answer is the child's next turn), `api.subagents.interrupt` with the durable parent/child address (stop), and the child session's `conversation` projection read through the sessions binding (result — the last assistant text, extracted by a pure presenter function, never activating the child Agent). Rows carry the parent session title for disambiguation when several parents project agents; panel open/close moves focus into the dialog and back to the trigger. The presenter (`src/client/presenter.ts`) is a pure function of the snapshot — testable without a DOM.
 
 ## Cross-ecosystem inbound (P2)
 

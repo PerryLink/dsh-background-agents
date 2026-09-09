@@ -26,10 +26,11 @@
 宿主 `0.1.2-alpha.2` 及以后对会话事件词汇表采取失败即拒读策略，本插件在这些宿主上不再写入其仅日志事实事件（`background-agents/fact`、`team-room/fact`）：事实改走 logger/面板通道，投影退化为空折叠。更早的 rc 线（截至 `0.1.1-rc.2`）保留 ignorable 标记机制。客户端半面现已使用现行客户端包（`dsh-api-session-controller`、`dsh-client-web`）与现行 subagent 远端（`interruptByParent`、带客户端铸造 `requestId` 的 `prompt`；旧 `history` RPC 已删除——结果窥视改读子会话的 `conversation` 投影）。
 0.1.2-rc.1（2026-09-04 已适配）：会话信封保留 ignorable 字段但仅用于存量日志读取兼容——Session.append 仍无法盖章（第三参数是 SurfaceIntent，仅用于表面事件类型，从不接受选项包），事实门行为不变。
 0.1.3-alpha.1（2026-09-06 已适配）：CI 宿主钉号移至 master checkout（`d347e7039`）——session-persistence 服务的句柄 seam（`open → read → close`）。已发布的 0.1.2-rc.1 运行时早于 open()，bg_result 冷读会特性探测该 seam 并回退到 load()——两条线上行为一致。2026-09-06 已对照 dsh-v0.1.3-alpha.1 master checkout 核验（全门禁链 + profile 安装冒烟测试）。
+0.1.5-alpha.1（2026-09-09 已适配）：`SessionHandleReadResult` 现返回 `{ eventState, events }`，因此 bg_result 冷读的句柄 seam 解构 `.events`（已发布线的 `load()` 回退臂不变）。CI 宿主钉号移至公开 tag commit `5dda764ed3aa`（本地 checkout 领先 13 个 infra commit，公开 CI 拉不到），compat 探针改装 alpha 线。peer 范围放宽为 `>=0.1.2-rc.1 <0.2.0 || >=0.1.5-alpha.1 <0.2.0`（prerelease-tuple 规则：单臂不匹配 `0.1.5-alpha.1`），devDeps 钉 `0.1.5-alpha.1`。2026-09-09 已对照 `dsh-v0.1.5-alpha.1` 核验（全门禁链）。此前的 `0.1.3-alpha.1` 宣称已作废：该预发布版本落在两条 peer 臂之外。
 
 | 方面 | 状态 |
 |---|---|
-| Harness | DeepSeek Harness `dsh-v0.1.3-alpha.1`（GitHub tag，2026-09-06 已核验；npm 依赖钉号 `0.1.2-rc.1`，peer 依赖 `>=0.1.2-rc.1 <0.2.0`） |
+| Harness | DeepSeek Harness `dsh-v0.1.5-alpha.1`（GitHub tag，2026-09-09 已核验；npm 依赖钉号 `0.1.2-rc.1`（latest）/ `0.1.5-alpha.1`（alpha），peer 依赖 `>=0.1.2-rc.1 <0.2.0 \|\| >=0.1.5-alpha.1 <0.2.0`） |
 | Node | `^22.19.0 \|\| >=24.0.0` |
 | 平台 | 全部（宿主工具；可选 Web 侧栏面板与团队房间，依赖存储域能力） |
 | 模型 | 任意（子代理继承父代理的路由；`childProvider`/`childModel` 可覆盖） |
