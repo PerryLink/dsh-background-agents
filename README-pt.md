@@ -29,10 +29,11 @@ Hosts `0.1.2-alpha.2` e posteriores falham de forma fechada no vocabulário de e
 0.1.3-alpha.1 (adaptado em 2026-09-06): o pin de CI do harness passa para o checkout master (`d347e7039`) - o seam de handles (`open → read → close`) do serviço session-persistence. O runtime publicado 0.1.2-rc.1 é anterior a open(), então a leitura fria do bg_result detecta o seam e recorre a load() - mesmo comportamento nas duas linhas. Verificado em 2026-09-06 contra o checkout master dsh-v0.1.3-alpha.1 (cadeia completa de gates + smoke de instalação de perfil).
 0.1.5-alpha.1 (adaptado em 2026-09-09): `SessionHandleReadResult` agora retorna `{ eventState, events }`, então a leitura fria do bg_result desestrutura `.events` do seam de handle (o fallback `load()` da linha publicada não muda). O pin de CI do harness passa para o commit público da tag `5dda764ed3aa` (o checkout local está 13 commits de infra à frente e inalcançável pela CI) e as sondas de compatibilidade instalam a linha alpha. Os peers são ampliados para `>=0.1.2-rc.1 <0.2.0 || >=0.1.5-alpha.1 <0.2.0` (regra prerelease-tuple: o primeiro braço sozinho não corresponde a `0.1.5-alpha.1`) e os devDeps fixam `0.1.5-alpha.1`. Verificado em 2026-09-09 contra `dsh-v0.1.5-alpha.1` (cadeia completa de gates). A afirmação anterior de `0.1.3-alpha.1` fica obsoleta: essa versão preliminar cai fora dos dois braços de peers.
 0.1.5-rc.1 (adaptado em 2026-09-10): os pins de dependências passam para a linha publicada 0.1.5-rc.1; nenhuma mudança de seam afeta o comportamento deste plugin.
+0.1.5-rc.2 (adaptado em 2026-09-11): os pins de dependências passam para a linha publicada 0.1.5-rc.2; nenhuma mudança de seam afeta o comportamento deste plugin.
 
 | Superfície | Status |
 |---|---|
-| Harness | DeepSeek Harness `dsh-v0.1.5-rc.1` (tag do GitHub, verificado em 2026-09-10; pins de desenvolvimento e runtime `0.1.5-rc.1`, peers `>=0.1.2-rc.1 <0.2.0 \|\| >=0.1.5-alpha.1 <0.2.0`) |
+| Harness | DeepSeek Harness `dsh-v0.1.5-rc.2` (tag do GitHub, verificado em 2026-09-11; pins de desenvolvimento e runtime `0.1.5-rc.2`, peers `>=0.1.2-rc.1 <0.2.0 \|\| >=0.1.5-alpha.1 <0.2.0`) |
 | Node | `^22.19.0 \|\| >=24.0.0` |
 | Plataformas | Todas (ferramentas de host; painel lateral web e salas de equipe opcionais via capacidade de domínio de armazenamento) |
 | Modelo | Qualquer (os filhos herdam a rota do pai; `childProvider`/`childModel` sobrescrevem) |

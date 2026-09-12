@@ -29,10 +29,11 @@
 0.1.3-alpha.1（2026-09-06 已适配）：CI 宿主钉号移至 master checkout（`d347e7039`）——session-persistence 服务的句柄 seam（`open → read → close`）。已发布的 0.1.2-rc.1 运行时早于 open()，bg_result 冷读会特性探测该 seam 并回退到 load()——两条线上行为一致。2026-09-06 已对照 dsh-v0.1.3-alpha.1 master checkout 核验（全门禁链 + profile 安装冒烟测试）。
 0.1.5-alpha.1（2026-09-09 已适配）：`SessionHandleReadResult` 现返回 `{ eventState, events }`，因此 bg_result 冷读的句柄 seam 解构 `.events`（已发布线的 `load()` 回退臂不变）。CI 宿主钉号移至公开 tag commit `5dda764ed3aa`（本地 checkout 领先 13 个 infra commit，公开 CI 拉不到），compat 探针改装 alpha 线。peer 范围放宽为 `>=0.1.2-rc.1 <0.2.0 || >=0.1.5-alpha.1 <0.2.0`（prerelease-tuple 规则：单臂不匹配 `0.1.5-alpha.1`），devDeps 钉 `0.1.5-alpha.1`。2026-09-09 已对照 `dsh-v0.1.5-alpha.1` 核验（全门禁链）。此前的 `0.1.3-alpha.1` 宣称已作废：该预发布版本落在两条 peer 臂之外。
 0.1.5-rc.1（2026-09-10 已适配）：依赖钉号移至已发布的 0.1.5-rc.1 线；无 seam 变更影响本插件行为。
+0.1.5-rc.2（2026-09-11 已适配）：依赖钉号移至已发布的 0.1.5-rc.2 线；无 seam 变更影响本插件行为。
 
 | 方面 | 状态 |
 |---|---|
-| Harness | DeepSeek Harness `dsh-v0.1.5-rc.1`（GitHub tag，2026-09-10 已核验；dev/运行时钉号 `0.1.5-rc.1`，peer 依赖 `>=0.1.2-rc.1 <0.2.0 \|\| >=0.1.5-alpha.1 <0.2.0`） |
+| Harness | DeepSeek Harness `dsh-v0.1.5-rc.2`（GitHub tag，2026-09-11 已核验；dev/运行时钉号 `0.1.5-rc.2`，peer 依赖 `>=0.1.2-rc.1 <0.2.0 \|\| >=0.1.5-alpha.1 <0.2.0`） |
 | Node | `^22.19.0 \|\| >=24.0.0` |
 | 平台 | 全部（宿主工具；可选 Web 侧栏面板与团队房间，依赖存储域能力） |
 | 模型 | 任意（子代理继承父代理的路由；`childProvider`/`childModel` 可覆盖） |

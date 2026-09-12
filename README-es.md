@@ -29,10 +29,11 @@ Los hosts `0.1.2-alpha.2` y posteriores fallan en cerrado ante el vocabulario de
 0.1.3-alpha.1 (adaptado el 2026-09-06): el pin de CI del harness pasa al checkout master (`d347e7039`) - el seam de handles (`open → read → close`) del servicio session-persistence. El runtime publicado 0.1.2-rc.1 es anterior a open(), así que la lectura fría de bg_result detecta el seam y recurre a load() - mismo comportamiento en ambas líneas. Verificado el 2026-09-06 contra el checkout master dsh-v0.1.3-alpha.1 (cadena completa de gates + smoke de instalación de perfil).
 0.1.5-alpha.1 (adaptado el 2026-09-09): `SessionHandleReadResult` ahora devuelve `{ eventState, events }`, así que la lectura fría de bg_result desestructura `.events` del seam de handle (el fallback `load()` de la línea publicada no cambia). El pin de CI del harness pasa al commit público del tag `5dda764ed3aa` (el checkout local está 13 commits de infra por delante e inalcanzable desde CI) y las sondas de compatibilidad instalan la línea alpha. Los peers se amplían a `>=0.1.2-rc.1 <0.2.0 || >=0.1.5-alpha.1 <0.2.0` (regla prerelease-tuple: el primer brazo por sí solo no coincide con `0.1.5-alpha.1`) y los devDeps fijan `0.1.5-alpha.1`. Verificado el 2026-09-09 contra `dsh-v0.1.5-alpha.1` (cadena completa de gates). La afirmación anterior de `0.1.3-alpha.1` queda obsoleta: esa versión preliminar cae fuera de ambos brazos de peers.
 0.1.5-rc.1 (adaptado el 2026-09-10): los pines de dependencias pasan a la línea publicada 0.1.5-rc.1; ningún cambio de seam afecta el comportamiento de este plugin.
+0.1.5-rc.2 (adaptado el 2026-09-11): los pines de dependencias pasan a la línea publicada 0.1.5-rc.2; ningún cambio de seam afecta el comportamiento de este plugin.
 
 | Superficie | Estado |
 |---|---|
-| Harness | DeepSeek Harness `dsh-v0.1.5-rc.1` (tag de GitHub, verificado el 2026-09-10; pines de desarrollo y runtime `0.1.5-rc.1`, peers `>=0.1.2-rc.1 <0.2.0 \|\| >=0.1.5-alpha.1 <0.2.0`) |
+| Harness | DeepSeek Harness `dsh-v0.1.5-rc.2` (tag de GitHub, verificado el 2026-09-11; pines de desarrollo y runtime `0.1.5-rc.2`, peers `>=0.1.2-rc.1 <0.2.0 \|\| >=0.1.5-alpha.1 <0.2.0`) |
 | Node | `^22.19.0 \|\| >=24.0.0` |
 | Plataformas | Todas (herramientas de host; panel lateral web y salas de equipo opcionales mediante la capacidad de dominio de almacenamiento) |
 | Modelo | Cualquiera (los hijos heredan la ruta del padre; `childProvider`/`childModel` la reemplazan) |
