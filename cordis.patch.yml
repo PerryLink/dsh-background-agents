@@ -15,7 +15,7 @@
 # overriding the `background-agents` row.
 #
 # Install (lib/ is committed, so no build step or allowBuilds is needed):
-#   dsh plugin --profile <name> add "github:PerryLink/dsh-background-agents#v0.9.6"
+#   dsh plugin --profile <name> add "github:PerryLink/dsh-background-agents#v0.9.7"
 - insert:
     - id: background-agents
       name: dsh-background-agents
