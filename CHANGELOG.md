@@ -2,6 +2,12 @@
 
 All notable changes to `dsh-background-agents` are documented here. The repo is pre-release; versions follow the DeepSeek Harness `0.1.x-rc.x` target runtime and bump on every behavior change.
 
+## [Unreleased]
+
+### Changed
+
+- Move the room catch-up listener from the removed `agent/session-start` event to `agent/created` (the 0.1.6-alpha.1 checkout renamed the lifecycle event and added `source` to its payload).
+
 ## [0.9.7] - 2026-09-12
 
 ### Changed

@@ -332,8 +332,8 @@ export function apply(ctx: Context, config: Config): void {
 
     // Offline catch-up: whenever a member session starts (fresh or resume),
     // replay the facts and bus messages it missed, in store order.
-    roomCtx.on('agent/session-start', ({ agent }) => {
-      void hub.catchUp(agent.id).catch((error: unknown) => {
+    roomCtx.on('agent/created', async ({ agent }) => {
+      await hub.catchUp(agent.id).catch((error: unknown) => {
         roomCtx.logger('background-agents').warn(`room catch-up failed for ${agent.id}: ${String(error)}`)
       })
     })
