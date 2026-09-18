@@ -49,15 +49,16 @@ function makeAgents(parent: FakeParent | undefined): LiveAgents {
   return { get: id => map.get(id) as never } as LiveAgents
 }
 
-function childSessionWithAssistant(text: string): { events: unknown[] } {
+function childSessionWithAssistant(text: string): { snapshotEvents(): unknown[] } {
   const message = {
     id: 'msg-1',
     role: 'assistant',
     content: [{ type: 'text', text }],
     source: { kind: 'model', provider: 'mock', model: 'mock' },
   }
+  // The real Session read face on every supported line is snapshotEvents().
   return {
-    events: [{
+    snapshotEvents: () => [{
       type: 'assistant/message',
       seq: 0,
       time: 1,
@@ -66,7 +67,7 @@ function childSessionWithAssistant(text: string): { events: unknown[] } {
   }
 }
 
-function childSessionWithReasoning(text: string): { events: unknown[] } {
+function childSessionWithReasoning(text: string): { snapshotEvents(): unknown[] } {
   const message = {
     id: 'msg-1',
     role: 'assistant',
@@ -74,7 +75,7 @@ function childSessionWithReasoning(text: string): { events: unknown[] } {
     source: { kind: 'model', provider: 'mock', model: 'mock' },
   }
   return {
-    events: [{
+    snapshotEvents: () => [{
       type: 'assistant/message',
       seq: 0,
       time: 1,
@@ -274,16 +275,16 @@ describe('idle sweep', () => {
 
 describe('sessionLastText extraction', () => {
   it('returns the text blocks by default', () => {
-    expect(sessionLastText(childSessionWithAssistant('final answer').events as never)).toBe('final answer')
+    expect(sessionLastText(childSessionWithAssistant('final answer').snapshotEvents() as never)).toBe('final answer')
   })
 
   it('returns empty for a reasoning-only message without the fallback', () => {
-    expect(sessionLastText(childSessionWithReasoning('thinking hard').events as never)).toBe('')
+    expect(sessionLastText(childSessionWithReasoning('thinking hard').snapshotEvents() as never)).toBe('')
   })
 
   it('falls back to reasoning blocks when allowed and flags the source', () => {
     const reasoning = { used: false }
-    expect(sessionLastText(childSessionWithReasoning('thinking hard').events as never, { allowReasoning: true, reasoning })).toBe('thinking hard')
+    expect(sessionLastText(childSessionWithReasoning('thinking hard').snapshotEvents() as never, { allowReasoning: true, reasoning })).toBe('thinking hard')
     expect(reasoning.used).toBe(true)
   })
 

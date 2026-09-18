@@ -696,10 +696,9 @@ export function registerBackgroundAgentTools(
       // the text source of record; a persistence read failure is loud.
       let events: readonly SessionEvent[] | undefined
       const live = ctx.sessions.get(childId)
-      if (live !== undefined) {
-        events = typeof live.snapshotEvents === 'function'
-          ? live.snapshotEvents()
-          : (live as unknown as { events: readonly SessionEvent[] }).events
+      if (live !== undefined && typeof live.snapshotEvents === 'function') {
+        // A2: the pre-0.1.2 `.events` getter is gone from every supported line.
+        events = live.snapshotEvents()
       } else {
         const persistence = ctx.get('sessionPersistence')
         if (persistence !== undefined) {
@@ -723,8 +722,11 @@ export function registerBackgroundAgentTools(
       // A thinking model's last message may carry reasoning blocks only; the
       // fallback keeps bg_result honest instead of reporting "no output".
       const reasoning = { used: false }
+      // A2: an unreadable log is reported explicitly instead of as a silent
+      // empty answer — the caller must be able to tell "produced no output"
+      // from "this host exposes no log read face".
       const text = events === undefined
-        ? ''
+        ? 'unavailable (no live session and no durable log read face on this host)'
         : sessionLastText(events, { allowReasoning: true, reasoning })
       const truncated = text.length > config.resultMaxChars
       const capped = truncated ? `${text.slice(0, config.resultMaxChars - 1)}…` : text
