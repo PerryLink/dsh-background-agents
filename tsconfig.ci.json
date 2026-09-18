@@ -2,5 +2,7 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "paths": {}
-  }
+  },
+  "include": ["src"],
+  "exclude": ["src/client", "tests"]
 }

@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
 import { CallId } from './call-id.ts'
 import AgentRegistry from '@deepseek-ai/dsh-agent'
+import type { Agent } from '@deepseek-ai/dsh-agent'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
 import LlmRuntime from '@deepseek-ai/dsh-llm'
@@ -103,7 +104,7 @@ describe('dsh-background-agents tools', () => {
     // registered fact never lands in the log; the appender routes it to the
     // logger fallback channel instead. The replay meta above is the durable
     // registration record the model and the reopen fold see.
-    expect(parent.session.snapshotEvents().some(event => event.type === 'background-agents/fact')).toBe(false)
+    expect(parent.session.snapshotEvents().some((event: { type: string }) => event.type === 'background-agents/fact')).toBe(false)
     expect(ctx.logger.buffer.some(message =>
       message.name === 'background-agents'
       && message.type === 'info'
@@ -193,10 +194,21 @@ describe('dsh-background-agents tools', () => {
       messageId: message.messageId,
     })
     await vi.waitFor(() => { expect(ctx.agents.get(started.childId)).toBeUndefined() }, { timeout: 5_000 })
-    const handle = await ctx.sessionPersistence.open(started.childId, 'read')
+    // `sessionPersistence` is contributed by the persistence plugin's Context
+    // merge; the published-line type face does not carry it, so read the handle
+    // structurally (the shape asserted below is the official one).
+    const persistence = (ctx as unknown as {
+      sessionPersistence: {
+        open(id: SessionId, mode: 'read'): Promise<{
+          read(): Promise<{ events: readonly { readonly type: string; readonly data: { readonly source?: unknown } }[] }>
+          close(): Promise<void>
+        }>
+      }
+    }).sessionPersistence
+    const handle = await persistence.open(started.childId, 'read')
     const { events: loadedEvents } = await handle.read()
     await handle.close()
-    const followUp = loadedEvents.findLast(event => event.type === 'user/message')
+    const followUp = loadedEvents.findLast((event: { readonly type: string }) => event.type === 'user/message')
     expect(followUp?.type === 'user/message' && followUp.data.source).toEqual({
       kind: 'agent-message',
       form: 'relay',
@@ -239,7 +251,12 @@ describe('dsh-background-agents tools', () => {
     ctx.provide('agentLoop' as never, {
       create: (id: SessionId) => ({ id }),
     } as never)
-    const parent = await ctx.agentLoop.create(SessionId('parent'), { provider: 'mock', model: 'mock' })
+    // Read the stand-in structurally: `agentLoop` is a checkout-face Context
+    // member, so the published-line type face has no such property.
+    const agentLoop = (ctx as unknown as {
+      agentLoop: { create(id: SessionId, options: { provider: string; model: string }): Promise<Agent> }
+    }).agentLoop
+    const parent = await agentLoop.create(SessionId('parent'), { provider: 'mock', model: 'mock' })
 
     const result = await callTool(ctx, 'bg_list', {}, parent)
     expect(result.isError).toBe(false)
@@ -499,7 +516,7 @@ describe('dsh-background-agents tools', () => {
     // The rc.1 host forbids the fact event in the log; the stop fact is
     // routed to the logger fallback channel instead, and the outcome above
     // is the model-visible record of the request.
-    expect(parent.session.snapshotEvents().some(event => event.type === 'background-agents/fact')).toBe(false)
+    expect(parent.session.snapshotEvents().some((event: { type: string }) => event.type === 'background-agents/fact')).toBe(false)
     expect(ctx.logger.buffer.some(message =>
       message.name === 'background-agents'
       && message.type === 'info'
