@@ -113,6 +113,15 @@ export declare class RoomHub extends Service {
     room(roomId: string): Promise<RoomRecord | undefined>;
     /** Every room one session is a member of, in creation order. */
     roomsOfMember(sessionId: SessionId): Promise<RoomRecord[]>;
+    /**
+     * Whether one session is already a member of any opened room. Synchronous by
+     * design: the `agent/created` listener is a hot path that must return without
+     * awaiting anything (A1), so this reports `false` while the store has not
+     * opened yet instead of waiting for `ready`.
+     * @param sessionId - the session to look up.
+     * @returns true when an opened room already lists the session.
+     */
+    hasMember(sessionId: SessionId): boolean;
     /** All rooms (used by the command surface for the roster). */
     allRooms(): Promise<RoomRecord[]>;
     /** Bus messages of one room with seq > since, in seq order. */

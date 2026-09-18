@@ -197,6 +197,23 @@ export class RoomHub extends Service {
       .filter(record => record.members.some(member => member.sessionId === sessionId))
   }
 
+  /**
+   * Whether one session is already a member of any opened room. Synchronous by
+   * design: the `agent/created` listener is a hot path that must return without
+   * awaiting anything (A1), so this reports `false` while the store has not
+   * opened yet instead of waiting for `ready`.
+   * @param sessionId - the session to look up.
+   * @returns true when an opened room already lists the session.
+   */
+  hasMember(sessionId: SessionId): boolean {
+    const rooms = this.rooms
+    if (rooms === undefined) return false
+    for (const [, record] of rooms.entries()) {
+      if (this.memberOf(record, sessionId) !== undefined) return true
+    }
+    return false
+  }
+
   /** All rooms (used by the command surface for the roster). */
   async allRooms(): Promise<RoomRecord[]> {
     await this.ready

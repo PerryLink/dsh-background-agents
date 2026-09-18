@@ -193,10 +193,11 @@ export function sessionLastText(
 export function childLastText(sessions: LiveSessions, childId: SessionId): string {
   const session = sessions.get(childId)
   if (session === undefined) return ''
-  const events = typeof session.snapshotEvents === 'function'
-    ? session.snapshotEvents()
-    : (session as unknown as { events: readonly SessionEvent[] }).events
-  return sessionLastText(events)
+  // A2: the pre-0.1.2 `.events` getter is gone from every supported line, so the
+  // read face is `snapshotEvents()` — no hand-written downgrade that could
+  // silently yield an empty string on a host without a read face at all.
+  if (typeof session.snapshotEvents !== 'function') return ''
+  return sessionLastText(session.snapshotEvents())
 }
 
 /** Bound one line to the configured report cap with an explicit ellipsis. */

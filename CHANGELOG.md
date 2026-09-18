@@ -7,6 +7,21 @@ All notable changes to `dsh-background-agents` are documented here. The repo is 
 ### Changed
 
 - Move the room catch-up listener from the removed `agent/session-start` event to `agent/created` (the 0.1.6-alpha.1 checkout renamed the lifecycle event and added `source` to its payload).
+- **The `agent/created` catch-up listener is now strictly synchronous and filtered (A1).** It returns `undefined` on every path, filters the four `SessionStartSource` values (`clear`/`compact` skip entirely), runs its real work on a microtask under a single try/catch, honours the payload's activation signal, and bounds the catch-up with its own 2 s timeout instead of inheriting `roomOpenTimeoutMs`. A slow or stuck room store can no longer serialize Agent creation. Three regression locks pin the contract (`tests/agent-created-listener.spec.ts`).
+- **Client-side subagent navigation is reported instead of failing silently (CS1).** `0.1.6-alpha.2` removed the `ISessions` subagent-navigation call and states that navigation belongs to the view owners (`ui-subagent` owns the session-header lineage seat and supplies `openChild(address)` to its own renderer). This plugin has no sanctioned navigation entry on that line, so the action now logs one explicit warning and returns a user-visible explanation — previously the removed method threw into a `catch` and surfaced as an unexplained failure.
+- **The panel's current session now derives from main-view retention (B5).** The removed `SessionListState.current` scalar is replaced by `retainInfo(id).retainedBy.mainView`, with per-catalog-id subscriptions so a navigation refreshes the panel; without a current session the panel keeps its explicit empty state as before.
+- **An unreadable child log is reported as `unavailable` instead of as empty text (A2)**, and the pre-0.1.2 `.events` read fallback is gone from both read sites — the supported read face is `snapshotEvents()`.
+- Bridge the package's zod-v3 schemas into the alpha.2 registry and domain-table slots. `@deepseek-ai/dsh-session-projection` and `@deepseek-ai/dsh-storage-domain` type their schema slots with the zod **v4** copy they depend on, which is not structurally assignable to this package's zod v3 schemas; the registry only calls `parse` on them, so the boundary is bridged explicitly and documented at each site.
+- `dsh.manifestVersion: 1` and the canonical three-clause `engines.dsh`; the dev/test line is pinned to `0.1.6-alpha.2`.
+
+### Fixed
+
+- The published-line ruler (`typecheck:ci`) again proves something: it now covers the shipped `src` surface against the published packages (it previously included `tests`, which need checkout-only packages that are not published dependencies), and `tsconfig.paths.json`/`vitest.aliases.mjs` were regenerated against the checkout (dead `code-runtime`/`e2b` aliases and friends dropped).
+
+### Notes
+
+- Session-log audit for the room/agent fact channel remains **off** on this line (see the README support matrix): the non-surface `background-agents/*` event cannot carry the `ignorable` marker, so the durable domain tables stay the record of authority.
+- Browser-visible behavior of the subagent navigation fix and the room panel is **not yet verified on a real machine** (no browser in this environment): the release note must not claim it until the manual checklist in the batch handoff is signed off.
 
 ## [0.9.7] - 2026-09-12
 

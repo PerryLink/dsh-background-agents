@@ -332,10 +332,31 @@ export function apply(ctx: Context, config: Config): void {
 
     // Offline catch-up: whenever a member session starts (fresh or resume),
     // replay the facts and bus messages it missed, in store order.
-    roomCtx.on('agent/created', async ({ agent }) => {
-      await hub.catchUp(agent.id).catch((error: unknown) => {
-        roomCtx.logger('background-agents').warn(`room catch-up failed for ${agent.id}: ${String(error)}`)
+    //
+    // A1 discipline (the `agent/created` dispatch is serialized and awaited by
+    // the registry): this listener must return synchronously — never await slow
+    // I/O inside the dispatch, and never let a rejection escape it. All real
+    // work rides one microtask, wrapped in a single try/catch, and the catch-up
+    // gets its own short timeout instead of inheriting `roomOpenTimeoutMs`.
+    roomCtx.on('agent/created', (payload) => {
+      const { agent, source, signal } = payload
+      // SessionStartSource: a cleared or compacted session is not a member
+      // coming back online, so there is no offline backlog to replay.
+      if (source === 'clear' || source === 'compact') return
+      // `startup` and `resume` are the two activation sources that carry
+      // offline work.
+      void Promise.resolve().then(async () => {
+        try {
+          if (signal?.aborted === true) return
+          if (!hub.hasMember(agent.id)) return
+          await catchUpWithTimeout(hub, agent.id, signal)
+        } catch (error) {
+          roomCtx.logger('background-agents').warn(`room catch-up failed for ${agent.id}: ${String(error)}`)
+        }
       })
+      // The listener contract is `undefined | Promise<undefined>`: returning
+      // `undefined` (not a thenable) is what keeps the dispatch non-serializing.
+      return undefined
     })
 
     // Cross-ecosystem inbound (P2): spawn the external runtime and map its
@@ -423,6 +444,45 @@ export function apply(ctx: Context, config: Config): void {
         + 'handing a task to another member.',
     })
   })
+}
+
+/**
+ * Independent short bound for one offline catch-up. Deliberately NOT
+ * `roomOpenTimeoutMs` (the `/room` command's 15 s patience): this runs off the
+ * `agent/created` dispatch, where a member's activation must not be held open
+ * by a slow store (A1).
+ */
+const CATCH_UP_TIMEOUT_MS = 2_000
+
+/**
+ * Run one member catch-up under its own short timeout and the activation
+ * signal, so neither a stalled store nor an abort can hang the caller's
+ * microtask. The race's losing timer is cleared in `finally`.
+ * @param hub - the room hub that owns the catch-up.
+ * @param sessionId - the member session to catch up.
+ * @param signal - the `agent/created` activation signal, when supplied.
+ * @returns completion of the catch-up, its timeout, or its cancellation.
+ */
+async function catchUpWithTimeout(hub: RoomHub, sessionId: SessionId, signal?: AbortSignal): Promise<void> {
+  let handle: ReturnType<typeof setTimeout> | undefined
+  const timeout = new Promise<never>((_, reject) => {
+    handle = setTimeout(() => {
+      reject(new Error(`room catch-up exceeded ${CATCH_UP_TIMEOUT_MS} ms`))
+    }, CATCH_UP_TIMEOUT_MS)
+  })
+  const cancelled = new Promise<never>((_, reject) => {
+    if (signal === undefined) return
+    if (signal.aborted) {
+      reject(new Error('room catch-up cancelled'))
+      return
+    }
+    signal.addEventListener('abort', () => { reject(new Error('room catch-up cancelled')) }, { once: true })
+  })
+  try {
+    await Promise.race([hub.catchUp(sessionId), timeout, cancelled])
+  } finally {
+    if (handle !== undefined) clearTimeout(handle)
+  }
 }
 
 /**
