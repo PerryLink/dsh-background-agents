@@ -31,6 +31,7 @@
 0.1.5-alpha.1（2026-09-09 已适配）：`SessionHandleReadResult` 现返回 `{ eventState, events }`，因此 bg_result 冷读的句柄 seam 解构 `.events`（已发布线的 `load()` 回退臂不变）。CI 宿主钉号移至公开 tag commit `5dda764ed3aa`（本地 checkout 领先 13 个 infra commit，公开 CI 拉不到），compat 探针改装 alpha 线。peer 范围放宽为 `>=0.1.2-rc.1 <0.2.0 || >=0.1.5-alpha.1 <0.2.0`（prerelease-tuple 规则：单臂不匹配 `0.1.5-alpha.1`），devDeps 钉 `0.1.5-alpha.1`。2026-09-09 已对照 `dsh-v0.1.5-alpha.1` 核验（全门禁链）。此前的 `0.1.3-alpha.1` 宣称已作废：该预发布版本落在两条 peer 臂之外。
 0.1.5-rc.1（2026-09-10 已适配）：依赖钉号移至已发布的 0.1.5-rc.1 线；无 seam 变更影响本插件行为。
 0.1.5-rc.2（2026-09-11 已适配）：依赖钉号移至已发布的 0.1.5-rc.2 线；无 seam 变更影响本插件行为。
+0.1.6-alpha.2（2026-09-18 已适配）：客户端会话服务移除了子代理导航调用，因此该动作现改为明确报告「导航归会话头部所有」（`ui-subagent` 的 lineage 座位），不再静默失败；房间面板的当前会话改由主视图保留计数推导（`retainedBy.mainView`），因为 `SessionListState.current` 已删除。`agent/created` 追赶监听器在自有 2 秒上限内同步返回，不可读的子会话日志改报 `unavailable` 而非空文本。本线上由会话日志事实通道供给的 dashboard 指标**仍不可用**（非表面事实事件仍无法盖上忽略标记）——持久房间表与面板投影值才是记录。2026-09-18 已核验（两把 typecheck 尺子 + 全量测试）；浏览器可见部分**尚未**实机验证。
 
 | 方面 | 状态 |
 |---|---|
