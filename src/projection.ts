@@ -22,6 +22,34 @@ import {
 import { FACT_EVENT } from './events.ts'
 import { isBackgroundAgentsMeta, parseNotice, PLUGIN } from './vocabulary.ts'
 
+/** The registry's own `stateSchema` slot type for this unit. */
+type RegistryStateSchema = ProjectionDefinition<'backgroundAgents', State>['stateSchema']
+/** The registry's own `wire.viewSchema` slot type for this unit. */
+type RegistryViewSchema = NonNullable<ProjectionDefinition<'backgroundAgents', State>['wire']>['viewSchema']
+
+/**
+ * Bridge one of this package's zod-v3 schemas into the registry's schema slot.
+ *
+ * The alpha.2 `@deepseek-ai/dsh-session-projection` types `stateSchema` and
+ * `wire.viewSchema` with the zod **v4** copy it depends on (`zod: ^4.4.3`),
+ * while this package builds its schemas with zod v3 (`dependencies.zod:
+ * ^3.24.0`); the two majors are not structurally assignable. The registry only
+ * ever calls `parse` on these schemas (verified in the published lib:
+ * `def.stateSchema.parse(row.val)` / `wire.viewSchema.parse(...)`), which both
+ * majors implement identically — so the cast is a deliberate, documented
+ * boundary bridge, not a hidden mismatch.
+ * @param schema - the zod-v3 schema built by this package.
+ * @returns the same schema, typed for the registry slot.
+ */
+function asRegistryStateSchema(schema: unknown): RegistryStateSchema {
+  return schema as RegistryStateSchema
+}
+
+/** Bridge one zod-v3 schema into the registry's `wire.viewSchema` slot (see above). */
+function asRegistryViewSchema(schema: unknown): RegistryViewSchema {
+  return schema as RegistryViewSchema
+}
+
 /**
  * Mutable fold state; plain JSON so the persisted projection cache can store
  * it. `source` is fold-internal only (never in the wire value): `legacy`
@@ -145,7 +173,7 @@ const backgroundAgentsStateSchema: z.ZodType<State> = z.object({
  */
 export const backgroundAgentsProjectionDefinition = {
   key: 'backgroundAgents',
-  stateSchema: backgroundAgentsStateSchema,
+  stateSchema: asRegistryStateSchema(backgroundAgentsStateSchema),
   init: (): State => ({ entries: [] }),
   apply(state: State, event: SessionEvent): State {
     switch (event.type) {
@@ -307,7 +335,7 @@ export const backgroundAgentsProjectionDefinition = {
   wire: {
     // The wire schema validates the client-visible whole value; the fold state
     // (with its per-row `source` provenance) never leaves the host.
-    viewSchema: backgroundAgentsSchema,
+    viewSchema: asRegistryViewSchema(backgroundAgentsSchema),
     view: (state): BackgroundAgentsProjection => ({
       agents: state.entries
         .map((entry): BackgroundAgentEntry => {
