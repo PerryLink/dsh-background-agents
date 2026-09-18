@@ -73,6 +73,7 @@ class TeamRoomsController implements ObservableSnapshot<TeamRoomsState> {
   private readonly listeners = new Set<() => void>()
   private stopList: (() => void) | undefined
   private stopFace: (() => void) | undefined
+  private readonly stopRetainInfo = new Map<string, () => void>()
   private boundSessionId: string | undefined
 
   constructor(private readonly sessions: ISessions) {}
@@ -93,6 +94,8 @@ class TeamRoomsController implements ObservableSnapshot<TeamRoomsState> {
     return () => {
       this.stopList?.()
       this.stopFace?.()
+      for (const stop of this.stopRetainInfo.values()) stop()
+      this.stopRetainInfo.clear()
     }
   }
 
@@ -106,11 +109,42 @@ class TeamRoomsController implements ObservableSnapshot<TeamRoomsState> {
     for (const listener of [...this.listeners]) listener()
   }
 
+  /**
+   * The session the main view currently holds. Derived from the official
+   * retention source counts (`retainedBy.mainView`) — the scalar
+   * `SessionListState.current` field this used to read was removed on
+   * 0.1.6-alpha.2 (B5). Retain-info sources are subscribed per catalog id so a
+   * navigation (a main-view retain/release) refreshes the panel too.
+   * @returns the main-view session id, or undefined while no session is held.
+   */
+  private mainViewSessionId(): string | undefined {
+    const list = this.sessions.list.getSnapshot() as unknown as SessionListLike & { ids?: readonly string[] }
+    const ids = list.ids ?? Object.keys(list.byId)
+    const live = new Set(ids)
+    for (const [id, stop] of this.stopRetainInfo) {
+      if (!live.has(id)) {
+        stop()
+        this.stopRetainInfo.delete(id)
+      }
+    }
+    let mainView: string | undefined
+    for (const id of ids) {
+      if (!this.stopRetainInfo.has(id)) {
+        this.stopRetainInfo.set(id, this.sessions.retainInfo(id as SessionId).subscribe(() => { this.refresh() }))
+      }
+      const info = this.sessions.retainInfo(id as SessionId).getSnapshot()
+      // `mainView` is the label `ui-session` merges into SessionReferenceSourceMap;
+      // read it structurally so this plugin compiles against the base
+      // session-controller types without depending on ui-session's type merge.
+      const retainedBy = (info?.retainedBy ?? {}) as Readonly<Record<string, number | undefined>>
+      if ((retainedBy['mainView'] ?? 0) > 0 && mainView === undefined) mainView = id
+    }
+    return mainView
+  }
+
   private refresh(): void {
-    const list = this.sessions.list.getSnapshot() as unknown as {
-      current?: string
-    } & SessionListLike
-    const current = list.current
+    const list = this.sessions.list.getSnapshot() as unknown as SessionListLike
+    const current = this.mainViewSessionId()
     // Re-bind the projection face when the current session changes.
     if (current !== this.boundSessionId) {
       this.stopFace?.()
@@ -224,12 +258,25 @@ export function apply(ctx: Context): void {
       async openChild(parentSessionId: string, childSessionId: string): Promise<string | undefined> {
         try {
           await sessions.refreshSubagents(parentSessionId as SessionId)
-          sessions.openSubagent({
-            parentSessionId: parentSessionId as SessionId,
-            childSessionId: childSessionId as SessionId,
-            mode: 'continuable',
-          })
-          return undefined
+          // 0.1.6-alpha.2 removed the client-side subagent-navigation call on
+          // `ISessions`: the published contract states that navigation belongs
+          // to the view owners, and the only navigation entry on this line is
+          // the `openChild(address)` action `ui-subagent` supplies to its own
+          // `conversation.session.header.lineage` renderer. A feature package
+          // therefore has no sanctioned way to switch the main view to a child
+          // session — say so explicitly, and once on the console, instead of
+          // letting a removed method throw into this catch and surface as an
+          // unexplained failure (CS1).
+          const address = sessions.subagentAddress(childSessionId as SessionId)
+          const detail = address === undefined
+            ? `no live subagent address for ${childSessionId}`
+            : 'the subagent address for this child is live'
+          console.warn(
+            'dsh-background-agents: client-side subagent navigation was removed in 0.1.6-alpha.2 — '
+            + 'navigation belongs to the view owners and ui-subagent owns the session-header lineage seat; '
+            + `open the child from the session header instead (${detail}).`,
+          )
+          return 'this host owns subagent navigation in the session header (ui-subagent) — open the child from the session header lineage'
         } catch (error) {
           return error instanceof Error ? error.message : String(error)
         }
