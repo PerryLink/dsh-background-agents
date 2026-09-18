@@ -41,72 +41,7 @@ export declare const backgroundAgentsProjectionDefinition: {
     init: () => State;
     apply(state: State, event: SessionEvent): State;
     wire: {
-        viewSchema: z.ZodObject<{
-            agents: z.ZodArray<z.ZodObject<{
-                agentId: z.ZodString;
-                label: z.ZodString;
-                activity: z.ZodEnum<["running", "inactive", "archived"]>;
-                messageCount: z.ZodNumber;
-                lastMessage: z.ZodOptional<z.ZodString>;
-                createdAt: z.ZodNumber;
-                lastActiveAt: z.ZodNumber;
-                archivedAt: z.ZodOptional<z.ZodNumber>;
-                stopRequestedAt: z.ZodOptional<z.ZodNumber>;
-                metrics: z.ZodOptional<z.ZodObject<{
-                    turnCount: z.ZodNumber;
-                    totalDurationMs: z.ZodNumber;
-                    inputTokens: z.ZodNullable<z.ZodNumber>;
-                    outputTokens: z.ZodNullable<z.ZodNumber>;
-                    errorCount: z.ZodNumber;
-                }, "strict", z.ZodTypeAny, {
-                    inputTokens: number | null;
-                    outputTokens: number | null;
-                    turnCount: number;
-                    totalDurationMs: number;
-                    errorCount: number;
-                }, {
-                    inputTokens: number | null;
-                    outputTokens: number | null;
-                    turnCount: number;
-                    totalDurationMs: number;
-                    errorCount: number;
-                }>>;
-            }, "strict", z.ZodTypeAny, {
-                agentId: string;
-                label: string;
-                activity: "archived" | "running" | "inactive";
-                messageCount: number;
-                createdAt: number;
-                lastActiveAt: number;
-                metrics?: {
-                    inputTokens: number | null;
-                    outputTokens: number | null;
-                    turnCount: number;
-                    totalDurationMs: number;
-                    errorCount: number;
-                } | undefined;
-                lastMessage?: string | undefined;
-                archivedAt?: number | undefined;
-                stopRequestedAt?: number | undefined;
-            }, {
-                agentId: string;
-                label: string;
-                activity: "archived" | "running" | "inactive";
-                messageCount: number;
-                createdAt: number;
-                lastActiveAt: number;
-                metrics?: {
-                    inputTokens: number | null;
-                    outputTokens: number | null;
-                    turnCount: number;
-                    totalDurationMs: number;
-                    errorCount: number;
-                } | undefined;
-                lastMessage?: string | undefined;
-                archivedAt?: number | undefined;
-                stopRequestedAt?: number | undefined;
-            }>, "many">;
-        }, "strict", z.ZodTypeAny, {
+        viewSchema: z.ZodType<{
             agents: {
                 agentId: string;
                 label: string;
@@ -125,7 +60,7 @@ export declare const backgroundAgentsProjectionDefinition: {
                 archivedAt?: number | undefined;
                 stopRequestedAt?: number | undefined;
             }[];
-        }, {
+        }, z.ZodTypeDef, {
             agents: {
                 agentId: string;
                 label: string;
