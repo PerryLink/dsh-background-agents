@@ -159,6 +159,7 @@
     "gen-aliases": "node scripts/gen-aliases.mjs",
     "build": "node scripts/clean.mjs && tsc -p tsconfig.build.json && tsc -p tsconfig.client-build.json && tsdown && node scripts/fix-dts.mjs",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.client.json --noEmit",
+    "typecheck:ci": "tsc -p tsconfig.ci.json --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
