@@ -58,6 +58,8 @@ jobs:
           DSH_HARNESS_ROOT=/tmp/dsh-harness pnpm run gen-aliases
       - name: Typecheck
         run: pnpm run typecheck
+      - name: Typecheck (published line)
+        run: pnpm run typecheck:ci
       - name: Test
         run: pnpm test
       - name: Coverage
