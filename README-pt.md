@@ -222,7 +222,7 @@ pnpm dsh --profile headless --patch dev/cordis.yml "【父会话】驱动后台 
 
 ## Família de Plugins DSH PerryLink
 
-Este projeto é um dos [40 plugins de DeepSeek Harness](https://github.com/PerryLink) mantidos por [PerryLink](https://github.com/PerryLink). Se este ajuda você, os outros provavelmente também:
+Este projeto é um dos [41 plugins de DeepSeek Harness](https://github.com/PerryLink) mantidos por [PerryLink](https://github.com/PerryLink). Se este ajuda você, os outros provavelmente também:
 
 | Plugin | One-liner |
 |---|---|
