@@ -4,6 +4,8 @@ All notable changes to `dsh-background-agents` are documented here. The repo is 
 
 ## [Unreleased]
 
+## [0.9.8] - 2026-09-22
+
 ### Changed
 
 - Move the room catch-up listener from the removed `agent/session-start` event to `agent/created` (the 0.1.6-alpha.1 checkout renamed the lifecycle event and added `source` to its payload).
