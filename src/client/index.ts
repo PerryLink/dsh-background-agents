@@ -257,7 +257,11 @@ export function apply(ctx: Context): void {
       sessions: sessions.list as unknown as ObservableSnapshot<SessionListLike>,
       async openChild(parentSessionId: string, childSessionId: string): Promise<string | undefined> {
         try {
-          await sessions.refreshSubagents(parentSessionId as SessionId)
+          // `refreshSubagents` is gone from the 0.1.7 `ISessions` contract;
+          // `refreshProjections(sessionId)` is its successor and is what makes
+          // the parent's subagent catalog readable before the address lookup
+          // below. It loads Session projections without opening a conversation.
+          await sessions.refreshProjections(parentSessionId as SessionId)
           // 0.1.6-alpha.2 removed the client-side subagent-navigation call on
           // `ISessions`: the published contract states that navigation belongs
           // to the view owners, and the only navigation entry on this line is

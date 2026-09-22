@@ -9,7 +9,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
 import type { PropsLocale, PropsRuntime, TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
-import { IconBranchOutline16, Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
+import { IconBranchOutlineRegular, Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import { buildAgentRows, buildCostReport, relativeTime, type AgentRow, type RowStatus, type SessionListLike } from './presenter.ts'
 import { NS } from './locales.ts'
@@ -334,7 +334,10 @@ export function BackgroundAgentsAction({
             setError(undefined)
           }}
         >
-          <span className={css.triggerIcon} aria-hidden><IconBranchOutline16 size={16} /></span>
+          {/* The 0.1.7 icon set names glyph and weight separately
+              (`IconBranchOutlineRegular`) and takes size as a prop; the
+              retired `IconBranchOutline16` baked the size into its name. */}
+          <span className={css.triggerIcon} aria-hidden><IconBranchOutlineRegular size={16} /></span>
           {wide && <span className={css.triggerLabel}>{t('trigger.label')}</span>}
           {runningCount > 0 && <span className={css.count}>{runningCount}</span>}
         </button>

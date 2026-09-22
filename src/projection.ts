@@ -20,7 +20,7 @@ import {
   backgroundAgentEntrySchema, backgroundAgentsSchema, type BackgroundAgentEntry, type BackgroundAgentMetrics, type BackgroundAgentsProjection,
 } from './projection-schema.ts'
 import { FACT_EVENT } from './events.ts'
-import { isBackgroundAgentsMeta, parseNotice, PLUGIN } from './vocabulary.ts'
+import { isBackgroundAgentsMeta, isBackgroundAgentsNotice, parseNotice } from './vocabulary.ts'
 
 /** The registry's own `stateSchema` slot type for this unit. */
 type RegistryStateSchema = ProjectionDefinition<'backgroundAgents', State>['stateSchema']
@@ -280,7 +280,10 @@ export const backgroundAgentsProjectionDefinition = {
       }
       case 'user/message': {
         const source = event.data.source
-        if (source.kind === 'plugin' && source.plugin === PLUGIN && source.form === 'notice') {
+        // The gate reads historical logs too: it accepts this plugin's declared
+        // source kind and the pre-0.1.7 `'plugin'` attribution those older rows
+        // still carry, then defers to the canonical notice-line prefix.
+        if (isBackgroundAgentsNotice(source)) {
           const head = parseNotice(messageText(event.data))
           if (head === undefined) return state
           const entry = state.entries.find(candidate => candidate.agentId === head.agentId)

@@ -1,25 +1,33 @@
 import { describe, expect, it } from 'vitest'
-import { createUserMessage } from '@deepseek-ai/dsh-llm'
+import { createToolResultMessage, createUserMessage } from '@deepseek-ai/dsh-llm'
 import { CallId } from './call-id.ts'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import type { SessionEvent, SessionEventMap, SessionEventType, UserMessage } from '@deepseek-ai/dsh-session'
 import type { JsonValue } from '@deepseek-ai/dsh-util-values'
 import { backgroundAgentsProjectionDefinition as unit } from '../src/projection.ts'
 import type { BackgroundAgentEntry } from '../src/projection-schema.ts'
-import { noticeLine, PLUGIN } from '../src/vocabulary.ts'
+import { noticeLine, PLUGIN, SOURCE_KIND } from '../src/vocabulary.ts'
 
 let seq = 0
 function event<T extends SessionEventType>(type: T, data: SessionEventMap[T], time = ++seq): SessionEvent {
   return { type, seq, time, data } as unknown as SessionEvent
 }
 
+/** This plugin's current notice attribution: the producer-owned source kind. */
+const NOTICE_SOURCE = { kind: SOURCE_KIND, form: 'notice' } as const
+
 function toolResultEvent(meta: JsonValue, time?: number): SessionEvent {
+  // V4 shape: the tool result IS the message. `tool/result` carries a
+  // first-class `role: 'tool'` message with a top-level `toolCallId` and
+  // `content` — there is no `{ type: 'tool-result' }` wrapper block any more,
+  // and the persistence layer refuses a nested one.
   return event('tool/result', {
     turn: 1,
     step: 1,
-    message: createUserMessage({
-      source: { kind: 'tool', callId: CallId('call-1') },
-      content: [{ type: 'tool-result', toolCallId: CallId('call-1'), content: [], isError: false }],
+    message: createToolResultMessage({
+      callId: CallId('call-1'),
+      content: [],
+      isError: false,
     }),
     meta,
   }, time)
@@ -57,9 +65,10 @@ describe('backgroundAgents projection', () => {
     const foreignMeta = event('tool/result', {
       turn: 1,
       step: 1,
-      message: createUserMessage({
-        source: { kind: 'tool', callId: CallId('c') },
-        content: [{ type: 'tool-result', toolCallId: CallId('c'), content: [], isError: false }],
+      message: createToolResultMessage({
+        callId: CallId('c'),
+        content: [],
+        isError: false,
       }),
       meta: { plugin: 'someone-else', action: 'registered', agentId: 'x' },
     })
@@ -79,7 +88,7 @@ describe('backgroundAgents projection', () => {
     const rows = fold([
       toolResultEvent({ plugin: PLUGIN, action: 'registered', agentId: 'child-1', label: 'writer' }, 10),
       userMessageEvent(
-        { kind: 'plugin', plugin: PLUGIN, form: 'notice', summary: 'writer progress' },
+        { ...NOTICE_SOURCE, summary: 'writer progress' },
         noticeLine('child-1', 'progress', 'writer completed a turn: wrote line 1'),
         30,
       ),
@@ -91,9 +100,17 @@ describe('backgroundAgents projection', () => {
     const base = [toolResultEvent({ plugin: PLUGIN, action: 'registered', agentId: 'child-1', label: 'writer' }, 10)]
     const rows = fold([
       ...base,
-      userMessageEvent({ kind: 'plugin', plugin: 'other-plugin', form: 'notice', summary: 'x' }, 'unrelated line', 30),
+      // A notice another producer injected. Its `'plugin'` attribution is the
+      // retired catch-all, so no live producer can mint this row any more —
+      // the cast reproduces a foreign row of the pre-0.1.7 vocabulary, which
+      // is exactly what the gate must keep rejecting on the way in.
       userMessageEvent(
-        { kind: 'plugin', plugin: PLUGIN, form: 'notice', summary: 'x' },
+        { kind: 'plugin', plugin: 'other-plugin', form: 'notice', summary: 'x' } as unknown as UserMessage['source'],
+        noticeLine('child-9', 'progress', 'foreign writer progress'),
+        30,
+      ),
+      userMessageEvent(
+        { ...NOTICE_SOURCE, summary: 'x' },
         'not our format',
         40,
       ),
@@ -128,7 +145,7 @@ describe('backgroundAgents projection', () => {
     const rows = fold([
       toolResultEvent({ plugin: PLUGIN, action: 'registered', agentId: 'child-1', label: 'writer' }, 10),
       userMessageEvent(
-        { kind: 'plugin', plugin: PLUGIN, form: 'notice', summary: 'writer archived (idle timeout)' },
+        { ...NOTICE_SOURCE, summary: 'writer archived (idle timeout)' },
         noticeLine('child-1', 'archived', 'writer archived: idle for 120 minutes'),
         60,
       ),
@@ -140,7 +157,7 @@ describe('backgroundAgents projection', () => {
     const rows = fold([
       toolResultEvent({ plugin: PLUGIN, action: 'registered', agentId: 'child-1', label: 'writer' }, 10),
       userMessageEvent(
-        { kind: 'plugin', plugin: PLUGIN, form: 'notice', summary: 'x' },
+        { ...NOTICE_SOURCE, summary: 'x' },
         noticeLine('child-1', 'archived', 'idle'),
         60,
       ),
@@ -205,7 +222,7 @@ describe('backgroundAgents projection', () => {
       toolResultEvent({ plugin: PLUGIN, action: 'message', agentId: 'child-1', messageId: 'm1' }, 21),
       event('background-agents/fact', { kind: 'progress', agentId: 'child-1', text: 'wrote line 1' }, 30),
       userMessageEvent(
-        { kind: 'plugin', plugin: PLUGIN, form: 'notice', summary: 'writer progress' },
+        { ...NOTICE_SOURCE, summary: 'writer progress' },
         noticeLine('child-1', 'progress', 'wrote line 1'),
         31,
       ),

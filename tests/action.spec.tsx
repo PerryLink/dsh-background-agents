@@ -7,10 +7,11 @@ import type { SessionListLike } from '../src/client/presenter.ts'
 
 // The panel binds primitives' Tooltip only as a hover affordance and the
 // branch icon as the trigger glyph; the mock keeps this test hermetic (one
-// React copy, no primitives runtime).
+// React copy, no primitives runtime). The 0.1.7 icon set names glyph and
+// weight separately, so the mocked export is `IconBranchOutlineRegular`.
 vi.mock('@deepseek-ai/dsh-client-ui-primitives', () => ({
   Tooltip: ({ children }: { readonly children?: ReactNode }) => <>{children}</>,
-  IconBranchOutline16: () => <svg />,
+  IconBranchOutlineRegular: () => <svg />,
 }))
 
 /** One snapshot: a parent whose projection carries one tracked child. */

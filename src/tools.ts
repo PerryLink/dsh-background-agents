@@ -18,7 +18,7 @@ import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { ContentBlock, MessageSource } from '@deepseek-ai/dsh-llm'
 import { SessionId, type SessionEvent } from '@deepseek-ai/dsh-session'
-import { SubagentError, type SubagentDescendantListEntry, type SubagentListEntry } from '@deepseek-ai/dsh-subagent'
+import { SubagentError, type SubagentCatalogEntry, type SubagentDescendantListEntry } from '@deepseek-ai/dsh-subagent'
 import { countBackgroundAgents, sessionLastText, type BackgroundAgentLifecycle } from './lifecycle.ts'
 import { FACT_EVENT } from './events.ts'
 import type { FactAppender } from './facts.ts'
@@ -200,8 +200,11 @@ function factsFor(ctx: Context, parent: Agent): Map<string, FactEntry> {
  * Build one bg_list row from a catalog entry's identity, overlaying the
  * parent's projection facts and the live agent registry. Kept separate from
  * the listing loops because `SubagentDescendantListEntry` is a strict
- * superset of `SubagentListEntry`: forming their union would let TypeScript
- * reduce the descendant members away, erasing `parentId`/`depth`.
+ * superset of the direct-child rows: forming their union would let TypeScript
+ * reduce the descendant members away, erasing `parentId`/`depth`. The two
+ * listings no longer share a row type at all — `listChildren` returns
+ * `SubagentCatalogEntry` (identity only), `listDescendants` returns
+ * `SubagentDescendantListEntry` (identity plus position, diagnosable).
  */
 function buildRow(ctx: Context, facts: Map<string, FactEntry>, id: SessionId, label: string): BgListAgent {
   const fact = facts.get(id)
@@ -596,7 +599,14 @@ export function registerBackgroundAgentTools(
           agents.push(row)
         }
       } else {
-        let entries: SubagentListEntry[]
+        // The direct-child listing is a bare catalog read now: the host
+        // narrowed `listChildren` to `SubagentCatalogEntry[]`, which carries
+        // no `kind` discriminator and no activity, because the diagnostics it
+        // used to interleave belong to the complete-descendant enumeration
+        // (`listDescendants`) that actually inspects every child's log. A
+        // direct listing reads one parent-owned projection and no child log,
+        // so it has nothing to diagnose — `diagnostics` stays empty here.
+        let entries: SubagentCatalogEntry[]
         try {
           entries = await ctx.subagents.listChildren(parent.id, exec.signal)
         } catch (error) {
@@ -606,10 +616,6 @@ export function registerBackgroundAgentTools(
           throw error
         }
         for (const entry of entries) {
-          if (entry.kind === 'diagnostic') {
-            diagnostics.push({ agentId: entry.id, reason: entry.reason })
-            continue
-          }
           if (entry.mode !== 'continuable') continue
           agents.push(buildRow(ctx, facts, entry.id, entry.label))
         }
@@ -683,7 +689,7 @@ export function registerBackgroundAgentTools(
       if (!known) {
         try {
           const entries = await ctx.subagents.listChildren(parent.id, exec.signal)
-          known = entries.some(entry => entry.kind === 'child' && entry.mode === 'continuable' && entry.id === childId)
+          known = entries.some(entry => entry.mode === 'continuable' && entry.id === childId)
         } catch (error) {
           if (!(error instanceof SubagentError)) throw error
         }
@@ -792,7 +798,7 @@ export function registerBackgroundAgentTools(
       let known = true
       try {
         const entries = await ctx.subagents.listChildren(parent.id, exec.signal)
-        known = entries.some(entry => entry.kind === 'child' && entry.mode === 'continuable' && entry.id === childId)
+        known = entries.some(entry => entry.mode === 'continuable' && entry.id === childId)
       } catch (error) {
         // The listing is discovery, not authority: the interrupt itself is the
         // authoritative operation, so a catalog outage must not disable stop.

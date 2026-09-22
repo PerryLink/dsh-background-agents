@@ -14,7 +14,7 @@ import SubagentRuntime from '@deepseek-ai/dsh-subagent'
 import * as SubagentSpawn from '@deepseek-ai/dsh-subagent-spawn-in-process'
 import { TestSessionQuery } from './test-session-query.ts'
 import { isBackgroundAgentsProjection } from '../src/projection-schema.ts'
-import { parseNotice, PLUGIN } from '../src/vocabulary.ts'
+import { isBackgroundAgentsNotice, parseNotice, PLUGIN } from '../src/vocabulary.ts'
 import * as plugin from '../src/index.ts'
 import { MockAdapter, textResponse, toolCallResponse } from './mock-adapter.ts'
 
@@ -115,9 +115,11 @@ describe('dsh-background-agents end-to-end', () => {
     await vi.waitFor(async () => {
       const entries = await ctx.subagents.listChildren(parent.id)
       expect(entries).toHaveLength(1)
+      // A direct catalog row is identity only: it carries no `kind`
+      // discriminator any more, so `mode` is the classification that matters.
       const entry = entries[0]
-      expect(entry?.kind).toBe('child')
-      childId = entry?.kind === 'child' ? entry.id : undefined
+      expect(entry?.mode).toBe('continuable')
+      childId = entry?.id
     }, { timeout: 5_000 })
     expect(childId).toBeDefined()
 
@@ -133,9 +135,7 @@ describe('dsh-background-agents end-to-end', () => {
 
     const events = parent.session.snapshotEvents()
     const progress = events.filter((event): event is Extract<typeof events[number], { type: 'user/message' }> =>
-      event.type === 'user/message' && event.data.source.kind === 'plugin'
-      && event.data.source.plugin === PLUGIN
-      && event.data.source.form === 'notice')
+      event.type === 'user/message' && isBackgroundAgentsNotice(event.data.source))
     expect(progress.length).toBeGreaterThanOrEqual(1)
     const progressText = progress
       .flatMap(event => event.data.content)
@@ -196,7 +196,7 @@ describe('dsh-background-agents end-to-end', () => {
     await vi.waitFor(() => { expect(adapter.requests.length).toBeGreaterThanOrEqual(2) }, { timeout: 5_000 })
     const entries = await ctx.subagents.listChildren(parent.id)
     const firstEntry = entries[0]!
-    if (firstEntry.kind !== 'child') throw new Error('expected a child catalog entry')
+    if (firstEntry.mode !== 'continuable') throw new Error('expected a continuable child catalog entry')
     const childId = firstEntry.id
     childGate.resolve(undefined)
     await settle(ctx, childId)

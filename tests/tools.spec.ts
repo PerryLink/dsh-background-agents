@@ -238,6 +238,10 @@ describe('dsh-background-agents tools', () => {
     roots.push(root)
     await ctx.plugin(JsonlSessionPersistence, { root })
     await ctx.plugin(AgentLoop, { agents: [] })
+    // The sessionQuery service is required: the 0.1.7 `listChildren` resolves
+    // it BEFORE the projection registry, so without it the failure would name
+    // the query service and never reach the guard under test.
+    await ctx.plugin(TestSessionQuery)
     // Deliberately NO SessionProjectionRegistry: listChildren must fail loud
     // instead of fabricating an empty catalog.
     await ctx.plugin(SubagentRuntime)
@@ -256,14 +260,24 @@ describe('dsh-background-agents tools', () => {
     const agentLoop = (ctx as unknown as {
       agentLoop: { create(id: SessionId, options: { provider: string; model: string }): Promise<Agent> }
     }).agentLoop
-    const parent = await agentLoop.create(SessionId('parent'), { provider: 'mock', model: 'mock' })
+    // The stand-in returns a bare `{ id }`, but the 0.1.7 `listChildren`
+    // resolves `sessionQuery` and OBSERVES the parent session before it reads
+    // the catalog projection — an id that names no stored session fails on
+    // `SESSION_QUERY_SESSION_NOT_FOUND` and never reaches the guard under
+    // test. Register a real Session under that exact id so the parent is
+    // observable; the projection registry stays absent, which is the point.
+    const parentId = SessionId('parent')
+    ctx.sessions.create(parentId)
+    const parent = await agentLoop.create(parentId, { provider: 'mock', model: 'mock' })
 
     const result = await callTool(ctx, 'bg_list', {}, parent)
     expect(result.isError).toBe(false)
     expect(valueOf<{ kind: string; code: string; message: string }>(result)).toEqual({
       kind: 'unrecoverable',
       code: 'SUBAGENT_CONTROL_PROJECTIONS_UNAVAILABLE',
-      message: expect.stringContaining('sessionProjections'),
+      // 0.1.7 names the missing fold (`subagentCatalog`) rather than the
+      // absent service; the code is the stable half of this contract.
+      message: expect.stringContaining('subagentCatalog'),
     })
   })
 

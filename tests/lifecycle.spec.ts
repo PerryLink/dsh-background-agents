@@ -5,7 +5,7 @@ import {
   BackgroundAgentLifecycle, countBackgroundAgents, reportProgress, sessionLastText, sweepIdle,
   type LifecycleConfig, type LiveAgents, type LiveSessions,
 } from '../src/lifecycle.ts'
-import { parseNotice } from '../src/vocabulary.ts'
+import { parseNotice, SOURCE_KIND } from '../src/vocabulary.ts'
 import { FactAppender } from '../src/facts.ts'
 
 const childId = SessionId('child-1')
@@ -107,7 +107,9 @@ describe('reportProgress throttle and bounds', () => {
     expect(second).toBe(false)
     expect(inject).toHaveBeenCalledTimes(1)
     const message = inject.mock.calls[0]![0]
-    expect(message.source).toMatchObject({ kind: 'plugin', plugin: 'dsh-background-agents', form: 'notice' })
+    // The producer-owned source kind, not the retired `{ kind: 'plugin', plugin }`
+    // catch-all: the persistence layer refuses a `'plugin'`-kinded row.
+    expect(message.source).toMatchObject({ kind: SOURCE_KIND, form: 'notice' })
     const head = parseNotice(message.content[0].text)
     expect(head).toMatchObject({ agentId: childId, kind: 'progress' })
     expect(head!.text).toContain('wrote line 1')

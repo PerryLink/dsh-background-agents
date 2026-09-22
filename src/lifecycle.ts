@@ -19,7 +19,7 @@ import { FACT_EVENT } from './events.ts'
 import type { FactAppender } from './facts.ts'
 import { emptyTurnMetricState, type TurnMetricState } from './metrics.ts'
 import { isBackgroundAgentsProjection } from './projection-schema.ts'
-import { noticeLine, PLUGIN } from './vocabulary.ts'
+import { noticeLine, SOURCE_KIND } from './vocabulary.ts'
 
 /** Tunables the lifecycle honors; every threshold is a validated Config field. */
 export interface LifecycleConfig {
@@ -208,7 +208,7 @@ function boundLine(line: string, max: number): string {
 
 /**
  * Report one completed child turn into the parent: a model-visible injected
- * notice (source `{ kind: 'plugin', plugin: 'dsh-background-agents' }`) whose
+ * notice (source `{ kind: 'dsh-background-agents', form: 'notice' }`) whose
  * canonical prefix lets the projection fold the durable fact back out of the
  * parent log. Honours the per-child throttle and the parent's presence.
  * `wakeup` delivery starts a parent turn through `Agent.followup` (queued
@@ -236,8 +236,7 @@ export function reportProgress(
   const message = createUserMessage({
     content: [{ type: 'text', text: noticeLine(child.childId, 'progress', line) }],
     source: {
-      kind: 'plugin',
-      plugin: PLUGIN,
+      kind: SOURCE_KIND,
       form: 'notice',
       summary: boundContextSummary(`${child.label} progress`),
     },
@@ -284,8 +283,7 @@ export function archiveChild(
         ),
       }],
       source: {
-        kind: 'plugin',
-        plugin: PLUGIN,
+        kind: SOURCE_KIND,
         form: 'notice',
         summary: boundContextSummary(`${child.label} archived (idle timeout)`),
       },
@@ -357,6 +355,12 @@ export function archivedIdsFor(ctx: Context, parent: Agent): string[] {
  * listing is authoritative; when it is unavailable (projections or session
  * store missing), the live registry is the honest fallback and the next
  * start proceeds against it.
+ *
+ * The host narrowed `listChildren` to `SubagentCatalogEntry[]`: a direct
+ * catalog row is identity only — no `kind` discriminator, no diagnostics —
+ * because a direct listing reads the parent-owned `subagentCatalog`
+ * projection and never a child log. Every row is therefore a child, and
+ * `mode` alone decides whether it is continuable.
  * @returns the current count, or undefined when the durable listing threw.
  */
 export async function countBackgroundAgents(
@@ -375,7 +379,7 @@ export async function countBackgroundAgents(
   const archivedIds = new Set(archivedIdsFor(ctx, parent))
   let count = 0
   for (const entry of entries) {
-    if (entry.kind !== 'child' || entry.mode !== 'continuable') continue
+    if (entry.mode !== 'continuable') continue
     if (archivedIds.has(entry.id)) continue
     count += 1
   }

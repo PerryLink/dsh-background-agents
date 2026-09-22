@@ -33,10 +33,11 @@
 0.1.5-rc.1（2026-09-10 已适配）：依赖钉号移至已发布的 0.1.5-rc.1 线；无 seam 变更影响本插件行为。
 0.1.5-rc.2（2026-09-11 已适配）：依赖钉号移至已发布的 0.1.5-rc.2 线；无 seam 变更影响本插件行为。
 0.1.6-alpha.2（2026-09-18 已适配）：客户端会话服务移除了子代理导航调用，因此该动作现改为明确报告「导航归会话头部所有」（`ui-subagent` 的 lineage 座位），不再静默失败；房间面板的当前会话改由主视图保留计数推导（`retainedBy.mainView`），因为 `SessionListState.current` 已删除。`agent/created` 追赶监听器在自有 2 秒上限内同步返回，不可读的子会话日志改报 `unavailable` 而非空文本。本线上由会话日志事实通道供给的 dashboard 指标**仍不可用**（非表面事实事件仍无法盖上忽略标记）——持久房间表与面板投影值才是记录。2026-09-18 已核验（两把 typecheck 尺子 + 全量测试）；浏览器可见部分**尚未**实机验证。
+0.1.7-alpha.1（2026-09-22 已适配）：宿主完成了「生产者自有的消息归属」迁移——通配的 `{ kind: 'plugin', plugin }` 来源已在类型映射与物理行准入两处同时退役——因此本插件注入的每条通知现在都携带自己的 `kind: 'dsh-background-agents'`（通过模块增强声明）；投影仍会从旧日志中读取 `'plugin'` 来源的通知。工具结果改为 V4 一等 `role: 'tool'` 消息（`toolCallId`/`content`/`isError` 位于顶层，不再有 `{ type: 'tool-result' }` 包裹块）；`listChildren` 恢复为仅含身份的 `SubagentCatalogEntry` 行——没有 `kind` 判别字段、没有诊断行、没有 `activity`——因此每个直接列举的调用点都改为按 `mode === 'continuable'` 分类。客户端方面，`IconBranchOutline16` 更名为 `IconBranchOutlineRegular`，`ISessions.refreshSubagents` 更名为 `refreshProjections(sessionId)`。2026-09-22 已核验（两把 typecheck 尺子 + 全量测试 + build + 产物校验）；浏览器可见部分**尚未**实机验证。
 
 | 方面 | 状态 |
 |---|---|
-| Harness | DeepSeek Harness `dsh-v0.1.5-rc.2`（GitHub tag，2026-09-11 已核验；dev/运行时钉号 `0.1.5-rc.2`，peer 依赖 `>=0.1.2-rc.1 <0.2.0 \|\| >=0.1.5-alpha.1 <0.2.0`） |
+| Harness | DeepSeek Harness `dsh-v0.1.7-alpha.1`（GitHub tag，2026-09-22 已核验；dev 钉号 `0.1.7-alpha.1`，peer 依赖 `>=0.1.2-rc.1 <0.2.0 \|\| >=0.1.5-alpha.1 <0.2.0`） |
 | Node | `^22.19.0 \|\| >=24.0.0` |
 | 平台 | 全部（宿主工具；可选 Web 侧栏面板与团队房间，依赖存储域能力） |
 | 模型 | 任意（子代理继承父代理的路由；`childProvider`/`childModel` 可覆盖） |
@@ -141,7 +142,7 @@ bg_stop <agentId>
 
 - **`background-agents/fact` 结构化事实事件** —— 即注册 / 消息 / 停止 / 进度 / 已归档等事实，以仅日志记录的形式追加到父日志，并带上信封的 `ignorable: true` 标记；不认识该类型的读取器会跳过这些记录，而不是拒绝读取日志。`Session.append` 早于该标记的宿主（迄今发布的所有 rc 版本，至 `0.1.0-rc.8`，`0.1.1-rc` 线至 rc.2，以及 `0.1.2-rc` 线（仅保留信封字段用于存量日志读取兼容，仍无法盖标记）—— 任何发布版都还未盖标记，未标记会话在更严格的构建上无法恢复）会在首次追加前被探测出来（peer 版本预检 + 返回信封探测），事实追加被跳过并发出一次性警告 —— 持久存储、通知与工具照常工作，投影降级为空事实折叠。
 - **`tool/result` 回放元数据** —— 在结构化通道出现之前写入日志的相同事实（仅当某行没有结构化来源时才折叠）。
-- **注入的 `user/message` 通知**（模型可见），来源为 `{ kind: 'plugin', plugin: 'dsh-background-agents' }` —— 即节流的进度行与归档通知（规范前缀 `[background-agent <id>] …`）。
+- **注入的 `user/message` 通知**（模型可见），来源为 `{ kind: 'dsh-background-agents', form: 'notice' }` —— 即节流的进度行与归档通知（规范前缀 `[background-agent <id>] …`）。
 - **官方的 `subagent-settled` 通知** —— 子代理持久化的 "settled"（已结束）事实。
 - 团队房间遵循同样的纪律：每一条投递的房间消息都是成员自身日志中持久化的 `user/message`，共享时间线则以仅日志的 `team-room/fact` 事件镜像到 `team_rooms` 存储域。
 

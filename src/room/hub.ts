@@ -34,7 +34,7 @@ import {
 } from './schema.ts'
 import { TEAM_ROOM_FACT, type TeamRoomFact } from './events.ts'
 import type { FactAppender } from '../facts.ts'
-import { PLUGIN } from '../vocabulary.ts'
+import { SOURCE_KIND } from '../vocabulary.ts'
 
 /** Tunables the room feature honors; every threshold is a validated Config field. */
 export interface RoomConfig {
@@ -595,8 +595,7 @@ export class RoomHub extends Service {
     agent.inject(createUserMessage({
       content: [{ type: 'text', text: this.briefText(room) }],
       source: {
-        kind: 'plugin',
-        plugin: PLUGIN,
+        kind: SOURCE_KIND,
         form: 'notice',
         summary: boundContextSummary(`team room ${room.name}`),
       },
@@ -822,8 +821,7 @@ export class RoomHub extends Service {
         text: `[team-room ${room.roomId}] ${message.senderSessionId} (${direction}): ${message.text}`,
       }],
       source: {
-        kind: 'plugin',
-        plugin: PLUGIN,
+        kind: SOURCE_KIND,
         form: 'relay',
       },
     })

@@ -5,7 +5,7 @@
  * chain, so this listener must return `undefined` synchronously on every path:
  * a never-settling store open, a filtered session source, or a rejecting
  * catch-up must all leave the dispatch untouched. The locks below assert
- * "returns without awaiting / does not throw" 鈥?the historical mis-diagnosis
+ * "returns without awaiting / does not throw" — the historical mis-diagnosis
  * ("throws synchronously") is deliberately NOT what is pinned.
  * @module dsh-background-agents/test/agent-created-listener
  */
