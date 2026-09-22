@@ -84,6 +84,16 @@ jobs:
     needs: test
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
+    # `id-token: write` is what lets GitHub mint the OIDC token npm exchanges for a
+    # short-lived publish credential (trusted publishing). Without it the job only ever
+    # had the NPM_TOKEN path, so a repository with a configured trusted publisher still
+    # could not publish: npm looks for ACTIONS_ID_TOKEN_REQUEST_TOKEN in the environment
+    # and, finding none, fails with ENEEDAUTH instead of performing the exchange.
+    # The NPM_TOKEN fallback below is kept on purpose -- it is what the job used before,
+    # and it still skips cleanly when the secret is absent.
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
