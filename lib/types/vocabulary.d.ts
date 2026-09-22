@@ -9,8 +9,53 @@
  *
  * @module dsh-background-agents/vocabulary
  */
+import type { ContextFormed, MessageSource } from '@deepseek-ai/dsh-llm';
+/**
+ * Producer-owned message attribution.
+ *
+ * The harness's `MessageSourceMap` is a merge-extensible sum type: each
+ * producer declares its own `kind` in its own module, and the retired
+ * catch-all `{ kind: 'plugin', plugin }` shape no longer exists. It is gone
+ * from BOTH layers that used to accept it — the type layer
+ * (`packages/llm/llm/src/message.ts`, whose map carries only
+ * `user | model | tool | 'system-prompt'`) and the persistence layer
+ * (`session-format-v3-to-v4/src/message-sources.ts` refuses a physical row
+ * whose source `kind` is `'plugin'`, so `as any` cannot smuggle one past
+ * admission). The host's own producers do exactly this (`tool-jobs` declares
+ * `{ kind: 'tool-jobs' } & ContextFormed`), so this plugin declares its own
+ * kind under its package name.
+ */
+declare module '@deepseek-ai/dsh-llm' {
+    interface MessageSourceMap {
+        /** This plugin's model-visible injections: the progress, archive, and room notices. */
+        'dsh-background-agents': {
+            kind: 'dsh-background-agents';
+        } & ContextFormed;
+    }
+}
 /** The producer tag stamped on every model-visible notice and replay meta this plugin writes. */
 export declare const PLUGIN: "dsh-background-agents";
+/** This plugin's message-source kind; the module augmentation above is what declares it. */
+export declare const SOURCE_KIND: "dsh-background-agents";
+/**
+ * Whether one message source is a notice this plugin injected.
+ *
+ * The source vocabulary is versioned independently of the notice text, so a
+ * parent log may hold notices written before the `kind: 'plugin'` catch-all
+ * was retired. Those rows are read (never written) here: the projection is a
+ * pure fold over arbitrary historical logs, and the notice-line prefix check
+ * stays the authority — the source gate only narrows which messages are
+ * worth parsing. A log carrying a `'plugin'`-kinded notice is therefore still
+ * folded instead of silently losing its row.
+ *
+ * Returns a plain boolean rather than a type predicate on purpose: the fold
+ * shares one `MessageSource` value with the official `subagent-settled`
+ * branch below it, and narrowing here would strip that variant from the
+ * union at the sibling check.
+ * @param source - the source of one `user/message` event.
+ * @returns true when the source is a notice from this plugin.
+ */
+export declare function isBackgroundAgentsNotice(source: MessageSource): boolean;
 /** Prefix that opens every injected notice line, carrying the durable child agent id. */
 export declare const NOTICE_PREFIX: "[background-agent ";
 /**

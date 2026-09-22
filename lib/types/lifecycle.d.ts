@@ -113,7 +113,7 @@ export declare function sessionLastText(events: readonly SessionEvent[], options
 export declare function childLastText(sessions: LiveSessions, childId: SessionId): string;
 /**
  * Report one completed child turn into the parent: a model-visible injected
- * notice (source `{ kind: 'plugin', plugin: 'dsh-background-agents' }`) whose
+ * notice (source `{ kind: 'dsh-background-agents', form: 'notice' }`) whose
  * canonical prefix lets the projection fold the durable fact back out of the
  * parent log. Honours the per-child throttle and the parent's presence.
  * `wakeup` delivery starts a parent turn through `Agent.followup` (queued
@@ -145,6 +145,12 @@ export declare function archivedIdsFor(ctx: Context, parent: Agent): string[];
  * listing is authoritative; when it is unavailable (projections or session
  * store missing), the live registry is the honest fallback and the next
  * start proceeds against it.
+ *
+ * The host narrowed `listChildren` to `SubagentCatalogEntry[]`: a direct
+ * catalog row is identity only — no `kind` discriminator, no diagnostics —
+ * because a direct listing reads the parent-owned `subagentCatalog`
+ * projection and never a child log. Every row is therefore a child, and
+ * `mode` alone decides whether it is continuable.
  * @returns the current count, or undefined when the durable listing threw.
  */
 export declare function countBackgroundAgents(ctx: Context, parent: Agent, lifecycle: BackgroundAgentLifecycle, signal: AbortSignal): Promise<number>;
