@@ -92,7 +92,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-          registry-url: https://registry.npmjs.org
       # No rebuild here: the test job's build-drift gate already proved the
       # committed lib/ is byte-identical to a fresh build of this tree, and
       # type declarations are not regenerable without the pinned harness.

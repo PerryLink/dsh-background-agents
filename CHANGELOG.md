@@ -4,7 +4,7 @@ All notable changes to `dsh-background-agents` are documented here. The repo is 
 
 ## [Unreleased]
 
-## [0.9.8] - 2026-09-22
+## [0.9.9] - 2026-09-22
 
 ### Changed
 
