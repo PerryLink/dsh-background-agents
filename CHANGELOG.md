@@ -2,7 +2,18 @@
 
 All notable changes to `dsh-background-agents` are documented here. The repo is pre-release; versions follow the DeepSeek Harness `0.1.x-rc.x` target runtime and bump on every behavior change.
 
-## [Unreleased]
+## [0.9.10] - 2026-09-23
+
+### Changed
+
+- Move the `@deepseek-ai/dsh-*` dev/test pins to the published `0.1.7-alpha.2` line and add `0.1.7-alpha.2` to `dshWorkshop.compatibility.dshVersions` (which keeps `0.1.7-alpha.1`); the monthly Compat workflow now installs the `0.1.7-alpha.2` host instead of `0.1.7-alpha.1`.
+- Append the fourth host clause `|| >=0.1.7-0 <0.2.0` to `engines.dsh` and to all eight `@deepseek-ai/dsh-*` peer ranges. Under semver's prerelease rule a range whose only prerelease comparators sit on earlier tuples cannot admit a later alpha, so the three-clause band excluded the very host line this release targets. No previously supported host line is dropped.
+- Raise the `@deepseek-ai/cordis` peer and dev/test pin to `^4.0.4` and the `@deepseek-ai/schemastery` peer and dev/test pin to `^3.18.4`.
+- Move the `pnpm-workspace.yaml` `overrides` block with the pins: the unscoped floors become `@deepseek-ai/cordis` 4.0.4, `@deepseek-ai/cosmokit` 1.8.5 and `@deepseek-ai/schemastery` 3.18.4 (every alpha.2 host package declares cordis `~4.0.4`, cordis 4.0.4 depends on cosmokit `~1.8.5`, and dsh-settings declares schemastery `~3.18.4`), and the thirteen self-referential rows that keep ONE copy of the host type graph in the tree now name `0.1.7-alpha.2`. The alpha.2 host packages pin their peers exactly, so no edge spells a caret today; the rows stay as the mirror of the devDeps.
+
+### Docs
+
+- The five README Harness rows listed only the first two host clauses (`>=0.1.2-rc.1 <0.2.0 || >=0.1.5-alpha.1 <0.2.0`) as this package's peers; they now carry the full four-clause range the package actually declares.
 
 ## [0.9.9] - 2026-09-22
 
