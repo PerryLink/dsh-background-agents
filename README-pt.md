@@ -38,7 +38,7 @@ Hosts `0.1.2-alpha.2` e posteriores falham de forma fechada no vocabulário de e
 
 | Superfície | Status |
 |---|---|
-| Harness | DeepSeek Harness `dsh-v0.1.7-alpha.1` (tag do GitHub, verificado em 2026-09-22; pins de desenvolvimento `0.1.7-alpha.1`, peers `>=0.1.2-rc.1 <0.2.0 \|\| >=0.1.5-alpha.1 <0.2.0`) |
+| Harness | DeepSeek Harness `dsh-v0.1.7-alpha.2` (tag do GitHub, verificado em 2026-09-22; pins de desenvolvimento `0.1.7-alpha.2`, peers `>=0.1.2-rc.1 <0.2.0 \|\| >=0.1.5-alpha.1 <0.2.0`) |
 | Node | `^22.19.0 \|\| >=24.0.0` |
 | Plataformas | Todas (ferramentas de host; painel lateral web e salas de equipe opcionais via capacidade de domínio de armazenamento) |
 | Modelo | Qualquer (os filhos herdam a rota do pai; `childProvider`/`childModel` sobrescrevem) |
