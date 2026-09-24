@@ -26,6 +26,14 @@
 
 ---
 
+<!-- star-cta -->
+## ⭐ 如果它帮到了你
+
+这个插件是 [DSH 插件家族](https://github.com/PerryLink)的一员（40+ 个，全部 Apache-2.0）。如果你在用，**给个 star** —— 它不会解锁任何功能，但会让下一个人在搜索里更容易找到它。
+
+*English:* part of a 40+ plugin family for DeepSeek Harness. If it is useful, **a star helps the next person find it** — nothing is gated behind it.
+
+
 ## Compatibility
 
 Host `0.1.2-alpha.2` and later fails closed on the session event vocabulary, so this plugin no longer writes its log-only fact events (`background-agents/fact`, `team-room/fact`) there: facts route to the logger/panel channel instead and the projections degrade to an empty fold. Older rc lines (through `0.1.1-rc.2`) keep the ignorable-marker discipline. The client half now rides the current client packages (`dsh-api-session-controller`, `dsh-client-web`) and the current subagent remote (`interruptByParent`, `prompt` with a client-minted `requestId`; the old `history` RPC is gone — result peeks read the child session's `conversation` projection).
