@@ -25,6 +25,13 @@
 
 ---
 
+
+<!-- star-cta -->
+## ⭐ 如果它帮到了你
+
+यह प्लगइन [DSH प्लगइन परिवार](https://github.com/PerryLink) का हिस्सा है (40+ प्लगइन, सभी Apache-2.0)। अगर यह उपयोगी लगे, तो **एक स्टार दें** — इससे कोई सुविधा अनलॉक नहीं होती, पर अगला व्यक्ति इसे खोज में आसानी से पा लेता है।
+
+*English:* part of a 40+ plugin family for DeepSeek Harness. If it is useful, **a star helps the next person find it** — nothing is gated behind it.
 ## अनुकूलता
 
 होस्ट `0.1.2-alpha.2` और बाद के संस्करण सत्र इवेंट शब्दावली पर बंद-विफल होते हैं, इसलिए यह प्लगइन वहाँ अपने केवल-लॉग तथ्य इवेंट (`background-agents/fact`, `team-room/fact`) नहीं लिखता: तथ्य लॉगर/पैनल चैनल से जाते हैं और प्रोजेक्शन खाली फोल्ड में बदल जाते हैं। पुरानी rc लाइनें (`0.1.1-rc.2` तक) ignorable-मार्कर अनुशासन बनाए रखती हैं। क्लाइंट आधा अब वर्तमान क्लाइंट पैकेज (`dsh-api-session-controller`, `dsh-client-web`) और वर्तमान सबएजेंट रिमोट (`interruptByParent`, क्लाइंट-निर्मित `requestId` के साथ `prompt`; पुराना `history` RPC हटा दिया गया — परिणाम झलकियाँ चाइल्ड सत्र के `conversation` प्रोजेक्शन से पढ़ी जाती हैं) का उपयोग करता है।

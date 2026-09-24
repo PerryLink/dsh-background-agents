@@ -25,6 +25,13 @@
 
 ---
 
+
+<!-- star-cta -->
+## ⭐ 如果它帮到了你
+
+这个插件是 [DSH 插件家族](https://github.com/PerryLink)的一员（40+ 个，全部 Apache-2.0）。如果你在用，**给个 star** —— 它不会解锁任何功能，但会让下一个人在搜索里更容易找到它。
+
+*English:* part of a 40+ plugin family for DeepSeek Harness. If it is useful, **a star helps the next person find it** — nothing is gated behind it.
 ## 兼容性
 
 宿主 `0.1.2-alpha.2` 及以后对会话事件词汇表采取失败即拒读策略，本插件在这些宿主上不再写入其仅日志事实事件（`background-agents/fact`、`team-room/fact`）：事实改走 logger/面板通道，投影退化为空折叠。更早的 rc 线（截至 `0.1.1-rc.2`）保留 ignorable 标记机制。客户端半面现已使用现行客户端包（`dsh-api-session-controller`、`dsh-client-web`）与现行 subagent 远端（`interruptByParent`、带客户端铸造 `requestId` 的 `prompt`；旧 `history` RPC 已删除——结果窥视改读子会话的 `conversation` 投影）。

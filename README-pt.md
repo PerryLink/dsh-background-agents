@@ -25,6 +25,13 @@
 
 ---
 
+
+<!-- star-cta -->
+## ⭐ 如果它帮到了你
+
+Este plugin faz parte da [família de plugins DSH](https://github.com/PerryLink) (mais de 40, todos Apache-2.0). Se for útil, **deixe uma estrela**: não desbloqueia nada, mas ajuda a próxima pessoa a encontrá-lo.
+
+*English:* part of a 40+ plugin family for DeepSeek Harness. If it is useful, **a star helps the next person find it** — nothing is gated behind it.
 ## Compatibilidade
 
 Hosts `0.1.2-alpha.2` e posteriores falham de forma fechada no vocabulário de eventos de sessão, então este plugin não grava mais ali seus eventos de fatos somente-registro (`background-agents/fact`, `team-room/fact`): os fatos seguem pelo canal de logger/painel e as projeções degradam para uma dobra vazia. As linhas rc anteriores (até `0.1.1-rc.2`) mantêm a disciplina do marcador ignorable. A metade cliente agora usa os pacotes de cliente atuais (`dsh-api-session-controller`, `dsh-client-web`) e o remoto subagent atual (`interruptByParent`, `prompt` com `requestId` cunhado pelo cliente; o antigo RPC `history` sumiu — os vistores de resultado leem a projeção `conversation` da sessão filha).
