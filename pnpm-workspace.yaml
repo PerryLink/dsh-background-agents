@@ -3,11 +3,11 @@ packages:
 allowBuilds:
   esbuild: true
 
-# The dev/test pins ride the 0.1.7-rc.1 line, and the self-referential rows
+# The dev/test pins ride the 0.1.7-rc.2 line, and the self-referential rows
 # mirror them: pnpm matches a prerelease range only against its own
 # [major, minor, patch] tuple, so a transitive peer asking for
-# `^0.1.7-rc.1` would otherwise resolve SEPARATELY from this package's own
-# `0.1.7-rc.1` devDeps. That installs a second copy of the host type graph,
+# `^0.1.7-rc.2` would otherwise resolve SEPARATELY from this package's own
+# `0.1.7-rc.2` devDeps. That installs a second copy of the host type graph,
 # and this package's `UserMessage`/`ContentBlock` then disagree with the host's
 # `Agent` (surfacing as spurious `X incorrectly extends Y` errors). Mirroring
 # each devDep pin keeps exactly one copy of every host package. (The alpha.2
@@ -15,7 +15,7 @@ allowBuilds:
 # rows stay as the mirror of the devDeps.)
 #
 # `cordis`, `cosmokit`, and `schemastery` carry explicit floors because the
-# 0.1.7-rc.1 line needs them: every alpha.2 host package declares cordis
+# 0.1.7-rc.2 line needs them: every alpha.2 host package declares cordis
 # `~4.0.4`, cordis 4.0.4 itself depends on cosmokit `~1.8.5`, and dsh-settings
 # declares schemastery `~3.18.4`. A lockfile that already pinned the older patch
 # keeps resolving to it, so the floors are explicit — and, being unscoped, they
@@ -24,40 +24,40 @@ overrides:
   '@deepseek-ai/cordis': 4.0.4
   '@deepseek-ai/cosmokit': 1.8.5
   '@deepseek-ai/schemastery': 3.18.4
-  '@deepseek-ai/dsh-agent@^0.1.7-rc.1': 0.1.7-rc.1
-  '@deepseek-ai/dsh-attachment@^0.1.7-rc.1': 0.1.7-rc.1
-  '@deepseek-ai/dsh-commands@^0.1.7-rc.1': 0.1.7-rc.1
-  '@deepseek-ai/dsh-llm@^0.1.7-rc.1': 0.1.7-rc.1
-  '@deepseek-ai/dsh-session@^0.1.7-rc.1': 0.1.7-rc.1
-  '@deepseek-ai/dsh-session-projection@^0.1.7-rc.1': 0.1.7-rc.1
-  '@deepseek-ai/dsh-storage@^0.1.7-rc.1': 0.1.7-rc.1
-  '@deepseek-ai/dsh-storage-domain@^0.1.7-rc.1': 0.1.7-rc.1
-  '@deepseek-ai/dsh-storage-json@^0.1.7-rc.1': 0.1.7-rc.1
-  '@deepseek-ai/dsh-subagent@^0.1.7-rc.1': 0.1.7-rc.1
-  '@deepseek-ai/dsh-tools@^0.1.7-rc.1': 0.1.7-rc.1
-  '@deepseek-ai/dsh-typert-protocol@^0.1.7-rc.1': 0.1.7-rc.1
-  '@deepseek-ai/dsh-util-values@^0.1.7-rc.1': 0.1.7-rc.1
+  '@deepseek-ai/dsh-agent@^0.1.7-rc.2': 0.1.7-rc.2
+  '@deepseek-ai/dsh-attachment@^0.1.7-rc.2': 0.1.7-rc.2
+  '@deepseek-ai/dsh-commands@^0.1.7-rc.2': 0.1.7-rc.2
+  '@deepseek-ai/dsh-llm@^0.1.7-rc.2': 0.1.7-rc.2
+  '@deepseek-ai/dsh-session@^0.1.7-rc.2': 0.1.7-rc.2
+  '@deepseek-ai/dsh-session-projection@^0.1.7-rc.2': 0.1.7-rc.2
+  '@deepseek-ai/dsh-storage@^0.1.7-rc.2': 0.1.7-rc.2
+  '@deepseek-ai/dsh-storage-domain@^0.1.7-rc.2': 0.1.7-rc.2
+  '@deepseek-ai/dsh-storage-json@^0.1.7-rc.2': 0.1.7-rc.2
+  '@deepseek-ai/dsh-subagent@^0.1.7-rc.2': 0.1.7-rc.2
+  '@deepseek-ai/dsh-tools@^0.1.7-rc.2': 0.1.7-rc.2
+  '@deepseek-ai/dsh-typert-protocol@^0.1.7-rc.2': 0.1.7-rc.2
+  '@deepseek-ai/dsh-util-values@^0.1.7-rc.2': 0.1.7-rc.2
 
 minimumReleaseAgeExclude:
   - '@deepseek-ai/*'
-  - '@deepseek-ai/cordis@4.0.1'
-  - '@deepseek-ai/cosmokit@1.8.2'
-  - '@deepseek-ai/dsh-agent@0.1.0-rc.6'
-  - '@deepseek-ai/dsh-attachment@0.1.0-rc.6'
-  - '@deepseek-ai/dsh-brand@0.1.0-rc.6'
-  - '@deepseek-ai/dsh-code-runtime@0.1.0-rc.6'
-  - '@deepseek-ai/dsh-invariants@0.1.0-rc.6'
-  - '@deepseek-ai/dsh-llm@0.1.0-rc.6'
-  - '@deepseek-ai/dsh-scope@0.1.0-rc.6'
-  - '@deepseek-ai/dsh-session@0.1.0-rc.6'
-  - '@deepseek-ai/dsh-subagent@0.1.0-rc.6'
-  - '@deepseek-ai/dsh-system-prompt@0.1.0-rc.6'
-  - '@deepseek-ai/dsh-timeout@0.1.0-rc.6'
-  - '@deepseek-ai/dsh-tools@0.1.0-rc.6'
-  - '@deepseek-ai/dsh-typert-protocol@0.1.0-rc.6'
-  - '@deepseek-ai/dsh-user-approval@0.1.0-rc.6'
-  - '@deepseek-ai/dsh-storage@0.1.0-rc.6'
-  - '@deepseek-ai/dsh-storage-domain@0.1.0-rc.6'
-  - '@deepseek-ai/dsh-commands@0.1.0-rc.6'
-  - '@deepseek-ai/schemastery@3.18.1'
+  - '@deepseek-ai/cordis@4.0.1 || 0.1.7-rc.2'
+  - '@deepseek-ai/cosmokit@1.8.2 || 0.1.7-rc.2'
+  - '@deepseek-ai/dsh-agent@0.1.0-rc.6 || 0.1.7-rc.2'
+  - '@deepseek-ai/dsh-attachment@0.1.0-rc.6 || 0.1.7-rc.2'
+  - '@deepseek-ai/dsh-brand@0.1.0-rc.6 || 0.1.7-rc.2'
+  - '@deepseek-ai/dsh-code-runtime@0.1.0-rc.6 || 0.1.7-rc.2'
+  - '@deepseek-ai/dsh-invariants@0.1.0-rc.6 || 0.1.7-rc.2'
+  - '@deepseek-ai/dsh-llm@0.1.0-rc.6 || 0.1.7-rc.2'
+  - '@deepseek-ai/dsh-scope@0.1.0-rc.6 || 0.1.7-rc.2'
+  - '@deepseek-ai/dsh-session@0.1.0-rc.6 || 0.1.7-rc.2'
+  - '@deepseek-ai/dsh-subagent@0.1.0-rc.6 || 0.1.7-rc.2'
+  - '@deepseek-ai/dsh-system-prompt@0.1.0-rc.6 || 0.1.7-rc.2'
+  - '@deepseek-ai/dsh-timeout@0.1.0-rc.6 || 0.1.7-rc.2'
+  - '@deepseek-ai/dsh-tools@0.1.0-rc.6 || 0.1.7-rc.2'
+  - '@deepseek-ai/dsh-typert-protocol@0.1.0-rc.6 || 0.1.7-rc.2'
+  - '@deepseek-ai/dsh-user-approval@0.1.0-rc.6 || 0.1.7-rc.2'
+  - '@deepseek-ai/dsh-storage@0.1.0-rc.6 || 0.1.7-rc.2'
+  - '@deepseek-ai/dsh-storage-domain@0.1.0-rc.6 || 0.1.7-rc.2'
+  - '@deepseek-ai/dsh-commands@0.1.0-rc.6 || 0.1.7-rc.2'
+  - '@deepseek-ai/schemastery@3.18.1 || 0.1.7-rc.2'
 verifyDepsBeforeRun: false
