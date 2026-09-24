@@ -38,7 +38,7 @@ Los hosts `0.1.2-alpha.2` y posteriores fallan en cerrado ante el vocabulario de
 
 | Superficie | Estado |
 |---|---|
-| Harness | DeepSeek Harness `dsh-v0.1.7-alpha.2` (tag de GitHub, verificado el 2026-09-22; pines de desarrollo `0.1.7-alpha.2`, peers `>=0.1.2-rc.1 <0.2.0 \|\| >=0.1.5-alpha.1 <0.2.0 \|\| >=0.1.6-0 <0.2.0 \|\| >=0.1.7-0 <0.2.0`) |
+| Harness | DeepSeek Harness `dsh-v0.1.7-rc.1` (tag de GitHub, verificado el 2026-09-24; pines de desarrollo `0.1.7-rc.1`, peers `>=0.1.2-rc.1 <0.2.0 \|\| >=0.1.5-alpha.1 <0.2.0 \|\| >=0.1.6-0 <0.2.0 \|\| >=0.1.7-0 <0.2.0`) |
 | Node | `^22.19.0 \|\| >=24.0.0` |
 | Plataformas | Todas (herramientas de host; panel lateral web y salas de equipo opcionales mediante la capacidad de dominio de almacenamiento) |
 | Modelo | Cualquiera (los hijos heredan la ruta del padre; `childProvider`/`childModel` la reemplazan) |
