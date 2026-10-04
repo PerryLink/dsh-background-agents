@@ -39,6 +39,16 @@ const configPath = resolve(configArgument)
 const configRequire = createRequire(resolve(import.meta.dirname, '../package.json'))
 
 const ctx = new Context()
+/** Error-severity log records, kept so a failed row's reason survives for the assertion. */
+const capturedErrors = []
+ctx.logger.exporter({
+  levels: { default: 0 },
+  export: (message) => {
+    if (message.level === 'error' || message.level === 0) {
+      capturedErrors.push(message.args?.[0] instanceof Error ? message.args[0] : new Error(String(message.args?.[0] ?? message.message ?? 'loader error')))
+    }
+  },
+})
 try {
   ctx.baseUrl = `${pathToFileURL(dirname(configPath)).href}/`
   const registered = []
@@ -78,6 +88,7 @@ try {
     config: { path: pathToFileURL(configPath).href },
   })
   await ctx.loader.await()
+  rethrowFirstFailedRow()
 
   // The authoritative tool registry carries the plugin's contribution.
   const names = registered.map(definition => definition.name)
@@ -92,4 +103,31 @@ try {
   process.exit(1)
 } finally {
   await ctx.fiber.dispose()
+}
+
+/**
+ * Re-throw the first FAILED loader row's error.
+ *
+ * `cordis-plugin-loader` 1.0.6 dropped the failure surface `await()` had in
+ * 1.0.4: the old body collected `entry._await()` outcomes and threw the single
+ * failure (or an AggregateError), while 1.0.6's body only loops over
+ * `_initTask || fiber.inertia` and returns as soon as there is no pending
+ * task — so a row whose `apply` threw no longer makes `await()` reject, and a
+ * negative composition regression silently passes on the downstream symptom
+ * ("tool is missing") instead of failing on the real reason. Walking the
+ * entries restores that reason without depending on the resurrected API.
+ *
+ * `DSH_LOADER_RUNNER_NO_RETHROW=1` disables it for re-measurement only.
+ */
+function rethrowFirstFailedRow() {
+  if (process.env.DSH_LOADER_RUNNER_NO_RETHROW === '1') return
+  const failed = []
+  for (const entry of ctx.loader.entries()) {
+    const fiber = entry?.fiber
+    // FiberState.FAILED === 3 (const enum, erased at runtime). A failed row keeps no
+    // `fiber.error` on this line, so the reason is recovered from the row's own log records.
+    if (fiber?.state === 3) failed.push(capturedErrors.shift() ?? new Error(`loader row ${String(entry?.options?.name ?? '?')} failed`))
+  }
+  if (failed.length === 1) throw failed[0]
+  if (failed.length > 1) throw new AggregateError(failed, 'loader fibers failed')
 }
