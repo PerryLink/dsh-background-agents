@@ -2,6 +2,13 @@
 
 All notable changes to `dsh-background-agents` are documented here. The repo is pre-release; versions follow the DeepSeek Harness `0.1.x-rc.x` target runtime and bump on every behavior change.
 
+## [0.10.2] - 2026-10-05
+
+### Changed
+
+- Correct the release date in the previous section, which was stamped with the literal string `undefined` by the release stamper. No content or behaviour change; the version is bumped only because npm will not republish an existing version.
+
+
 ## [Unreleased]
 
 ## [0.10.1] - 2026-10-05
