@@ -93,8 +93,19 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if gh release view "${{ github.ref_name }}" >/dev/null 2>&1; then
-            echo "release ${{ github.ref_name }} already exists; skipping"
+          # A tag push releases the pushed tag; a workflow_dispatch run on a branch
+          # has no tag in the ref (`github.ref_name` would be the BRANCH name), so
+          # fall back to the version in package.json. Without this, dispatching the
+          # release on main created a GitHub Release literally named "main" —
+          # observed on 2026-10-05, and cleaned up afterwards.
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            REF_NAME="${GITHUB_REF_NAME}"
+          else
+            REF_NAME="v$(node -p "require('./package.json').version")"
+          fi
+          echo "releasing ${REF_NAME}"
+          if gh release view "${REF_NAME}" >/dev/null 2>&1; then
+            echo "release ${REF_NAME} already exists; skipping"
             exit 0
           fi
-          gh release create "${{ github.ref_name }}" --generate-notes
+          gh release create "${REF_NAME}" --generate-notes
