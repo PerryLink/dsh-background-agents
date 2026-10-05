@@ -42,19 +42,26 @@ jobs:
           VERSION="${GITHUB_REF_NAME#v}"
           grep -q "## \[${VERSION}\]" CHANGELOG.md || { echo "CHANGELOG.md has no '## [${VERSION}]' section"; exit 1; }
 
-      # Publish with provenance when NPM_TOKEN is present. A tag push without
-      # the secret, or for a version already on the registry, skips instead of
-      # failing the release tag.
+      # Trusted publishing: the OIDC token (id-token: write above) replaces the
+      # long-lived NPM_TOKEN. A configured bearer token is preferred over the OIDC
+      # exchange, and the registry then answers 404 on PUT instead of publishing —
+      # which is exactly how this repo's tag run failed. So this step reads no
+      # secret and writes no .npmrc.
+      - name: Upgrade npm and show what the publish will authenticate with
+        run: |
+          npm install -g npm@^11.5.1
+          echo "npm: $(npm --version)"
+          echo "registry: $(npm config get registry)"
+          if [ -f .npmrc ]; then echo "--- workspace .npmrc ---"; cat .npmrc; else echo "no workspace .npmrc"; fi
+          if [ -n "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-}" ]; then echo "OIDC request TOKEN: present"; else echo "OIDC request TOKEN: MISSING"; fi
+
       - name: Publish to npm
         env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          # npm's OIDC exchange never throws: a failure is only visible at verbose
+          # level, otherwise the step just fails with ENEEDAUTH and no reason.
+          NPM_CONFIG_LOGLEVEL: verbose
         run: |
           version="$(node -p "require('./package.json').version")"
-          if [ -z "$NPM_TOKEN" ]; then
-            echo "NPM_TOKEN secret is not set; skipping npm publish"
-            exit 0
-          fi
           if npm view "dsh-background-agents@${version}" version >/dev/null 2>&1; then
             echo "dsh-background-agents@${version} is already published; skipping npm publish"
           else
