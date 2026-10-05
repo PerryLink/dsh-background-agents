@@ -21,7 +21,7 @@
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { spawnSync } from 'node:child_process'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
@@ -30,6 +30,27 @@ const builtEntry = join(repositoryRoot, 'lib', 'index.js')
 // The probe must live inside the repository so `@deepseek-ai/cordis` resolves
 // through the repo's own dependency tree; a %TEMP% location cannot.
 const temporaryRoot = mkdtempSync(join(repositoryRoot, '.room-half-guard-'))
+
+/**
+ * This spec imports the BUILT bundle, because the guard it exercises lives in the
+ * shipped artifact. `lib/` is committed, but the CI job runs `pnpm test` and
+ * `test:coverage` BEFORE its build step, so the artifact has to exist here
+ * independently — otherwise the probe dies with
+ * `ERR_MODULE_NOT_FOUND: .../lib/index.js` and the guard reads as a failure.
+ * Building on demand keeps the spec self-contained and means a stale committed
+ * artifact can never mask the real behaviour.
+ */
+function ensureBuilt(): void {
+  if (existsSync(builtEntry)) return
+  const built = spawnSync('pnpm', ['run', 'build'], {
+    cwd: repositoryRoot,
+    stdio: 'inherit',
+    shell: process.platform === 'win32',
+  })
+  if (built.status !== 0 || !existsSync(builtEntry)) {
+    throw new Error(`room-half-guard: could not build ${builtEntry} (pnpm run build exited ${String(built.status)})`)
+  }
+}
 
 /** The probe runs in its own process so the built bundle is imported fresh. */
 const PROBE = 'room-half-guard-probe.mjs'
@@ -120,7 +141,12 @@ function runProbe(file: string, rival: boolean) {
 }
 
 let file = ''
-beforeAll(() => { file = writeProbe() }, 180_000)
+beforeAll(() => {
+  // The bundle must exist before the probe imports it; CI runs this suite before
+  // its build step, so build on demand rather than assuming an artifact.
+  ensureBuilt()
+  file = writeProbe()
+}, 300_000)
 afterAll(() => { rmSync(temporaryRoot, { recursive: true, force: true }) })
 
 describe('room-half coexistence guard', () => {
