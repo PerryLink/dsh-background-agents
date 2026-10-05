@@ -8,6 +8,12 @@ name: release
 on:
   push:
     tags: ['v*']
+  # Allows re-running a release after repairing a credential or configuring a
+  # trusted publisher, without inventing a new version. A version already on the
+  # registry is skipped rather than republished, so this is safe to press. The
+  # sibling repos' publish.yml carries the same escape hatch; this file lacked it,
+  # which is why a failed tag run had to be retried by moving the tag.
+  workflow_dispatch:
 
 jobs:
   publish:
