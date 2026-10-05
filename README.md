@@ -218,9 +218,27 @@ The runtime emits three notification kinds; `method` is the event name and `para
 
 Each maps onto the room's existing surfaces: `agent_started` opens a task-board card, `agent_message` posts to the message bus, and `agent_finished` completes the card and posts the outcome. Invalid messages fail closed — they are dropped and a JSON-RPC error is written back. External runtimes are not DSH sessions, so the room owner's member session stands in as the sender; a room with no owner member drops the event. Start and stop are owned by the plugin fiber through a disposer; an unspawnable `inbound.command` degrades to a logged warning (the bridge stays dormant, nothing else is affected).
 
+## Interoperability with other DSH plugins
+
+Verified against **DSH `0.2.0-rc.2`** (the runtime this README ships for) and the high-star plugin set surveyed on 2026-10-05.
+
+This plugin **does not interfere** with other plugins, including the widely installed high-star ones:
+
+- **No tool-name collision.** Every tool is namespaced (`background_agent`, `bg_*`, `room_*`). The plugin registers no bare name that a shipped tool or another plugin owns, so it never shadows anything — the mechanism `dsh-routing-suite` (7000★) uses against the built-in `get_goal` / `create_goal` / `update_goal`.
+- **No service-key collision.** It provides exactly one service, `roomHub`. That key is not a built-in seam and is not provided by any surveyed high-star plugin. (`dsh-routing-suite` provides `shell`, which collides with the built-in `@deepseek-ai/dsh-shell`; this plugin does not.)
+- **No slot collision.** It registers no client `slot` key that a surveyed high-star plugin also claims, so it never competes for the `shadows-shipped-ui` seats (`main`, `conversation.chat.node`, `plugins.bundle.config`, `tool.call.toolview`) that `dsh-agent-teams`, `dsh-context`, `dsh-market` and `modlens` contend for.
+- **No HTTP route collision.** It registers no `webServer` prefix. (`DSH-better-sidebar` 3993★ documents that a duplicated prefix such as `/sidebar/api` fails the whole plugin tree at boot.)
+- **No patch-layer collision.** The bundle patch only `insert`s its own row (`id: background-agents`); it never overrides a built-in row's `config`. Overriding is whole-object replacement, which is how `dsh-purge` and `dsh-infinite-gen-4` mutually erase each other's `system-prompt` config.
+- **No global mutation.** It does not patch prototypes, rewrite `process.env`, or replace the global fetch dispatcher. (Surveyed hitters: `dsh-market` rewrites `Date.prototype.getTimezoneOffset` and 13 env vars; `modlens` rewrites `HOME` / `PATH` / `TMP` / `OPENAI_BASE_URL` / `ANTHROPIC_BASE_URL`; `dsh-context` rewrites `Element.prototype.scrollIntoView`.)
+
+**Shared event listeners are non-interfering by construction.** This plugin observes six events that high-star plugins also use — `agent/pre-step`, `agent/request`, `tools/pre-execute`, `tools/post-execute`, `llm/stream`, `system-prompt/assemble` — and all of them are registered with `ctx.on()`, which is Cordis's broadcast registration: every listener runs and no listener can starve another. For the ordering-sensitive ones (`agent/pre-step`, `agent/request`, `tools/*` are waterfalls) **every listener here delegates through `next()`**, so the chain is never short-circuited; a mutation is applied to the value `next()` produced, not returned in its place. This is what keeps co-installation safe even where a surveyed peer short-circuits, e.g. `dsh-agent-teams` (1923★) on `agent/request`, which returns by throwing and never calls `next()`.
+
+Runtime-tested behaviour: `tests/room-half-guard.spec.ts` drives the built bundle and asserts the room half stands down — with no service-key or tool collision — when a sibling already owns `roomHub`.
+
 ## Known limitations
 
 - Team rooms require the storage domain to be composed; without `@deepseek-ai/dsh-storage-domain`, the `/room` command and `room_*` tools are disabled (the five `bg_*` tools still load).
+- **Room-half ownership is first-provider-wins.** This package's room half and the standalone [`dsh-team-rooms`](https://github.com/PerryLink/dsh-team-rooms) package register the same `roomHub` service key, the same eight `room_*` tools, the same `team-rooms` settings slot and the same `team_rooms` storage domain. Cordis permits exactly one provider per service key per isolate scope, so since **0.9.14** this package checks whether `roomHub` is already provided and stands its own room half down if so, logging `team rooms disabled: the roomHub service is already provided`. When it stands down, `background_agent` and the five `bg_*` tools keep working and rooms are served by the other package. Either package may be mounted first. On **≤ 0.9.13** there is no guard: mount only one of the two room halves.
 - `provider` must name a continuable-capable provider (`prepareContinuable`); a missing provider makes `background_agent` fail until it appears.
 - `maxBackgroundAgents` is a shared budget across **every** continuable direct child of the session, including ones the built-in `subagent` tool started.
 - One-shot children are never listed or messaged — `bg_list` keeps continuable rows only.

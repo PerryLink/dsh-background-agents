@@ -4,6 +4,10 @@ All notable changes to `dsh-background-agents` are documented here. The repo is 
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-10-05
+
+Room-half coexistence guard. The room half was extracted into the standalone `dsh-team-rooms` package, but this package kept registering the same `roomHub` service key, the same eight `room_*` tools, the same `team-rooms` settings slot and the same `team_rooms` storage domain, so mounting both made one half silently lose (Cordis permits exactly one provider per service key per isolate scope, and the duplicate registration surfaces only as a logged error that the fiber swallows). This package now checks whether `roomHub` is already provided and stands its own room half down if so; `background_agent` and the five `bg_*` tools keep working either way, and either package may be mounted first. Guarded by `tests/room-half-guard.spec.ts`, which drives the built bundle against a faithful tool registry that rejects duplicate names. Adds the versioned five-language interoperability declaration. Declares the nine intentional room-half name overlaps to `dsh-plugin-doctor` K14 via `dsh-plugin-doctor.crossPlugin.exempt`.
+
 ## [0.9.13] - 2026-10-04
 
 

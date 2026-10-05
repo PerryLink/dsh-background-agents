@@ -1,6 +1,6 @@
 {
   "name": "dsh-background-agents",
-  "version": "0.9.13",
+  "version": "0.10.0",
   "packageManager": "pnpm@11.7.0",
   "description": "Interactive long-session background agents plus persistent multi-agent team rooms for DeepSeek Harness: durable continuable child agents with progress, steering and interruption, and cross-session team rooms with a message bus, shared task board, approval-gated handoffs and a shared timeline that survive DSH restarts.",
   "repository": {
@@ -41,6 +41,66 @@
     "THIRD_PARTY_NOTICES.md",
     "LICENSE"
   ],
+  "dsh-plugin-doctor": {
+    "crossPlugin": {
+      "exempt": [
+        {
+          "kind": "service",
+          "name": "roomHub",
+          "peer": "dsh-team-rooms",
+          "guard": "0.9.14"
+        },
+        {
+          "kind": "tool",
+          "name": "room_list_rooms",
+          "peer": "dsh-team-rooms",
+          "guard": "0.9.14"
+        },
+        {
+          "kind": "tool",
+          "name": "room_post",
+          "peer": "dsh-team-rooms",
+          "guard": "0.9.14"
+        },
+        {
+          "kind": "tool",
+          "name": "room_read",
+          "peer": "dsh-team-rooms",
+          "guard": "0.9.14"
+        },
+        {
+          "kind": "tool",
+          "name": "room_list_tasks",
+          "peer": "dsh-team-rooms",
+          "guard": "0.9.14"
+        },
+        {
+          "kind": "tool",
+          "name": "room_create_task",
+          "peer": "dsh-team-rooms",
+          "guard": "0.9.14"
+        },
+        {
+          "kind": "tool",
+          "name": "room_claim_task",
+          "peer": "dsh-team-rooms",
+          "guard": "0.9.14"
+        },
+        {
+          "kind": "tool",
+          "name": "room_transfer_task",
+          "peer": "dsh-team-rooms",
+          "guard": "0.9.14"
+        },
+        {
+          "kind": "tool",
+          "name": "room_complete_task",
+          "peer": "dsh-team-rooms",
+          "guard": "0.9.14"
+        }
+      ]
+    }
+  },
   "dsh": {
     "manifestVersion": 1,
     "bundle": {

@@ -13,11 +13,15 @@
 // harness checkout in vitest (not through this plain-Node runner), so the
 // faithful-load test composes the plugin's own built bundle instead.
 //
-// Usage: node scripts/loader-runner.mjs <cordis.yml> [bare]
+// Usage: node scripts/loader-runner.mjs <cordis.yml> [bare|storage,strict]
 // Exit 0 prints DSH_LOADER_RESULT <json>; a load failure (invalid config,
 // default export) exits non-zero with the reason on stderr. The optional
 // `bare` mode skips the in-process service provides so a default-export
 // wrapper's apply fails with the missing-inject reason instead of mounting.
+// Otherwise a comma-separated mode list is accepted: `storage` provides a
+// narrow `storageDomain` fake (what makes the room half actually mount — without
+// it the room_* tools stay dormant and a room-half assertion passes vacuously),
+// and `strict` makes the tool registry reject duplicate names as ToolRuntime does.
 
 import { Context } from '@deepseek-ai/cordis'
 import Include from '@deepseek-ai/cordis-plugin-include'
@@ -28,6 +32,15 @@ import { pathToFileURL } from 'node:url'
 
 const configArgument = process.argv[2]
 const bare = process.argv[3] === 'bare'
+/**
+ * Comma-separated modes. `storage` fakes the storage domain so the room half can
+ * mount; `strict` makes the tool registry throw on a duplicate name, which is
+ * what ToolRuntime does (it is what turns a room-half collision into an error
+ * rather than a silently doubled registration list).
+ */
+const modes = new Set((process.argv[3] ?? '').split(',').map(mode => mode.trim()).filter(Boolean))
+const withStorage = modes.has('storage')
+const strictTools = modes.has('strict')
 if (configArgument === undefined) {
   console.error('usage: loader-runner.mjs <cordis.yml> [bare]')
   process.exit(2)
@@ -53,8 +66,14 @@ try {
   ctx.baseUrl = `${pathToFileURL(dirname(configPath)).href}/`
   const registered = []
   if (!bare) {
-    ctx.provide('tools', {
+    const tools = {
       register(definition) {
+        // Faithful to ToolRuntime: a duplicate name in one layer throws. The
+        // default stub is lenient; `strict` mode is what makes a room-half
+        // collision observable instead of silently listing both registrations.
+        if (strictTools && registered.some(existing => existing.name === definition.name)) {
+          throw new Error(`Tool "${definition.name}" is already registered in this layer`)
+        }
         registered.push(definition)
         return () => undefined
       },
@@ -64,13 +83,39 @@ try {
       get(name) {
         return registered.find(definition => definition.name === name)
       },
-    })
+    }
+    ctx.provide('tools', tools)
     ctx.provide('subagents', {
       getProvider: () => undefined,
       start: async () => { throw new Error('no subagent provider in the loader composition') },
     })
     ctx.provide('agents', { get: () => undefined })
     ctx.provide('sessions', { get: () => undefined })
+    if (withStorage) {
+      // Narrow `storageDomain` fake: enough for RoomHub.open() to resolve and
+      // register its four tables, so the room half reaches tool registration.
+      // The tables are in-memory maps covering the KV/append surface the hub
+      // uses (get/put/delete/list); this run never exercises room semantics.
+      const makeTable = () => {
+        const rows = new Map()
+        return {
+          get: key => rows.get(key),
+          put: (key, value) => { rows.set(key, value) },
+          delete: key => { rows.delete(key) },
+          list: () => [...rows.entries()].map(([key, value]) => ({ key, value })),
+        }
+      }
+      const tables = { rooms: makeTable(), bus: makeTable(), tasks: makeTable(), timeline: makeTable() }
+      ctx.provide('storageDomain', {
+        open: async () => ({
+          close: async () => undefined,
+          table: name => {
+            tables[name] ??= makeTable()
+            return tables[name]
+          },
+        }),
+      })
+    }
   }
   await ctx.plugin(Loader)
   ctx.loader.internal = /** @type {any} */ ({

@@ -322,8 +322,42 @@ export function apply(ctx: Context, config: Config): void {
       ctx.logger('background-agents').warn('cross-ecosystem inbound disabled: enabled but no storage domain composed (team rooms are required)')
     }
   }
+  // Room-half coexistence guard (first provider wins).
+  //
+  // The room half was extracted into the standalone `dsh-team-rooms` package,
+  // which registers the SAME `roomHub` service, the same eight `room_*` tools,
+  // the same `team-rooms` settings slot id and the same `team_rooms` storage
+  // domain. A Cordis service key can have exactly one provider per isolate scope:
+  // a second `super(ctx, 'roomHub')` throws `service "roomHub" has been
+  // registered at <fiber>`, which would fail this plugin's whole activation.
+  //
+  // Both packages are published while the deprecation window is open, so either
+  // may mount first. This guard makes the pair order-independent: if some other
+  // provider already owns `roomHub`, this row stands down instead of throwing,
+  // and the background-agent core (background_agent + the five bg_* tools) keeps
+  // working. `ctx.get` reads the global service store, so the check is
+  // topology-independent and sees a provider registered anywhere.
+  if (ctx.get('roomHub') !== undefined) {
+    ctx.logger('background-agents').info('team rooms disabled: the roomHub service is already provided (another team-rooms implementation is mounted); background agents keep working')
+    if (config.inbound?.enabled) {
+      ctx.logger('background-agents').warn('cross-ecosystem inbound disabled: enabled but the roomHub service is owned by another team-rooms implementation')
+    }
+  }
   ctx.inject(['storageDomain'], (roomCtx) => {
-    const hub = new RoomHub(roomCtx, roomPolicy, roomCtx.agents, roomCtx.sessions, facts)
+    if (roomCtx.get('roomHub') !== undefined) return
+    let hub: RoomHub
+    try {
+      hub = new RoomHub(roomCtx, roomPolicy, roomCtx.agents, roomCtx.sessions, facts)
+    } catch (error) {
+      // Defence in depth: the pre-checks above are topology-independent, and
+      // Cordis awaits each notified fiber in turn, so the first provider is
+      // observed by the second. If a future host ever registers two providers
+      // within one tick, `Service` throws `service "roomHub" has been registered
+      // at <fiber>` — stand down rather than failing this plugin's activation and
+      // taking the background-agent core down with it.
+      roomCtx.logger('background-agents').info('team rooms disabled: the roomHub service is already provided (%s); background agents keep working', String(error))
+      return
+    }
     void hub.open().catch((error: unknown) => {
       roomCtx.logger('background-agents').error(`team room store failed to open: ${String(error)}`)
     })

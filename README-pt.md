@@ -197,6 +197,23 @@ Fora de escopo: acionamento programado (a costura de agendamento existe), agente
 
 Runtimes de agentes externos — OpenAI Agents SDK, CrewAI e similares — podem publicar em uma sala de equipe por uma **ponte JSON-RPC 2.0 delimitada por quebras de linha sobre stdio** (conjunto mínimo de conexão direta; a compatibilidade total com o protocolo ACP aguarda a costura upstream). Ative com `inbound.enabled` e `inbound.command`; o runtime emite uma notificação JSON por linha onde `method` é o evento (`agent_started` abre um cartão no quadro, `agent_message` publica no barramento, `agent_finished` conclui o cartão). Mensagens inválidas são descartadas e um erro JSON-RPC é respondido; início e parada passam por um disposer.
 
+## Interoperabilidade com outros plugins do DSH
+
+Verificado contra **DSH `0.2.0-rc.2`** (o runtime para o qual este README é publicado) e o conjunto de plugins com mais estrelas pesquisado em 2026-10-05.
+
+Este plugin **não interfere** em outros plugins, incluindo os de mais estrelas:
+
+- **Sem colisão de nome de ferramenta.** Todas as ferramentas têm namespace (`background_agent`, `bg_*`, `room_*`); nenhuma ocupa um nome puro já pertencente a uma ferramenta embutida ou a outro plugin, portanto nunca sombreia nada — o mecanismo que `dsh-routing-suite` (7000★) usa contra as embutidas `get_goal` / `create_goal` / `update_goal`.
+- **Sem colisão de chave de serviço.** Fornece apenas `roomHub`, que não é uma costura embutida nem é fornecido por nenhum plugin de mais estrelas. (`dsh-routing-suite` fornece `shell`, que colide com a embutida `@deepseek-ai/dsh-shell`; este plugin não.)
+- **Sem colisão de slot.** Não registra nenhuma chave `slot` de cliente que outro plugin de mais estrelas reivindique, então não disputa os assentos `shadows-shipped-ui` (`main`, `conversation.chat.node`, `plugins.bundle.config`, `tool.call.toolview`) pelos quais `dsh-agent-teams`, `dsh-context`, `dsh-market` e `modlens` competem.
+- **Sem colisão de rota HTTP.** Não registra nenhum prefixo `webServer`. (`DSH-better-sidebar` 3993★ documenta que um prefixo duplicado como `/sidebar/api` derruba toda a árvore de plugins na inicialização.)
+- **Sem colisão na camada de patch.** O patch do bundle apenas faz `insert` da própria linha (`id: background-agents`); nunca sobrescreve o `config` de uma linha embutida — a sobrescrita substitui o objeto inteiro, que é como `dsh-purge` e `dsh-infinite-gen-4` apagam mutuamente o `config` de `system-prompt`.
+- **Sem mutação global.** Não altera protótipos, não reescreve `process.env` nem substitui o dispatcher global de fetch.
+
+**Listeners de eventos compartilhados não interferem por construção.** Este plugin observa seis eventos que os plugins de mais estrelas também usam — `agent/pre-step`, `agent/request`, `tools/pre-execute`, `tools/post-execute`, `llm/stream`, `system-prompt/assemble` — e todos são registrados com `ctx.on()`, o registro de difusão do Cordis: cada listener executa e nenhum pode privar outro do turno. Nos sensíveis à ordem (`agent/pre-step`, `agent/request`, `tools/*` são waterfalls) **todos os listeners aqui delegam via `next()`**, então a cadeia nunca é curto-circuitada. Isso mantém a coinstalação segura mesmo onde um par pesquisado curto-circuita, por exemplo `dsh-agent-teams` (1923★) em `agent/request`.
+
+Comportamento testado em runtime: `tests/room-half-guard.spec.ts` executa o bundle compilado e afirma que a metade de salas se retira — sem colisão de serviço nem de ferramentas — quando um irmão já possui `roomHub`.
+
 ## Limitações conhecidas
 
 - As salas de equipe exigem que o domínio de armazenamento seja composto; sem `@deepseek-ai/dsh-storage-domain`, o comando `/room` e as ferramentas `room_*` são desativados (as cinco ferramentas `bg_*` ainda carregam).

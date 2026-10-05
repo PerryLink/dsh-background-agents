@@ -216,6 +216,23 @@ inbound:
 
 三者分别映射到房间既有界面：`agent_started` 在任务板开一张卡，`agent_message` 发到消息总线，`agent_finished` 完成该卡并发布结果。无效消息 fail-closed —— 丢弃并回写一条 JSON-RPC error。外部运行时不是 DSH 会话，因此由房间 owner 成员会话代发；无 owner 成员的房间会丢弃事件。启动/停止都由插件 fiber 通过 disposer 持有；无法 spawn 的 `inbound.command` 降级为一条日志警告（桥接保持休眠，其余不受影响）。
 
+## 与其他 DSH 插件的互操作
+
+已对照 **DSH `0.2.0-rc.2`**（本 README 面向的运行时）与 2026-10-05 实测的高星插件集验证。
+
+本插件**不干扰**其他插件，包括广泛安装的高星插件：
+
+- **无工具名冲突。** 所有工具都带命名空间（`background_agent`、`bg_*`、`room_*`），不占用任何已被内置工具或其他插件持有的裸名，因此从不遮蔽任何东西 —— 而 `dsh-routing-suite`（7000★）正是用遮蔽机制改写了内置的 `get_goal` / `create_goal` / `update_goal`。
+- **无服务键冲突。** 只提供 `roomHub` 一个服务；它既不是内置 seam，也没有被任何已调研的高星插件提供。（`dsh-routing-suite` 提供 `shell`，与内置 `@deepseek-ai/dsh-shell` 同名双提供；本插件没有这个问题。）
+- **无 slot 冲突。** 不注册任何与高星插件重合的客户端 `slot` key，因此不参与 `main`、`conversation.chat.node`、`plugins.bundle.config`、`tool.call.toolview` 这些 `shadows-shipped-ui` 座位的争抢（争抢者是 `dsh-agent-teams`、`dsh-context`、`dsh-market`、`modlens`）。
+- **无 HTTP 路由冲突。** 不注册任何 `webServer` 前缀。（`DSH-better-sidebar` 3993★ 的 patch 注释明确记录：`/sidebar/api` 这类前缀重复会导致**整个插件树启动失败**。）
+- **无 patch 层冲突。** 组合包 patch 只 `insert` 自己那一行（`id: background-agents`），从不覆写内置行的 `config` —— 覆写是整段对象替换，`dsh-purge` 与 `dsh-infinite-gen-4` 正是因此在 `system-prompt` 上互相抹掉。
+- **无全局改写。** 不改原型、不改写 `process.env`、不替换全局 fetch dispatcher。
+
+**共享事件监听器在构造上就不互相干扰。** 本插件监听了六个高星插件同样使用的事件 —— `agent/pre-step`、`agent/request`、`tools/pre-execute`、`tools/post-execute`、`llm/stream`、`system-prompt/assemble` —— 全部用 `ctx.on()` 注册，即 Cordis 的**广播**语义：每个监听器都会运行，任何一个都无法饿死其他监听器。其中顺序敏感的几个（`agent/pre-step`、`agent/request`、`tools/*` 都是 waterfall）**本插件的每个监听器都通过 `next()` 委托**，因此链条绝不会被短路；改写作用在 `next()` 产出的值上，而不是用它顶替返回。即使某个被调研的同侪确实短路（例如 `dsh-agent-teams` 1923★ 在 `agent/request` 上以 `throw` 直接返回、不调 `next()`），共存依然安全。
+
+运行时已验证：`tests/room-half-guard.spec.ts` 驱动构建产物，断言当同级插件已持有 `roomHub` 时房间半会主动让位，且**没有服务键冲突、没有工具重名冲突**。
+
 ## 已知限制
 
 - 团队房间需要存储域被组合；没有 `@deepseek-ai/dsh-storage-domain` 时，`/room` 命令与 `room_*` 工具会被禁用（五个 `bg_*` 工具仍可加载）。
