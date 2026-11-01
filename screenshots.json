@@ -2,13 +2,13 @@
   {
     "path": "docs/assets/dsh-background-agents-hero.png",
     "kind": "hero",
-    "alt": "dsh-background-agents documentation card",
-    "caption": "Generated documentation baseline; replace with a real run."
+    "alt": "dsh-background-agents real test run",
+    "caption": "Real command: npx vitest run tests/manifest.spec.ts tests/metrics.spec.ts tests/presenter.spec.ts tests/inbound.spec.ts \u2014 4 test files / 41 tests passed. Selected tests; full suite needs the workspace host dependencies. Run 2026-11-01."
   },
   {
     "path": "docs/assets/dsh-background-agents-demo.gif",
     "kind": "demo",
-    "alt": "dsh-background-agents install preview",
-    "caption": "Generated install preview; not a test result."
+    "alt": "dsh-background-agents real test output replay",
+    "caption": "The same real command output, replayed line by line."
   }
 ]
