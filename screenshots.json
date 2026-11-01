@@ -1,0 +1,14 @@
+[
+  {
+    "path": "docs/assets/dsh-background-agents-hero.png",
+    "kind": "hero",
+    "alt": "dsh-background-agents documentation card",
+    "caption": "Generated documentation baseline; replace with a real run."
+  },
+  {
+    "path": "docs/assets/dsh-background-agents-demo.gif",
+    "kind": "demo",
+    "alt": "dsh-background-agents install preview",
+    "caption": "Generated install preview; not a test result."
+  }
+]
