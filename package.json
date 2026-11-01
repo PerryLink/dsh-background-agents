@@ -44,7 +44,9 @@
     "icon.svg",
     "screenshots.json",
     "docs/assets/dsh-background-agents-demo.gif",
-    "docs/assets/dsh-background-agents-hero.png"
+    "docs/assets/dsh-background-agents-hero.png",
+    "CONTRIBUTING.md",
+    "docs/assets/dsh-background-agents-flow.svg"
   ],
   "dsh-plugin-doctor": {
     "crossPlugin": {
