@@ -8,7 +8,7 @@ import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
 import CommandRuntime from '@deepseek-ai/dsh-commands'
 import { SessionId } from '@deepseek-ai/dsh-session'
-import JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
+import * as JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
 import Storage from '@deepseek-ai/dsh-storage'
 import * as StorageJson from '@deepseek-ai/dsh-storage-json'
 import * as StorageDomain from '@deepseek-ai/dsh-storage-domain'
@@ -26,7 +26,7 @@ afterEach(() => {
 /** Mount the full stack plus the storage domain so the room half activates. */
 async function setup(config: Partial<plugin.Config> = {}) {
   const ctx = new Context()
-  await mountAgentLoopTestDependencies(ctx)
+  await mountAgentLoopTestDependencies(ctx, { workingDirectory: true })
   const root = mkdtempSync(join(tmpdir(), 'dsh-background-agents-room-'))
   roots.push(root)
   await ctx.plugin(JsonlSessionPersistence, { root })
@@ -49,14 +49,20 @@ async function setup(config: Partial<plugin.Config> = {}) {
 }
 
 let calls = 0
-function callTool(ctx: Context, name: string, args: unknown, agent: unknown) {
-  return ctx.tools.execute({
+async function callTool(ctx: Context, name: string, args: unknown, agent: unknown) {
+  const batch = await ctx.tools.execute({
+    calls: [{
+      type: 'tool-call',
+      id: CallId(`call-${++calls}`),
+      name,
+      arguments: JSON.stringify(args),
+    }],
     signal: testToolSignal,
-    callId: CallId(`call-${++calls}`),
-    name,
-    arguments: args,
     agent: agent as never,
   })
+  const result = batch.results[0]?.result
+  if (result === undefined) throw new Error(`tool batch returned no result for "${name}"`)
+  return result
 }
 
 /** Create one room through the real `/room create` command and return its id. */

@@ -5,16 +5,17 @@ import { join } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { CallId } from './call-id.ts'
-import type { StreamChunk } from '@deepseek-ai/dsh-llm'
+import type { GenerateOptions, StreamChunk } from '@deepseek-ai/dsh-llm'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
 import { SessionId } from '@deepseek-ai/dsh-session'
-import JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
+import * as JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
 import SubagentRuntime from '@deepseek-ai/dsh-subagent'
 import * as SubagentSpawn from '@deepseek-ai/dsh-subagent-spawn-in-process'
 import { TestSessionQuery } from './test-session-query.ts'
 import { isBackgroundAgentsProjection } from '../src/projection-schema.ts'
 import { isBackgroundAgentsNotice, parseNotice, PLUGIN } from '../src/vocabulary.ts'
+import { listDirectChildren } from '../src/subagent-compat.ts'
 import * as plugin from '../src/index.ts'
 import { MockAdapter, textResponse, toolCallResponse } from './mock-adapter.ts'
 
@@ -33,6 +34,19 @@ function gatedTextResponse(gate: Promise<undefined>, text: string): (() => Promi
   }
 }
 
+/** Answer whichever model call lands first — the parent's closing step or the child's gated turn. */
+function roleBranch(
+  parentId: SessionId,
+  gate: Promise<undefined>,
+  childText: string,
+  parentText: string,
+): (options: GenerateOptions) => Promise<StreamChunk[]> {
+  return async (options) => {
+    if (options.sessionId === parentId) return textResponse(parentText)
+    return gatedTextResponse(gate, childText)( )
+  }
+}
+
 interface Mounts {
   readonly ctx: Context
   readonly root: string
@@ -41,7 +55,7 @@ interface Mounts {
 
 async function mount(root: string, adapter: MockAdapter, config: Partial<plugin.Config> = {}): Promise<Context> {
   const ctx = new Context()
-  await mountAgentLoopTestDependencies(ctx)
+  await mountAgentLoopTestDependencies(ctx, { workingDirectory: true })
   await ctx.plugin(JsonlSessionPersistence, { root })
   await ctx.plugin(AgentLoop, { agents: [] })
   await ctx.plugin(TestSessionQuery)
@@ -75,14 +89,20 @@ async function settle(ctx: Context, childId: SessionId): Promise<void> {
 }
 
 let calls = 0
-function callTool(ctx: Context, name: string, args: unknown, agent?: unknown) {
-  return ctx.tools.execute({
+async function callTool(ctx: Context, name: string, args: unknown, agent?: unknown) {
+  const batch = await ctx.tools.execute({
+    calls: [{
+      type: 'tool-call',
+      id: CallId(`call-${++calls}`),
+      name,
+      arguments: JSON.stringify(args),
+    }],
     signal: testToolSignal,
-    callId: CallId(`call-${++calls}`),
-    name,
-    arguments: args,
     ...agent !== undefined ? { agent: agent as never } : {},
   })
+  const result = batch.results[0]?.result
+  if (result === undefined) throw new Error(`tool batch returned no result for "${name}"`)
+  return result
 }
 
 describe('dsh-background-agents end-to-end', () => {
@@ -92,10 +112,11 @@ describe('dsh-background-agents end-to-end', () => {
     // the final entry answers the parent's wake turn that claims the
     // injected progress notice and the official settled account.
     const childGate = Promise.withResolvers<undefined>()
+    const branch = roleBranch(SessionId('parent'), childGate.promise, 'line one', 'ok, started')
     const adapter = new MockAdapter([
       toolCallResponse('c1', 'background_agent', { task: 'write progress lines', label: 'writer' }),
-      gatedTextResponse(childGate.promise, 'line one'),
-      textResponse('ok, started'),
+      branch,
+      branch,
       textResponse('noted'),
     ])
     const { ctx, adapter: adapterRef } = await mountWith(adapter)
@@ -113,7 +134,7 @@ describe('dsh-background-agents end-to-end', () => {
     })
     let childId: SessionId | undefined
     await vi.waitFor(async () => {
-      const entries = await ctx.subagents.listChildren(parent.id)
+      const entries = await listDirectChildren(ctx, parent.id)
       expect(entries).toHaveLength(1)
       // A direct catalog row is identity only: it carries no `kind`
       // discriminator any more, so `mode` is the classification that matters.
@@ -180,10 +201,11 @@ describe('dsh-background-agents end-to-end', () => {
 
   it('recovers the child catalog and the projection facts after a parent-session reopen', async () => {
     const childGate = Promise.withResolvers<undefined>()
+    const branch = roleBranch(SessionId('parent'), childGate.promise, 'first line', 'ok, started')
     const adapter = new MockAdapter([
       toolCallResponse('c1', 'background_agent', { task: 'durable work', label: 'durable' }),
-      gatedTextResponse(childGate.promise, 'first line'),
-      textResponse('ok, started'),
+      branch,
+      branch,
       textResponse('noted'),
     ])
     const first = await mountWith(adapter, { allowUnmarkedFacts: false })
@@ -194,7 +216,7 @@ describe('dsh-background-agents end-to-end', () => {
       source: { kind: 'user' },
     }))
     await vi.waitFor(() => { expect(adapter.requests.length).toBeGreaterThanOrEqual(2) }, { timeout: 5_000 })
-    const entries = await ctx.subagents.listChildren(parent.id)
+    const entries = await listDirectChildren(ctx, parent.id)
     const firstEntry = entries[0]!
     if (firstEntry.mode !== 'continuable') throw new Error('expected a continuable child catalog entry')
     const childId = firstEntry.id
@@ -208,7 +230,7 @@ describe('dsh-background-agents end-to-end', () => {
 
     // Simulated restart on the same persistence root.
     const second = new Context()
-    await mountAgentLoopTestDependencies(second)
+    await mountAgentLoopTestDependencies(second, { workingDirectory: true })
     await second.plugin(JsonlSessionPersistence, { root })
     await second.plugin(AgentLoop, { agents: [] })
     await second.plugin(TestSessionQuery)

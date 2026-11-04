@@ -8,7 +8,7 @@ import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
 import CommandRuntime from '@deepseek-ai/dsh-commands'
 import { SessionId } from '@deepseek-ai/dsh-session'
-import JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
+import * as JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
 import Storage from '@deepseek-ai/dsh-storage'
 import * as StorageJson from '@deepseek-ai/dsh-storage-json'
 import SubagentRuntime from '@deepseek-ai/dsh-subagent'
@@ -28,7 +28,7 @@ afterEach(() => {
  */
 async function setupWithStuckDomain() {
   const ctx = new Context()
-  await mountAgentLoopTestDependencies(ctx)
+  await mountAgentLoopTestDependencies(ctx, { workingDirectory: true })
   const root = mkdtempSync(join(tmpdir(), 'dsh-background-agents-stuck-'))
   roots.push(root)
   await ctx.plugin(JsonlSessionPersistence, { root })
@@ -65,13 +65,18 @@ describe('room open timeout against a stuck storage provider', () => {
 
   it('settles room_create_task with a closed failure instead of hanging', async () => {
     const { ctx, parent } = await setupWithStuckDomain()
-    const result = await ctx.tools.execute({
+    const batch = await ctx.tools.execute({
+      calls: [{
+        type: 'tool-call',
+        id: CallId('room-stuck-open-1'),
+        name: 'room_create_task',
+        arguments: JSON.stringify({ roomId: 'r-1', content: 'x' }),
+      }],
       signal: new AbortController().signal,
-      callId: CallId('room-stuck-open-1'),
-      name: 'room_create_task',
-      arguments: { roomId: 'r-1', content: 'x' },
       agent: parent as never,
     })
+    const result = batch.results[0]?.result
+    if (result === undefined) throw new Error('tool batch returned no room_create_task result')
     // The tool must settle (the executor normalizes the plugin's failure),
     // never park on the never-settling domain open.
     expect(result.isError).toBe(true)
@@ -87,7 +92,7 @@ describe('room open timeout against a stuck storage provider', () => {
 describe('room open racing a fiber unload', () => {
   it('closes the late-opened domain when the plugin fiber unloads mid-open', async () => {
     const ctx = new Context()
-    await mountAgentLoopTestDependencies(ctx)
+    await mountAgentLoopTestDependencies(ctx, { workingDirectory: true })
     const root = mkdtempSync(join(tmpdir(), 'dsh-background-agents-midopen-'))
     roots.push(root)
     await ctx.plugin(JsonlSessionPersistence, { root })

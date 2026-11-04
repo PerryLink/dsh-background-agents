@@ -1,7 +1,8 @@
 /**
  * The five model-facing tools: `background_agent` starts a durable continuable
- * child through the official seam (with optional per-child tool scoping,
- * persona, depth cap, and model route), `bg_message` delivers one later turn,
+ * child through the official seam (with optional per-child tool scoping and
+ * persona on host lines that still carry them, plus the depth cap and model
+ * route on every line), `bg_message` delivers one later turn,
  * `bg_list` merges the official child catalog with this plugin's projection
  * facts (optionally as the descendant tree), `bg_result` reads a child's
  * latest result text, and `bg_stop` requests interruption. Every execution
@@ -18,20 +19,22 @@ import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { ContentBlock, MessageSource } from '@deepseek-ai/dsh-llm'
 import { SessionId, type SessionEvent } from '@deepseek-ai/dsh-session'
-import { SubagentError, type SubagentCatalogEntry, type SubagentDescendantListEntry } from '@deepseek-ai/dsh-subagent'
+import { SubagentError, type SubagentDescendantListEntry } from '@deepseek-ai/dsh-subagent'
 import { countBackgroundAgents, sessionLastText, type BackgroundAgentLifecycle } from './lifecycle.ts'
 import { FACT_EVENT } from './events.ts'
 import type { FactAppender } from './facts.ts'
 import { isBackgroundAgentsProjection } from './projection-schema.ts'
+import { listDirectChildren, startContinuableChild, supportsPerChildComposition, type DirectChildRow } from './subagent-compat.ts'
 import { PLUGIN } from './vocabulary.ts'
 
 /**
  * Queue one host-protocol message for a background child across harness
- * lines. 0.1.2-alpha.5+ (including the published rc.1 line, which is
- * source-identical) ships the process-stable queue symbols on the
- * subagent runtime (`dsh.subagent.queuePrompt` in the published line,
- * `dsh.subagent.deliverPrompt` on master), and older hosts still ship
- * `subagents.followup`. Both arms fail loudly when unavailable.
+ * lines. 0.1.2-alpha.5+ (including the published 0.2.2 line) ships the
+ * process-stable queue symbols on the subagent runtime
+ * (`dsh.subagent.queuePrompt` in the published line,
+ * `dsh.subagent.deliverPrompt` on master); the harness master dropped both,
+ * so its public `subagents.sendMessage` seam is the next arm, and older hosts
+ * still ship `subagents.followup`. Every arm fails loudly when unavailable.
  */
 async function deliverQueuedPrompt(
   subagents: unknown,
@@ -47,11 +50,23 @@ async function deliverQueuedPrompt(
   if (typeof masterQueue === 'function') return await masterQueue.call(runtime, parent, childId, content, source, signal, 'queue')
   const alphaQueue = runtime[Symbol.for('dsh.subagent.queuePrompt')] as QueueFn | undefined
   if (typeof alphaQueue === 'function') return await alphaQueue.call(runtime, parent, childId, content, source, signal)
+  // The harness master dropped both process-stable delivery symbols. Its public
+  // adjacent-Agent message is the supported seam there: the runtime derives the
+  // same durable `agent-message`/`relay` source from the exact live sender and
+  // starts an idle child's turn, which is what bg_message promises for a
+  // settled agent (a running child receives it at its next step instead of
+  // waiting for the turn boundary).
+  const sendMessage = (subagents as {
+    sendMessage?: (sender: Agent, targetId: SessionId, content: ContentBlock[], options: { signal: AbortSignal }) => Promise<unknown>
+  }).sendMessage
+  if (typeof sendMessage === 'function') {
+    return String(await sendMessage.call(subagents, parent, childId, content, { signal }))
+  }
   const followup = (subagents as {
     followup?: (parent: Agent, childId: SessionId, content: ContentBlock[], opts: { source: MessageSource; signal: AbortSignal }) => Promise<string>
   }).followup
   if (typeof followup !== 'function') {
-    throw new Error('bg_message delivery unavailable: this harness line exposes neither the queue symbols nor subagents.followup')
+    throw new Error('bg_message delivery unavailable: this harness line exposes none of the queue symbols, subagents.sendMessage, or subagents.followup')
   }
   return await followup.call(subagents, parent, childId, content, { source, signal })
 }
@@ -264,9 +279,11 @@ export function registerBackgroundAgentTools(
       + '(autoReport), send it more work any time with bg_message, read its settled result text with bg_result, '
       + 'and request a stop with bg_stop. Progress summaries are injected into this conversation after each of '
       + 'its turns and its final outcome arrives as a notice when it settles. Use this for long-running or '
-      + 'parallel objectives you want to steer over time. Optionally scope the child: tool_filter removes tools '
-      + 'from its view (never grants new ones), persona gives it a dedicated system-prompt persona, and '
-      + 'max_depth caps its further delegation.',
+      + 'parallel objectives you want to steer over time. Optionally scope the child where this host line still '
+      + 'carries per-child composition: tool_filter removes tools from its view (never grants new ones) and '
+      + 'persona gives it a dedicated system-prompt persona. On the 0.2.2 line presets own child composition, '
+      + 'so both are validated but not applied (the start logs a warning). max_depth caps its further '
+      + 'delegation on every line.',
     parameters: {
       task: {
         type: 'string',
@@ -286,7 +303,8 @@ export function registerBackgroundAgentTools(
         description:
           'Optional tool scoping for the child: keep only the listed tools (allow) or remove them (deny). At '
           + 'least one of allow/deny with a tool name is required. Names must come from the deployment '
-          + 'allowlist when one is configured (allowedChildTools). This can only restrict — never grant.',
+          + 'allowlist when one is configured (allowedChildTools). This can only restrict — never grant. '
+          + 'Not applied on the 0.2.2 line (presets own child composition); older host lines honor it.',
         properties: {
           allow: {
             type: 'array',
@@ -304,7 +322,8 @@ export function registerBackgroundAgentTools(
         type: 'string',
         description:
           'Optional per-child persona: a dedicated system-prompt section shadowing the deployment persona for '
-          + 'this child alone.',
+          + 'this child alone. Not applied on the 0.2.2 line (presets own child composition); older host lines '
+          + 'honor it.',
       },
       max_depth: {
         type: 'number',
@@ -373,23 +392,31 @@ export function registerBackgroundAgentTools(
         const persona = args.persona === undefined || args.persona.trim() === ''
           ? undefined
           : args.persona.trim()
+        // The 0.2.2 seam moved per-child composition to presets and no longer
+        // carries persona/tool_filter. Keep validating both (the arguments stay
+        // accepted) and tell the operator they cannot be honored here instead
+        // of presenting an unscoped child as scoped.
+        if ((toolFilter !== undefined || persona !== undefined) && !supportsPerChildComposition(ctx.subagents)) {
+          ctx.logger('background-agents').warn(
+            'tool_filter/persona are not representable on this host line\'s subagent seam '
+            + '(0.2.2 moved child composition to presets); starting the child without them',
+          )
+        }
         const agentOptions = config.childProvider !== undefined || config.childModel !== undefined
           ? {
             ...(config.childProvider !== undefined ? { provider: config.childProvider } : {}),
             ...(config.childModel !== undefined ? { model: config.childModel } : {}),
           }
           : undefined
-        const started = await ctx.subagents.startContinuable({
+        const started = await startContinuableChild(ctx.subagents, {
           provider: config.provider,
           label,
-          request: {
-            prompt: [{ type: 'text', text: task }] as ContentBlock[],
-            parent,
-            ...(toolFilter !== undefined ? { toolFilter } : {}),
-            ...(persona !== undefined ? { persona } : {}),
-            ...(maxDepth !== undefined ? { maxDepth } : {}),
-            ...(agentOptions !== undefined ? { agentOptions } : {}),
-          },
+          prompt: [{ type: 'text', text: task }] as ContentBlock[],
+          parent,
+          ...(toolFilter !== undefined ? { toolFilter } : {}),
+          ...(persona !== undefined ? { persona } : {}),
+          ...(maxDepth !== undefined ? { maxDepth } : {}),
+          ...(agentOptions !== undefined ? { agentOptions } : {}),
           signal: exec.signal,
         })
         lifecycle.register(started.childId, parent.id, label, Date.now())
@@ -600,15 +627,17 @@ export function registerBackgroundAgentTools(
         }
       } else {
         // The direct-child listing is a bare catalog read now: the host
-        // narrowed `listChildren` to `SubagentCatalogEntry[]`, which carries
-        // no `kind` discriminator and no activity, because the diagnostics it
-        // used to interleave belong to the complete-descendant enumeration
+        // narrowed `listChildren` to catalog rows, which carry no `kind`
+        // discriminator and no activity, because the diagnostics it used to
+        // interleave belong to the complete-descendant enumeration
         // (`listDescendants`) that actually inspects every child's log. A
         // direct listing reads one parent-owned projection and no child log,
         // so it has nothing to diagnose — `diagnostics` stays empty here.
-        let entries: SubagentCatalogEntry[]
+        // `listDirectChildren` falls back to the depth-1 rows of the recursive
+        // walk on hosts (the harness master) that dropped the direct method.
+        let entries: readonly DirectChildRow[]
         try {
-          entries = await ctx.subagents.listChildren(parent.id, exec.signal)
+          entries = await listDirectChildren(ctx, parent.id, exec.signal)
         } catch (error) {
           if (error instanceof SubagentError) {
             return { kind: 'unrecoverable' as const, code: error.code, message: error.message }
@@ -617,7 +646,9 @@ export function registerBackgroundAgentTools(
         }
         for (const entry of entries) {
           if (entry.mode !== 'continuable') continue
-          agents.push(buildRow(ctx, facts, entry.id, entry.label))
+          // A continuable catalog row always carries a label on every line;
+          // the id keeps the display honest if a foreign host ever omits it.
+          agents.push(buildRow(ctx, facts, entry.id, entry.label ?? entry.id))
         }
       }
       return { kind: 'listing' as const, agents, diagnostics }
@@ -688,7 +719,7 @@ export function registerBackgroundAgentTools(
       let known = factsFor(ctx, parent).has(childId)
       if (!known) {
         try {
-          const entries = await ctx.subagents.listChildren(parent.id, exec.signal)
+          const entries = await listDirectChildren(ctx, parent.id, exec.signal)
           known = entries.some(entry => entry.mode === 'continuable' && entry.id === childId)
         } catch (error) {
           if (!(error instanceof SubagentError)) throw error
@@ -797,7 +828,7 @@ export function registerBackgroundAgentTools(
       const childId = SessionId(args.agent_id)
       let known = true
       try {
-        const entries = await ctx.subagents.listChildren(parent.id, exec.signal)
+        const entries = await listDirectChildren(ctx, parent.id, exec.signal)
         known = entries.some(entry => entry.mode === 'continuable' && entry.id === childId)
       } catch (error) {
         // The listing is discovery, not authority: the interrupt itself is the

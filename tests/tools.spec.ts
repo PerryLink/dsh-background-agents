@@ -4,19 +4,16 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
 import { CallId } from './call-id.ts'
-import AgentRegistry from '@deepseek-ai/dsh-agent'
-import type { Agent } from '@deepseek-ai/dsh-agent'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
-import LlmRuntime from '@deepseek-ai/dsh-llm'
-import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
-import JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
-import SubagentRuntime from '@deepseek-ai/dsh-subagent'
-import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
-import ToolRuntime, { defineTool } from '@deepseek-ai/dsh-tools'
+import { SessionId } from '@deepseek-ai/dsh-session'
+import * as JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
+import SubagentRuntime, { SubagentError } from '@deepseek-ai/dsh-subagent'
+import { defineTool } from '@deepseek-ai/dsh-tools'
 import * as SubagentSpawn from '@deepseek-ai/dsh-subagent-spawn-in-process'
 import { TestSessionQuery } from './test-session-query.ts'
 import * as plugin from '../src/index.ts'
+import { startContinuableChild } from '../src/subagent-compat.ts'
 import { MockAdapter, reasoningResponse, textResponse } from './mock-adapter.ts'
 
 const testToolSignal = new AbortController().signal
@@ -28,7 +25,7 @@ afterEach(() => {
 
 async function setup(config: Partial<plugin.Config> = {}) {
   const ctx = new Context()
-  await mountAgentLoopTestDependencies(ctx)
+  await mountAgentLoopTestDependencies(ctx, { workingDirectory: true })
   const root = mkdtempSync(join(tmpdir(), 'dsh-background-agents-'))
   roots.push(root)
   const persistenceFiber = await ctx.plugin(JsonlSessionPersistence, { root })
@@ -54,14 +51,20 @@ async function setup(config: Partial<plugin.Config> = {}) {
 }
 
 let calls = 0
-function callTool(ctx: Context, name: string, args: unknown, agent?: unknown) {
-  return ctx.tools.execute({
+async function callTool(ctx: Context, name: string, args: unknown, agent?: unknown) {
+  const batch = await ctx.tools.execute({
+    calls: [{
+      type: 'tool-call',
+      id: CallId(`call-${++calls}`),
+      name,
+      arguments: JSON.stringify(args),
+    }],
     signal: testToolSignal,
-    callId: CallId(`call-${++calls}`),
-    name,
-    arguments: args,
     ...agent !== undefined ? { agent: agent as never } : {},
   })
+  const result = batch.results[0]?.result
+  if (result === undefined) throw new Error(`tool batch returned no result for "${name}"`)
+  return result
 }
 
 function text(result: { content: { type: string; text?: string }[] }): string {
@@ -176,10 +179,11 @@ describe('dsh-background-agents tools', () => {
   it('delivers a follow-up through the official seam with coordinator attribution', async () => {
     const { ctx, parent } = await setup()
     ctx.llm.registerAdapter(['mock'], new MockAdapter([textResponse('first answer'), textResponse('second answer')]))
-    const started = await ctx.subagents.startContinuable({
+    const started = await startContinuableChild(ctx.subagents, {
       provider: 'spawn',
       label: 'child task',
-      request: { prompt: [{ type: 'text', text: 'child task' }], parent },
+      prompt: [{ type: 'text', text: 'child task' }],
+      parent,
       signal: testToolSignal,
     })
     await vi.waitFor(() => { expect(ctx.agents.get(started.childId)).toBeUndefined() }, { timeout: 5_000 })
@@ -222,61 +226,37 @@ describe('dsh-background-agents tools', () => {
     expect(result.isError).toBe(true)
   })
 
-  it('reports an explicit unrecoverable listing when the projection registry is absent', async () => {
+  it('reports an explicit unrecoverable listing when the subagent catalog cannot be read', async () => {
+    // 0.2.2's SubagentRuntime hard-injects `sessionProjections`, so a mounted
+    // runtime without the registry cannot exist. The reachable contract is the
+    // tool's own mapping of a catalog-read SubagentError to the stable
+    // `unrecoverable` value, so provide the service with exactly that failure.
     const ctx = new Context()
-    // Mount the prerequisites by hand instead of using
-    // mountAgentLoopTestDependencies: the shared testkit now mounts
-    // SessionProjectionRegistry itself, and this test needs a registry-less
-    // context. Order matches the helper minus the registry, plus the
-    // systemPrompt registry that ToolRuntime hard-injects.
-    await ctx.plugin(LlmRuntime)
-    await ctx.plugin(SessionStore)
-    await ctx.plugin(SystemPrompt, {})
-    await ctx.plugin(ToolRuntime, {})
-    await ctx.plugin(AgentRegistry)
+    await mountAgentLoopTestDependencies(ctx, { workingDirectory: true })
     const root = mkdtempSync(join(tmpdir(), 'dsh-background-agents-'))
     roots.push(root)
     await ctx.plugin(JsonlSessionPersistence, { root })
     await ctx.plugin(AgentLoop, { agents: [] })
-    // The sessionQuery service is required: the 0.1.7 `listChildren` resolves
-    // it BEFORE the projection registry, so without it the failure would name
-    // the query service and never reach the guard under test.
     await ctx.plugin(TestSessionQuery)
-    // Deliberately NO SessionProjectionRegistry: listChildren must fail loud
-    // instead of fabricating an empty catalog.
-    await ctx.plugin(SubagentRuntime)
-    await ctx.plugin(SubagentSpawn, { providerName: 'spawn' })
+    const unavailable = () => Promise.reject(new SubagentError(
+      'subagent listing needs the unavailable subagentCatalog projection',
+      'SUBAGENT_CONTROL_PROJECTIONS_UNAVAILABLE',
+    ))
+    ctx.provide('subagents' as never, {
+      getProvider: () => undefined,
+      listChildren: unavailable,
+      listDescendants: unavailable,
+      startActivation: unavailable,
+    } as never)
     await ctx.plugin(plugin, { provider: 'spawn', autoReport: false, allowUnmarkedFacts: true })
     ctx.llm.registerAdapter(['mock'], new MockAdapter([]))
-    // The alpha.3 AgentLoop hard-injects sessionProjections, so this
-    // registry-less context never materializes ctx.agentLoop; provide a
-    // minimal stand-in to reach the guarded listing path (the guard lives in
-    // the subagent control's listChildren, not in the loop).
-    ctx.provide('agentLoop' as never, {
-      create: (id: SessionId) => ({ id }),
-    } as never)
-    // Read the stand-in structurally: `agentLoop` is a checkout-face Context
-    // member, so the published-line type face has no such property.
-    const agentLoop = (ctx as unknown as {
-      agentLoop: { create(id: SessionId, options: { provider: string; model: string }): Promise<Agent> }
-    }).agentLoop
-    // The stand-in returns a bare `{ id }`, but the 0.1.7 `listChildren`
-    // resolves `sessionQuery` and OBSERVES the parent session before it reads
-    // the catalog projection — an id that names no stored session fails on
-    // `SESSION_QUERY_SESSION_NOT_FOUND` and never reaches the guard under
-    // test. Register a real Session under that exact id so the parent is
-    // observable; the projection registry stays absent, which is the point.
-    const parentId = SessionId('parent')
-    ctx.sessions.create(parentId)
-    const parent = await agentLoop.create(parentId, { provider: 'mock', model: 'mock' })
+    const parent = await ctx.agentLoop.create(SessionId('parent'), { provider: 'mock', model: 'mock' })
 
     const result = await callTool(ctx, 'bg_list', {}, parent)
     expect(result.isError).toBe(false)
     expect(valueOf<{ kind: string; code: string; message: string }>(result)).toEqual({
       kind: 'unrecoverable',
       code: 'SUBAGENT_CONTROL_PROJECTIONS_UNAVAILABLE',
-      // 0.1.7 names the missing fold (`subagentCatalog`) rather than the
-      // absent service; the code is the stable half of this contract.
       message: expect.stringContaining('subagentCatalog'),
     })
   })
@@ -330,9 +310,11 @@ describe('dsh-background-agents tools', () => {
     expect(text(over)).toContain('maxChildDepth=2')
   })
 
-  it('passes tool_filter, persona, max_depth, and the configured child route to the official start', async () => {
+  it('passes max_depth and the configured child route to the 0.2.2 activation seam', async () => {
     const { ctx, parent } = await setup({ childProvider: 'mock', childModel: 'cheap-model', maxChildDepth: 3 })
-    // The seam validates filter names loudly, so the scoped tool must exist.
+    // The 0.2.2 seam moved per-child composition to presets: tool_filter and
+    // persona stay accepted and validated, but cannot be represented on this
+    // host line. The start must warn instead of pretending the child is scoped.
     ctx.tools.register(defineTool({
       name: 'read',
       description: 'fixture tool for tool_filter tests',
@@ -341,7 +323,7 @@ describe('dsh-background-agents tools', () => {
       isConcurrencySafe: () => true,
       execute: async () => 'ok',
     }))
-    const spy = vi.spyOn(ctx.subagents, 'startContinuable')
+    const spy = vi.spyOn(ctx.subagents, 'startActivation')
     const result = await callTool(ctx, 'background_agent', {
       task: 'scoped work',
       tool_filter: { allow: ['read'], deny: [] },
@@ -350,11 +332,24 @@ describe('dsh-background-agents tools', () => {
     }, parent)
     expect(result.isError).toBe(false)
     expect(spy).toHaveBeenCalledTimes(1)
-    const spec = spy.mock.calls[0]![0]
-    expect(spec.request.toolFilter).toEqual({ allow: ['read'] })
-    expect(spec.request.persona).toBe('researcher')
+    const spec = spy.mock.calls[0]![0] as unknown as {
+      request: { maxDepth?: number; agentOptions?: unknown; toolFilter?: unknown; persona?: unknown }
+      maxDepth?: number
+      delivery?: string
+    }
+    // Both published 0.2.2 builds read the task from one of these two places;
+    // the compat start fills both so either host line finds every field.
     expect(spec.request.maxDepth).toBe(2)
+    expect(spec.maxDepth).toBe(2)
     expect(spec.request.agentOptions).toEqual({ provider: 'mock', model: 'cheap-model' })
+    expect(spec.request.toolFilter).toBeUndefined()
+    expect(spec.request.persona).toBeUndefined()
+    expect(spec.delivery).toBe('parent')
+    expect(ctx.logger.buffer.some(message =>
+      message.name === 'background-agents'
+      && message.type === 'warn'
+      && typeof message.args[0] === 'string'
+      && message.args[0].includes('tool_filter/persona are not representable'))).toBe(true)
   })
 
   it('bg_result reads the settled child\'s final text and errors for untracked ids', async () => {
@@ -403,8 +398,11 @@ describe('dsh-background-agents tools', () => {
     const { events: durable } = await handle.read()
     await handle.close()
     const load = vi.fn(async () => ({ events: durable }))
-    vi.spyOn(ctx.subagents, 'listChildren').mockResolvedValue([
-      { kind: 'child', mode: 'continuable', id: SessionId(childId), label: 'load arm' },
+    vi.spyOn(ctx.subagents, 'listDescendants').mockResolvedValue([
+      {
+        kind: 'child', mode: 'continuable', id: SessionId(childId), label: 'load arm',
+        parentId: parent.id, depth: 1, activity: 'inactive', hasChildren: false,
+      },
     ] as never)
     await persistenceFiber.dispose() // unregisters the handle-seam service
     ctx.provide('sessionPersistence', { load } as never)
@@ -453,10 +451,10 @@ describe('dsh-background-agents tools', () => {
 
   it('fails loud at load when the configured provider is registered but cannot continue', async () => {
     const ctx = new Context()
-    await mountAgentLoopTestDependencies(ctx)
+    await mountAgentLoopTestDependencies(ctx, { workingDirectory: true })
     await ctx.plugin(AgentLoop, { agents: [] })
     await ctx.plugin(SubagentRuntime)
-    const capabilities = { outputSchema: false, depthLimit: false, toolFilter: false, persona: false, agentOptions: false } as Parameters<typeof ctx.subagents.registerProvider>[0]['capabilities']
+    const capabilities = { outputSchema: false, depthLimit: false, agentOptions: false, agentPreset: false }
     ctx.subagents.registerProvider({
       name: 'one-shot-only',
       capabilities,
@@ -475,10 +473,11 @@ describe('dsh-background-agents tools', () => {
     await vi.waitFor(() => { expect(ctx.agents.get(SessionId(childId))?.status).toBe('running') }, { timeout: 5_000 })
     const childAgent = ctx.agents.get(SessionId(childId))!
     // A background agent is itself an agent: it starts a grandchild of its own.
-    const grand = await ctx.subagents.startContinuable({
+    const grand = await startContinuableChild(ctx.subagents, {
       provider: 'spawn',
       label: 'grand',
-      request: { prompt: [{ type: 'text', text: 'grand task' }], parent: childAgent },
+      prompt: [{ type: 'text', text: 'grand task' }],
+      parent: childAgent,
       signal: testToolSignal,
     })
     expect(typeof grand.childId).toBe('string')
@@ -509,10 +508,11 @@ describe('dsh-background-agents tools', () => {
   it('requests interruption of a running child with keepInbox, without killing anything itself', async () => {
     const { ctx, parent } = await setup()
     ctx.llm.registerAdapter(['mock'], new MockAdapter(['hang', textResponse('after stop')]))
-    const started = await ctx.subagents.startContinuable({
+    const started = await startContinuableChild(ctx.subagents, {
       provider: 'spawn',
       label: 'long work',
-      request: { prompt: [{ type: 'text', text: 'long work' }], parent },
+      prompt: [{ type: 'text', text: 'long work' }],
+      parent,
       signal: testToolSignal,
     })
     await vi.waitFor(() => {
@@ -556,7 +556,7 @@ describe('dsh-background-agents tools', () => {
 
   it('unregisters everything with its plugin fiber (HMR safety)', async () => {
     const ctx = new Context()
-    await mountAgentLoopTestDependencies(ctx)
+    await mountAgentLoopTestDependencies(ctx, { workingDirectory: true })
     await ctx.plugin(AgentLoop, { agents: [] })
     await ctx.plugin(SubagentRuntime)
     await ctx.plugin(SubagentSpawn, { providerName: 'spawn' })

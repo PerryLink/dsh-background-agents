@@ -19,6 +19,7 @@ import { FACT_EVENT } from './events.ts'
 import type { FactAppender } from './facts.ts'
 import { emptyTurnMetricState, type TurnMetricState } from './metrics.ts'
 import { isBackgroundAgentsProjection } from './projection-schema.ts'
+import { listDirectChildren } from './subagent-compat.ts'
 import { noticeLine, SOURCE_KIND } from './vocabulary.ts'
 
 /** Tunables the lifecycle honors; every threshold is a validated Config field. */
@@ -371,7 +372,7 @@ export async function countBackgroundAgents(
 ): Promise<number> {
   let entries
   try {
-    entries = await ctx.subagents.listChildren(parent.id, signal)
+    entries = await listDirectChildren(ctx, parent.id, signal)
   } catch (error) {
     if (error instanceof SubagentError) return lifecycle.activeCountFor(parent.id)
     throw error

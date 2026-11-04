@@ -2,14 +2,31 @@
 
 All notable changes to `dsh-background-agents` are documented here. The repo is pre-release; versions follow the DeepSeek Harness `0.1.x-rc.x` target runtime and bump on every behavior change.
 
+## [Unreleased]
+
+### Changed
+
+- **Host 0.2.2 line support.** Every `@deepseek-ai/dsh-*` dev/test dependency moves from `0.2.1-alpha.1` to `0.2.2-rc.1`; `@deepseek-ai/cordis-plugin-include` and `cordis-plugin-loader` move to `^1.1.0`, the cordis peer/dev floor to `^4.1.0`, and `@deepseek-ai/schemastery` to `~3.19.0` so exactly one copy resolves against the 0.2.2 host. `@deepseek-ai/dsh-package-manifest` (0.2.2 `dsh-llm` types import it without declaring it) and `@deepseek-ai/dsh-tool-executor-native` (0.2.2 moved raw batch execution behind a pluggable executor) join the devDependencies. `engines.dsh` appends `>=0.2.2-0 <0.3.0`, `engines.node` becomes `^22.19.0 || >=24.9.0`, and `dshWorkshop.compatibility.dshVersions` appends `0.2.2-rc.1`. No previously supported host line is dropped; the peer ranges only widen.
+- **Workspace overrides move with the vendor set.** `pnpm-workspace.yaml` pins cordis 4.1.0 / cosmokit 1.9.0 / schemastery 3.19.0 and mirrors the 0.2.2 devDep pins. Without the floors the loader/settings graph resolves the older cordis and the plugin fiber stays pending.
+
+### Fixed
+
+- **Batch tool dispatch in every suite.** 0.2.2 replaced single-call `ctx.tools.execute({ callId, name, arguments })` with `ToolBatchInput` → `ToolBatchResult`; the four harness call sites now build one-call batches (`calls: [{ type: 'tool-call', id, name, arguments: JSON.stringify(args) }]`) and project `results[0].result`. The hand-built projection-less context now mounts `@deepseek-ai/dsh-tool-executor-native`, and every harness mounts the working-directory service that `SubagentRuntime` 0.2.2 statically injects.
+- **Continuable starts across seam generations.** `SubagentRuntime.startContinuable()` no longer exists on the 0.2.2 line; `src/subagent-compat.ts` calls `startActivation()` with the task carried both nested (`request`, the published `0.2.2-rc.1` shape) and flattened (the post-release harness shape), and keeps the legacy `startContinuable` path for the declared 0.1.x–0.2.1 hosts. It also requires an accepted initial message id, so a start is always addressable.
+- **Direct-child discovery survives both catalog surfaces.** Published lines expose `listChildren()`; the harness master dropped that method while keeping `listDescendants()`. The helper reads the direct catalog where present and otherwise keeps the `depth === 1` children of the recursive walk, so `bg_list` (direct), `bg_result` discovery, `bg_stop` lookup, and the per-session cap keep working on both.
+- **`bg_message` delivery on the 0.2.2 line.** The harness master removed both process-stable queue symbols; delivery now falls back to the public adjacent-agent `sendMessage()` seam (which derives the same durable `agent-message`/`relay` source from the exact live sender) after the symbol paths and before the ancient `followup` arm. A settled child still starts a new turn; a running child receives the message at its next step.
+- **Room-half guard probe survives a concurrent rebuild.** `tests/room-half-guard.spec.ts` waits for `lib/index.js` and retries its own probe when the concurrently running `composition.spec.ts` build unlinks the artifact between the readiness check and the probe import. The coexistence guard itself is untouched.
+
+### Removed
+
+- **Per-child `persona` and `tool_filter` cannot be represented on 0.2.2.** The 0.2.2 seam dropped both request fields (presets own child composition), so `background_agent` keeps accepting and validating them for older hosts but starts the child without them on 0.2.2 and logs a warning. Presenting an unscoped child as scoped would be worse than the visible warning. Hosts on the 0.1.x–0.2.1 lines still forward both unchanged.
+
 ## [0.10.2] - 2026-10-05
 
 ### Changed
 
 - Correct the release date in the previous section, which was stamped with the literal string `undefined` by the release stamper. No content or behaviour change; the version is bumped only because npm will not republish an existing version.
 
-
-## [Unreleased]
 
 ## [0.10.1] - 2026-10-05
 

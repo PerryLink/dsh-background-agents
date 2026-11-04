@@ -1,7 +1,8 @@
 /**
  * The five model-facing tools: `background_agent` starts a durable continuable
- * child through the official seam (with optional per-child tool scoping,
- * persona, depth cap, and model route), `bg_message` delivers one later turn,
+ * child through the official seam (with optional per-child tool scoping and
+ * persona on host lines that still carry them, plus the depth cap and model
+ * route on every line), `bg_message` delivers one later turn,
  * `bg_list` merges the official child catalog with this plugin's projection
  * facts (optionally as the descendant tree), `bg_result` reads a child's
  * latest result text, and `bg_stop` requests interruption. Every execution

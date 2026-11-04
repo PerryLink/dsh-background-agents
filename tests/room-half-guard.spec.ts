@@ -125,19 +125,33 @@ process.exit(0)
   return file
 }
 
-function runProbe(file: string, rival: boolean) {
-  const result = spawnSync(process.execPath, [file], {
-    cwd: repositoryRoot,
-    encoding: 'utf8',
-    env: { ...process.env, ROOM_HALF_RIVAL: rival ? '1' : '0' },
-    timeout: 120_000,
-  })
-  if (result.error !== undefined) throw result.error
-  const marker = result.stdout.match(/ROOM_GUARD_RESULT (.+)$/mu)
-  if (marker === null) {
-    throw new Error(`probe produced no result\nstatus=${String(result.status)}\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`)
+async function runProbe(file: string, rival: boolean) {
+  let last = ''
+  // Another suite (composition) rebuilds `lib/` in its own beforeAll, whose
+  // first build step unlinks the artifact. A probe spawned in that window dies
+  // with ERR_MODULE_NOT_FOUND before it runs any assertion, so wait for the
+  // artifact and retry that specific, transient failure instead of reporting
+  // a guard regression that never happened.
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    for (let waited = 0; waited < 300 && !existsSync(builtEntry); waited += 1) {
+      await new Promise(resolve => setTimeout(resolve, 100))
+    }
+    ensureBuilt()
+    const result = spawnSync(process.execPath, [file], {
+      cwd: repositoryRoot,
+      encoding: 'utf8',
+      env: { ...process.env, ROOM_HALF_RIVAL: rival ? '1' : '0' },
+      timeout: 120_000,
+    })
+    if (result.error !== undefined) throw result.error
+    const marker = result.stdout.match(/ROOM_GUARD_RESULT (.+)$/mu)
+    if (marker !== null) {
+      return JSON.parse(marker[1]!) as { tools: string[]; collisions: string[]; roomHubOwner: string | null }
+    }
+    last = `probe produced no result\nstatus=${String(result.status)}\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`
+    if (!/ERR_MODULE_NOT_FOUND[\s\S]*lib[\\/]index\.js/u.test(result.stderr)) break
   }
-  return JSON.parse(marker[1]!) as { tools: string[]; collisions: string[]; roomHubOwner: string | null }
+  throw new Error(last)
 }
 
 let file = ''
@@ -150,17 +164,17 @@ beforeAll(() => {
 afterAll(() => { rmSync(temporaryRoot, { recursive: true, force: true }) })
 
 describe('room-half coexistence guard', () => {
-  it('mounts the room half and collides with nothing when it is the only provider', () => {
-    const result = runProbe(file, false)
+  it('mounts the room half and collides with nothing when it is the only provider', async () => {
+    const result = await runProbe(file, false)
     expect(result.collisions).toEqual([])
     expect(result.tools.filter((name) => name.startsWith('room_'))).toHaveLength(8)
     for (const core of ['background_agent', 'bg_message', 'bg_list', 'bg_result', 'bg_stop']) {
       expect(result.tools).toContain(core)
     }
-  })
+  }, 180_000)
 
-  it('stands down on the room half when a sibling already owns roomHub', () => {
-    const result = runProbe(file, true)
+  it('stands down on the room half when a sibling already owns roomHub', async () => {
+    const result = await runProbe(file, true)
     // The whole point: no service-key collision, no duplicate room_* registration.
     expect(result.collisions).toEqual([])
     expect(result.tools.filter((name) => name.startsWith('room_'))).toEqual([])
@@ -168,5 +182,5 @@ describe('room-half coexistence guard', () => {
     for (const core of ['background_agent', 'bg_message', 'bg_list', 'bg_result', 'bg_stop']) {
       expect(result.tools).toContain(core)
     }
-  })
+  }, 180_000)
 })
