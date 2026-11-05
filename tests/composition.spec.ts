@@ -9,7 +9,11 @@
  * @module dsh-background-agents/tests/composition.spec
  */
 
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
+
+// The Loader composition spawns a child Node process per case; on a drvfs mount
+// (WSL /mnt) cold start alone exceeds vitest's 5s default.
+vi.setConfig({ testTimeout: 30_000, hookTimeout: 30_000 })
 import { spawnSync } from 'node:child_process'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
