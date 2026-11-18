@@ -19,7 +19,7 @@
 [![npm downloads](https://img.shields.io/npm/dm/dsh-background-agents)](https://www.npmjs.com/package/dsh-background-agents)
 [![dshfind](https://dshfind.com/api/badge/PerryLink/dsh-background-agents?metric=downloads&lang=zh)](https://dshfind.com/zh/plugins/PerryLink/dsh-background-agents?ref=badge)
 
-> 🪦 **已退役 —— 自 2026-10-05 起停止兼容性更新。** 该能力**官方宿主已自行实现**：DeepSeek Harness 自带**原生可续子代理**——`subagent` 配 `backgroundMode: continuable`，外加 `send_message` / `interrupt_agent` / `list_agents` / `job_*`——均挂载在 `dsh-base` 内，无需任何插件。房间（team room）那一半已抽取为 [`dsh-team-rooms`](https://github.com/PerryLink/dsh-team-rooms)，它同样因「官方 Agent Teams 已实现」而退役。👉 **请改用官方原生可续子代理。** 本仓保留公开以供查阅，但不再跟随宿主变化做兼容性更新。
+> 🪦 **已退役 —— 自 2026-11-18 起停止兼容性更新。** 该能力**官方宿主已自行实现**：DeepSeek Harness 自带**原生可续子代理**——`dsh-v0.2.2-rc.4`（2026-11-18）；`subagent` 配 `backgroundMode: continuable`，外加 `send_message` / `interrupt_agent` / `list_agents` / `job_*`——均挂载在 `dsh-base` 内，无需任何插件。房间（team room）那一半已抽取为 [`dsh-team-rooms`](https://github.com/PerryLink/dsh-team-rooms)，它同样因「官方 Agent Teams 已实现」而退役。👉 **请改用官方原生可续子代理。** 本仓保留公开以供查阅，但不再跟随宿主变化做兼容性更新。
 
 [English](README.md) · [简体中文](README-zh.md) · [Español](README-es.md) · [Português](README-pt.md) · [हिन्दी](README-hi.md)
 
@@ -47,7 +47,7 @@
 
 | 方面 | 状态 |
 |---|---|
-| Harness | DeepSeek Harness `dsh-v0.2.1-alpha.1`（GitHub tag，2026-09-24 已核验；dev 钉号 `0.1.7-rc.2`，peer 依赖 `>=0.1.2-rc.1 <0.2.0 \|\| >=0.1.5-alpha.1 <0.2.0 \|\| >=0.1.6-0 <0.2.0 \|\| >=0.1.7-0 <0.2.0`） |
+| Harness | DeepSeek Harness `dsh-v0.2.2-rc.4`（GitHub tag，2026-11-18 已核验；dev 钉号 `0.1.7-rc.2`，peer 依赖 `>=0.1.2-rc.1 <0.2.0 \|\| >=0.1.5-alpha.1 <0.2.0 \|\| >=0.1.6-0 <0.2.0 \|\| >=0.1.7-0 <0.2.0 \|\| >=0.2.2-0 <0.3.0`） |
 | Node | `^22.19.0 \|\| >=24.0.0` |
 | 平台 | 全部（宿主工具；可选 Web 侧栏面板与团队房间，依赖存储域能力） |
 | 模型 | 任意（子代理继承父代理的路由；`childProvider`/`childModel` 可覆盖） |

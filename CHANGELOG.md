@@ -4,6 +4,8 @@ All notable changes to `dsh-background-agents` are documented here. The repo is 
 
 ## [Unreleased]
 
+## [0.10.4] - 2026-11-18
+
 ### Changed
 
 - **Align the dependency pins and the pinned harness commit with the 0.2.2-rc.4 host line.** Every `@deepseek-ai/dsh-*` devDependency moves from `0.2.2-rc.1` to `0.2.2-rc.4` (npm next); the thirteen self-referential `pnpm-workspace.yaml` overrides that mirror those pins move with them, the append-only `>=0.2.2-0 <0.3.0` peer/`engines.dsh` clause from the 0.2.2 entry below is unchanged, and `pnpm-lock.yaml` re-resolves against the new pins. `HARNESS_COMMIT` moves from `c36a83f` to the measured host master `ca33fd6843b205e279c7ccb6cb73a472c78f5760`. No runtime behaviour changed; the version is not bumped.

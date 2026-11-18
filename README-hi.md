@@ -19,7 +19,7 @@
 [![npm downloads](https://img.shields.io/npm/dm/dsh-background-agents)](https://www.npmjs.com/package/dsh-background-agents)
 [![dshfind](https://dshfind.com/api/badge/PerryLink/dsh-background-agents?metric=downloads&lang=hi)](https://dshfind.com/hi/plugins/PerryLink/dsh-background-agents?ref=badge)
 
-> 🪦 **सेवानिवृत्त — 2026-10-05 से संगतता अद्यतन बंद।** यह क्षमता अब **आधिकारिक हार्नेस स्वयं लागू करता है**: DeepSeek Harness में **नेटिव continuable subagents** — `subagent` के साथ `backgroundMode: continuable`, तथा `send_message` / `interrupt_agent` / `list_agents` / `job_*` — `dsh-base` में माउंट हैं, किसी प्लगइन की ज़रूरत नहीं। टीम-रूम वाला हिस्सा [`dsh-team-rooms`](https://github.com/PerryLink/dsh-team-rooms) में अलग किया गया था, जो उसी कारण सेवानिवृत्त है (नेटिव Agent Teams)। 👉 **कृपया नेटिव continuable subagents का उपयोग करें।** यह रिपॉज़िटरी संदर्भ हेतु सार्वजनिक है, पर अब होस्ट परिवर्तनों के अनुरूप अद्यतन नहीं होगी।
+> 🪦 **सेवानिवृत्त — 2026-11-18 से संगतता अद्यतन बंद।** यह क्षमता अब **आधिकारिक हार्नेस स्वयं लागू करता है**: DeepSeek Harness में **नेटिव continuable subagents** — `dsh-v0.2.2-rc.4`（2026-11-18）；`subagent` के साथ `backgroundMode: continuable`, तथा `send_message` / `interrupt_agent` / `list_agents` / `job_*` — `dsh-base` में माउंट हैं, किसी प्लगइन की ज़रूरत नहीं। टीम-रूम वाला हिस्सा [`dsh-team-rooms`](https://github.com/PerryLink/dsh-team-rooms) में अलग किया गया था, जो उसी कारण सेवानिवृत्त है (नेटिव Agent Teams)। 👉 **कृपया नेटिव continuable subagents का उपयोग करें।** यह रिपॉज़िटरी संदर्भ हेतु सार्वजनिक है, पर अब होस्ट परिवर्तनों के अनुरूप अद्यतन नहीं होगी।
 
 [English](README.md) · [简体中文](README-zh.md) · [Español](README-es.md) · [Português](README-pt.md) · [हिन्दी](README-hi.md)
 
@@ -47,7 +47,7 @@
 
 | सतह | स्थिति |
 |---|---|
-| Harness | DeepSeek Harness `dsh-v0.2.1-alpha.1` (GitHub tag, 2026-09-25 को सत्यापित; dev पिन `0.1.7-rc.2`, peers `>=0.1.2-rc.1 <0.2.0 \|\| >=0.1.5-alpha.1 <0.2.0 \|\| >=0.1.6-0 <0.2.0 \|\| >=0.1.7-0 <0.2.0`) |
+| Harness | DeepSeek Harness `dsh-v0.2.2-rc.4` (GitHub tag, 2026-11-18 को सत्यापित; dev पिन `0.1.7-rc.2`, peers `>=0.1.2-rc.1 <0.2.0 \|\| >=0.1.5-alpha.1 <0.2.0 \|\| >=0.1.6-0 <0.2.0 \|\| >=0.1.7-0 <0.2.0 \|\| >=0.2.2-0 <0.3.0`) |
 | Node | `^22.19.0 \|\| >=24.0.0` |
 | प्लेटफ़ॉर्म | सभी (होस्ट टूल; स्टोरेज-डोमेन क्षमता के ज़रिए वैकल्पिक वेब साइडबार पैनल और टीम रूम) |
 | मॉडल | कोई भी (चाइल्ड पैरेंट का मार्ग लेते हैं; `childProvider`/`childModel` उसे बदलते हैं) |
